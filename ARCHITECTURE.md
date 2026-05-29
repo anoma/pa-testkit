@@ -1,114 +1,82 @@
 # Architecture
 
-This workspace is organized around a backend-agnostic testing core with backend-specific harness implementations.
+This repository is the **risc0 testkit**: the reusable, backend-agnostic core for
+Anoma integration testing. It owns the risc0 proving path and the traits that
+each target chain's harness implements. It knows nothing about EVM or Solana —
+all chain-specific testing code lives in the protocol-adapter repos.
 
-## Design goals
+See `CONTEXT.md` for the glossary, `docs/adr/` for decisions, and
+`docs/RESTRUCTURE-PLAN.md` for the migration that produced this shape.
 
-- Support both local integration tests and end-to-end tests against real deployments.
-- Keep test execution generic across backends.
-- Isolate backend-specific setup, deploy, and state concerns.
-- Reuse shared witness and execution helpers across test crates.
-- Keep extension crates optional and composable.
+## Two axes of variation
 
-## Crate map
+- **Proving backend** (risc0 today; possibly openVM/Jolt later) — varies the
+  `Prover` and the `Transaction`. Lives here.
+- **Target chain** (EVM today; Solana later) — varies the `ProtocolAdapter`,
+  on-chain execution, and state. Lives in the protocol-adapter repos.
 
-### `crates/harness/core`
+An `Environment` binds one (backend, chain) pair, and for e2e one proving queue.
 
-Defines the shared contract used by all backends:
+## Crate
 
-- `Environment`
-- `Prover`
-- `ProtocolAdapter`
-- `Transaction`
-- `CommitmentTree`
-- generic helpers: `prove_actions`, `execute_tx`, `commitment_root`
-- typed state container: `State` / `StateBuilder`
-- witness types under `witness`
+A single crate `anoma-pa-testkit` at the repo root — no workspace, no `crates/`
+nesting.
 
-This crate is backend-agnostic.
+- `environment` — backend-agnostic traits: `Environment`, `Prover`,
+  `ProtocolAdapter`, `Transaction`, `CommitmentTree`, plus the typed `State` /
+  `StateBuilder` container.
+- `witness` — `ActionWitnesses`, `LogicWitness`, and `constrain_action` (native
+  constraint checking, no zkVM).
+- `transaction` — the risc0 `Transaction` newtype over `arm::Transaction`, the
+  orphan-rule seam that lets the testkit implement the `Transaction` trait.
+- `prover` — the two chain-agnostic provers:
+  - `LocalProver` (`feature = "local"`): runs `constrain` and emits mock Groth16
+    seals. No real proving — fast and offline.
+  - `QueueProver` (`feature = "e2e"`): submits to the real remote proving queue.
+    Built from typed params (`new(base_url, auth_token)`); reads no environment.
+- `assert` — negative-test assertion helpers (`Needle`,
+  `expect_integration_panic`), shared by every integration-test crate. The
+  proof-tamper counterpart lives on `Transaction` (`tamper_first_logic_seal`).
+- `fixtures` (`feature = "fixtures"`): the trivial action kind — one `build`
+  (plus batch `build_many`) returning `ActionData`, with `Overrides` for negative
+  tests (ADR-0003). App- and chain-agnostic, exposed for reuse by every
+  integration-test crate.
+- `identities` — well-known test signing keys.
+- `mocks` (`feature = "mocks"`): `mockall` doubles of the core traits.
 
-The trait set provides dependency injection points for proving, execution, and state access, so test logic can remain generic while setup targets different backends or deployment modes.
+Generic helpers `prove_actions`, `execute_tx`, `commitment_root` live at the
+crate root.
 
-### `crates/harness/evm`
+## Downstream layout
 
-EVM implementation of the core traits.
+Each protocol-adapter / forwarder repo owns one `integration-test` crate next to
+its `bindings`, implementing the core traits (or composing helpers) for its
+contracts:
 
-Main areas:
-
-- `envs/integration_test/`
-  - `setup.rs` - local chain bootstrapping and environment assembly
-  - `prover.rs` - witness-to-transaction proving path
-  - `evm_execute.rs` - preflight, on-chain execution, and revert diagnostics
-  - `evm_convert.rs` - transaction conversion glue
-- `envs/e2e/` - remote-queue proving environment gated behind `feature = "e2e"`. Setup forks Sepolia via Anvil, reads verifier params from a reference PA, deploys a fresh PA, and constructs a `QueueClient` for the remote GPU proving queue. Proving submits base logic/compliance jobs concurrently via `try_join_all`, assembles an aggregation proof payload, and polls for the final aggregated transaction.
-- `state/` - EVM state keys and typed getters/setters
-- `pa.rs` - protocol adapter bindings and deployment helpers
-- `mock_risc0_bindings.rs` - mock verifier stack deployment
-
-### `crates/harness/evm-erc20`
-
-ERC-20 utilities for EVM scenarios:
-
-- token contract bindings
-- deploy/mint helpers
-- typed state insertion and retrieval for token addresses
-
-### `crates/harness/evm-erc20-forwarder`
-
-ERC20 forwarder utilities for EVM transfer scenarios:
-
-- forwarder contract bindings
-- deploy and deploy+insert helpers
-- typed state insertion and retrieval for forwarder addresses
-
-### `crates/harness/evm-generic-call-forwarder`
-
-Generic call forwarder utilities for EVM generic-call scenarios:
-
-- forwarder contract bindings
-- deploy and deploy+insert helpers
-- typed state insertion and retrieval for forwarder addresses
-
-### `crates/harness/evm-mock-permit2`
-
-Utility for deploying and validating Permit2 at canonical address in local test environments.
-
-### `crates/harness/evm-action-trivial`
-
-Reusable builders for trivial action witness sets, including controlled invalid variants for negative tests.
-
-### `crates/harness/evm-action-transfer`
-
-Reusable builders for transfer witness action sets:
-
-- wrap, transfer, and unwrap action builders
-- Permit2 signing helpers and deterministic fixtures
-- override-driven invalid variants for negative tests
-
-### `crates/harness/evm-action-generic-call`
-
-Reusable builders for generic call witness action sets, including override-driven invalid variants for negative tests.
-
-### `crates/tests/evm`
-
-Integration tests that exercise harness behavior through core abstractions and the EVM backend implementation.
+- `anoma-pa-evm` → `anoma-pa-evm-integration-test`: the EVM `Environment`
+  (local + e2e), `ProtocolAdapter`, ARM→EVM conversion, EVM state, PA deploy
+  (local) / lookup-from-bindings per chain (e2e), mock verifier bindings.
+- `anomapay-erc20-forwarder` → `anomapay-erc20-forwarder-integration-test`:
+  ERC20/Permit2/forwarder deploy + state helpers and the AnomaPay ERC20
+  wrap/transfer/unwrap action builders.
+- `anoma-generic-call-forwarder` →
+  `anoma-generic-call-forwarder-integration-test`: generic-call deploy + state
+  and action builders; composes the AnomaPay ERC20 app in its setups.
 
 ## Data flow
 
-1. Test setup constructs an environment and populates backend state.
-2. Tests build action witnesses (e.g., via `evm-action-trivial`, `evm-action-transfer`, or `evm-action-generic-call`).
-3. `prove_actions` delegates to backend prover and returns backend transaction type.
-4. `execute_tx` delegates to backend protocol adapter execution.
-5. Successful execution updates the commitment tree; tests assert roots and error paths.
+1. A chain harness constructs an `Environment` and populates backend state.
+2. Tests build action witnesses (trivial fixtures here, or app-specific builders
+   downstream).
+3. `prove_actions` delegates to the backend `Prover`, yielding an
+   `arm::Transaction`.
+4. `execute_tx` delegates to the chain `ProtocolAdapter`, which converts the ARM
+   transaction to chain calldata and executes it.
+5. Successful execution updates the commitment tree; tests assert roots and
+   error paths.
 
-Setup can target local ephemeral deployments for integration testing or real deployed contracts for end-to-end testing. For the e2e env, proving submits jobs to a remote queue instead of running the prover locally.
+## CI / proving guardrail
 
-## State and namespacing
-
-State keys are backend-scoped (for example `evm.*`, future `solana.*`).
-Core abstractions remain backend-agnostic and should not assume a specific namespace.
-
-## Extension model
-
-Optional backend features and extension crates are used for deploy and bindings behavior.
-Base environments stay minimal; additional dependencies are layered in only when needed by a test scenario.
+Integration tests never prove locally (local = `constrain`; e2e = remote queue).
+No crate enables `risc0-zkvm/prove` or `cuda`, or depends on a guest `*-methods`
+crate — see `docs/adr/0001`. This keeps CI off the risc0 guest toolchain.

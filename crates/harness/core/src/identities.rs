@@ -1,3 +1,0 @@
-pub const ALICE: &str = "7ad4b84636a3fa408827e7202f6da39287bbf099d1fab6250d3b56e03e77586b";
-
-pub const BOB: &str = "59c6995e998f97a5a0044966f094538d8f0f1d1593f17f5f8cfb743f7f6f5f17";

@@ -1,206 +1,47 @@
 name: Rust
+
 on:
   push:
-    branches: ["main"]
+    branches: [main]
   pull_request:
-    branches: ["main"]
-concurrency:
-  group: ${{ github.ref }}-rust-checks
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
-env:
-  CARGO_TERM_COLOR: always
-  # Global cache version for easy cache-busting
-  CACHE_VERSION: v0
+  workflow_dispatch:
+
 jobs:
-  fmt-check:
-    name: Check Code Formatting
-    runs-on: ubuntu-latest # Standard runner is fine for simple formatting
+  tests:
+    name: Tests
+    runs-on: macos-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - name: Check code formatting
-        run: cargo fmt --check
-  clippy:
-    name: Check Clippy
-    runs-on: runs-on=${{ github.run_id }}/runner=4cpu-linux-x64/family=c7+c8+m8azn/image=ubuntu24-full-x64/spot=true
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup SSH Agent
-        uses: webfactory/ssh-agent@v0.9.0
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Install just
+        uses: extractions/setup-just@v3
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
         with:
-          ssh-private-key: ${{ secrets.BACKEND_MULTICHAIN_SSH_KEY }}
-      - name: Swap HTTPS for SSH
-        run: git config --global url."git@github.com:".insteadOf "https://github.com/"
-      - uses: runs-on/action@v2
-        with:
-          metrics: cpu,memory
-      - uses: rui314/setup-mold@v1
-      - uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          components: clippy
-          cache: false # We handle caching manually below
-      - name: Cache cargo
-        uses: runs-on/cache@v4
+          components: rustfmt, clippy
+
+      - name: Show Rust version
+        run: rustc --version
+
+      - name: Restore dependencies cache
+        uses: actions/cache@v4
         with:
           path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-clippy-${{ hashFiles('**/Cargo.lock') }}-${{ env.CACHE_VERSION }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-clippy-${{ hashFiles('**/Cargo.lock') }}-
-            ${{ runner.os }}-cargo-clippy-
-      - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.9
-        env:
-          SCCACHE_BUCKET: ${{ env.RUNS_ON_S3_BUCKET_CACHE }}
-          SCCACHE_S3_KEY_PREFIX: /anoma/pa-tests/sccache/clippy
-      - name: Check clippy
-        run: cargo clippy --verbose
-        env:
-          RUSTC_WRAPPER: sccache
-  test-integration:
-    name: Test Integration
-    runs-on: runs-on=${{ github.run_id }}/runner=8cpu-linux-x64/family=c7+c8+m8azn/image=ubuntu24-full-x64/spot=true
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup SSH Agent
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.BACKEND_MULTICHAIN_SSH_KEY }}
-      - name: Swap HTTPS for SSH
-        run: git config --global url."git@github.com:".insteadOf "https://github.com/"
-      - uses: runs-on/action@v2
-        with:
-          metrics: cpu,memory
-      - uses: rui314/setup-mold@v1
-      - uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          cache: false
-      - name: Cache cargo
-        uses: runs-on/cache@v4
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-integration-${{ hashFiles('**/Cargo.lock') }}-${{ env.CACHE_VERSION }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-integration-${{ hashFiles('**/Cargo.lock') }}-
-            ${{ runner.os }}-cargo-integration-
-      - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.9
-        env:
-          SCCACHE_BUCKET: ${{ env.RUNS_ON_S3_BUCKET_CACHE }}
-          SCCACHE_S3_KEY_PREFIX: /anoma/pa-tests/sccache/integration
-      - name: Install foundry
-        uses: foundry-rs/foundry-toolchain@v1
-        with:
-          version: stable
-      - name: Install cargo-nextest
-        uses: taiki-e/install-action@cargo-nextest
-      - name: Run integration tests
-        run: cargo nextest run -E 'not package(/harness-.*/)' integration_test
-        env:
-          RISC0_SKIP_BUILD_KERNELS: 1
-          RUSTC_WRAPPER: sccache
-  test-e2e:
-    name: Test E2E
-    runs-on: runs-on=${{ github.run_id }}/runner=8cpu-linux-x64/family=c7+c8+m8azn/image=ubuntu24-full-x64/spot=true
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup SSH Agent
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.BACKEND_MULTICHAIN_SSH_KEY }}
-      - name: Swap HTTPS for SSH
-        run: git config --global url."git@github.com:".insteadOf "https://github.com/"
-      - uses: runs-on/action@v2
-        with:
-          metrics: cpu,memory
-      - uses: rui314/setup-mold@v1
-      - uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          cache: false
-      - name: Cache cargo
-        uses: runs-on/cache@v4
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-e2e-${{ hashFiles('**/Cargo.lock') }}-${{ env.CACHE_VERSION }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-e2e-${{ hashFiles('**/Cargo.lock') }}-
-            ${{ runner.os }}-cargo-e2e-
-      - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.9
-        env:
-          SCCACHE_BUCKET: ${{ env.RUNS_ON_S3_BUCKET_CACHE }}
-          SCCACHE_S3_KEY_PREFIX: /anoma/pa-tests/sccache/e2e
-      - name: Install foundry
-        uses: foundry-rs/foundry-toolchain@v1
-        with:
-          version: stable
-      - name: Install cargo-nextest
-        uses: taiki-e/install-action@cargo-nextest
-      - name: Run e2e tests
-        run: cargo nextest run -F e2e -E 'not package(/harness-.*/)' e2e_test
-        env:
-          ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
-          QUEUE_AUTH_TOKEN: ${{ secrets.QUEUE_AUTH_TOKEN }}
-          QUEUE_BASE_URL: ${{ secrets.QUEUE_BASE_URL }}
-          RISC0_SKIP_BUILD_KERNELS: 1
-          RUSTC_WRAPPER: sccache
-  test-harness:
-    name: Test Harness
-    runs-on: runs-on=${{ github.run_id }}/runner=8cpu-linux-x64/family=c7+c8+m8azn/image=ubuntu24-full-x64/spot=true
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup SSH Agent
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.BACKEND_MULTICHAIN_SSH_KEY }}
-      - name: Swap HTTPS for SSH
-        run: git config --global url."git@github.com:".insteadOf "https://github.com/"
-      - uses: runs-on/action@v2
-        with:
-          metrics: cpu,memory
-      - uses: rui314/setup-mold@v1
-      - uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          cache: false
-      - name: Cache cargo
-        uses: runs-on/cache@v4
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-harness-${{ hashFiles('**/Cargo.lock') }}-${{ env.CACHE_VERSION }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-harness-${{ hashFiles('**/Cargo.lock') }}-
-            ${{ runner.os }}-cargo-harness-
-      - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.9
-        env:
-          SCCACHE_BUCKET: ${{ env.RUNS_ON_S3_BUCKET_CACHE }}
-          SCCACHE_S3_KEY_PREFIX: /anoma/pa-tests/sccache/harness
-      - name: Install foundry
-        uses: foundry-rs/foundry-toolchain@v1
-        with:
-          version: stable
-      - name: Install cargo-nextest
-        uses: taiki-e/install-action@cargo-nextest
-      - name: Run tests on the harness itself
-        run: cargo nextest run -E 'package(/harness-.*/)'
-        env:
-          RISC0_SKIP_BUILD_KERNELS: 1
-          RUSTC_WRAPPER: sccache
+            target
+          key: rust-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: rust-
+
+      - name: Run rustfmt
+        run: just fmt-check
+
+      - name: Build
+        run: just build
+
+      - name: Lint
+        run: just lint
+
+      - name: Run Tests
+        run: just test

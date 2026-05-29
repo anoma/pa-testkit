@@ -2,27 +2,36 @@
 
 A lightweight, multi-backend test harness for Protocol Adapter integration and end-to-end testing.
 
-This repository provides a backend-agnostic harness core, EVM-specific harness and support crates, reusable action builders for generating test inputs, and EVM test suites. The same test logic can run in local integration-style setups or end-to-end flows against real deployments by injecting backend behavior through shared core traits.
+This repository provides a backend-agnostic harness core and an EVM-specific harness. The same test logic can run in local integration-style setups or end-to-end flows against real deployments by injecting backend behavior through shared core traits.
+
+Forwarder-specific harness extensions, action builders, and the integration/e2e tests that use them live alongside each forwarder contract:
+
+- ERC20 forwarder: [anomapay-erc20-forwarder](https://github.com/anoma/anomapay-erc20-forwarder)
+- Generic call forwarder: [generic-call-forwarder](https://github.com/anoma/generic-call-forwarder)
 
 For a deeper walkthrough of crate responsibilities and data flow, see [ARCHITECTURE.md](./ARCHITECTURE.md).
 
 ## Workspace overview
 
-- `crates/harness/core` - shared traits, state container, witness types, test helpers
-- `crates/harness/evm` - EVM environment, setup/prover/execute paths, EVM state helpers
-- `crates/harness/evm-erc20` - ERC-20 deploy/binding utilities for tests
-- `crates/harness/evm-erc20-forwarder` - ERC20 forwarder deploy/binding and typed address state helpers
-- `crates/harness/evm-generic-call-forwarder` - generic call forwarder deploy/binding and typed address state helpers
-- `crates/harness/evm-mock-permit2` - optional Permit2 canonical-address deployment helper
-- `crates/harness/evm-action-trivial` - trivial action witness builders
-- `crates/harness/evm-action-transfer` - transfer witness action builders (wrap/transfer/unwrap + negative variants)
-- `crates/harness/evm-action-generic-call` - generic call witness action builders
-- `crates/tests/evm` - integration tests using the harness
+- `crates/core` - shared traits, state container, witness types, test helpers
+- `crates/evm` - EVM environment, setup/prover/execute paths, EVM state helpers
+
+ERC-20 / Permit2 deploy helpers and forwarder-specific action builders now live in the forwarder repositories listed above.
 
 ## Quick start
 
 ```bash
-cargo test -p pa-evm-tests
+cargo test --workspace
 ```
 
-For targeted runs, use crate-local tests or specific test names under `crates/tests/evm/tests/`.
+A trivial-action self-test lives at `crates/evm/tests/integration.rs` and exercises the local environment end-to-end. Its trivial-action fixtures live next to it under `crates/evm/tests/trivial_action/` (test-only — never compiled into the library). Forwarder-specific suites live in the forwarder repositories listed above.
+
+## Using as a dependency
+
+Forwarder repositories depend on this crate via a pinned git revision, e.g.:
+
+```toml
+[workspace.dependencies]
+anoma-pa-testkit-core = { git = "https://github.com/anoma/pa-tests.git", rev = "..." }
+anoma-pa-testkit-evm = { git = "https://github.com/anoma/pa-tests.git", rev = "..." }
+```

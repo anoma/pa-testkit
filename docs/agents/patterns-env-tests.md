@@ -1,15 +1,16 @@
 # Environment and Tests Patterns
 
-Scope: integration environment setup, proving, execution, and test style.
+Scope: local environment setup, proving, execution, and test style.
 
 ## Environment Structure
 
-- Integration env lives under `crates/harness/evm/src/envs/integration_test/`.
-- E2e env lives under `crates/harness/evm/src/envs/e2e/` (feature = "e2e", remote queue proving).
+- Local env lives under `crates/evm/src/envs/local/` (feature = "local", default; mock proving).
+- E2e env lives under `crates/evm/src/envs/e2e/` (feature = "e2e", remote queue proving).
+- Glue identical across both envs (the `Transaction` newtype, `convert`, `execute`) lives in `crates/evm/src/envs/common/`.
 - This is the current EVM location; other backends may differ.
-- Keep setup concerns split by file (`setup`, `prover`, `evm_execute`, `evm_convert`).
+- Keep per-env setup concerns split by file (`setup`, `prover`); shared `convert`/`execute` live in `envs/common/`.
 - Environment fields are public for setup-time mutation/inspection.
-- Runtime APIs should stay trait-based via `pa-test-harness-core::environment`.
+- Runtime APIs should stay trait-based via `anoma-pa-testkit-core::environment`.
 
 ## Setup and Execution
 
@@ -32,6 +33,6 @@ Scope: integration environment setup, proving, execution, and test style.
 
 ## Do / Do Not
 
-- Do keep helper utilities in test crate `src/lib.rs` when reused by multiple tests.
+- Do keep helper utilities in an integration-tests crate's `src/lib.rs` (in the forwarder repo that owns them) when reused by multiple tests.
 - Do run focused crate tests after edits.
 - Do not couple test logic to concrete env internals unless setup-only.
