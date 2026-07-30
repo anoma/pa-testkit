@@ -4,21 +4,15 @@ Scope: crate responsibilities and data flow.
 
 ## Workspace Layout
 
-- `crates/harness/core`: generic traits, state store, witness types, helpers (`prove_actions`, `execute_tx`, `commitment_root`).
-- `crates/harness/evm`: EVM harness implementation, state helpers, PA/mock Risc0 deploy and integration/e2e envs.
-- `crates/harness/evm-erc20`: ERC-20 bindings and token address state helpers.
-- `crates/harness/evm-erc20-forwarder`: ERC20 forwarder bindings, deploy helpers, and forwarder address state helpers.
-- `crates/harness/evm-generic-call-forwarder`: generic call forwarder bindings, deploy helpers, and forwarder address state helpers.
-- `crates/harness/evm-mock-permit2`: optional Permit2 canonical deployment helper.
-- `crates/harness/evm-action-trivial`: trivial action witness builders for test scenarios.
-- `crates/harness/evm-action-transfer`: transfer witness action builders for wrap/transfer/unwrap and negative test variants.
-- `crates/harness/evm-action-generic-call`: generic call witness action builders for test scenarios.
-- `crates/tests/evm`: cross-crate EVM tests using harness abstractions.
+- `crates/core`: generic traits, state store, witness types, helpers (`prove_actions`, `execute_tx`, `commitment_root`).
+- `crates/evm`: EVM harness implementation, state helpers, PA/mock Risc0 deploy and integration/e2e envs. Hosts the trivial-action self-test under `tests/`, with its fixtures under `tests/trivial_action/`.
+
+ERC-20 / Permit2 deploy helpers and forwarder-specific harness extensions and integration tests live in their respective forwarder repositories (`anomapay-erc20-forwarder`, `generic-call-forwarder`) and depend on this workspace via a pinned git revision.
 
 ## Core Flow
 
 - Setup builds concrete env and populates typed `State` keys.
-- Tests construct witnesses (often via `evm-action-trivial` or `evm-action-transfer`).
+- Tests construct witnesses (via the trivial-action fixtures under `crates/evm/tests/trivial_action/`, or a forwarder-specific action builder in a downstream repo).
 - `prove_actions` delegates to env prover.
 - `execute_tx` delegates to protocol adapter execution.
 - Successful execution updates commitment tree; tests assert roots and failures.

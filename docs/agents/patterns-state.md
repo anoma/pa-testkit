@@ -15,12 +15,11 @@ Scope: define and access harness state.
 
 ## Existing Examples
 
-- `crates/harness/evm/src/state/pa.rs`: `KEY_PA_ADDRESS = "evm.pa.address"`.
-- `crates/harness/evm/src/state/actors.rs`: `KEY_DEFAULT_SIGNER = "evm.actor.default_signer"`.
-- `crates/harness/evm/src/state/keys.rs`: `KEY_CHAIN_ID = "evm.chain.id"`, `KEY_CHAIN_NAME = "evm.chain.name"`.
-- `crates/harness/evm/src/state/chains.rs`: `insert_chain`, `chain_id`, `chain_name` typed helpers.
-- `crates/harness/evm-erc20/src/state/keys.rs`: `evm.erc20.addr.<symbol>`.
-- `crates/harness/evm-generic-call-forwarder/src/state/keys.rs`: `evm.forwarder.generic-call.v1`.
+- `crates/evm/src/state/pa.rs`: `KEY_PA_ADDRESS = "evm.pa.address"`.
+- `crates/evm/src/state/actors.rs`: `KEY_DEFAULT_SIGNER = "evm.actor.default_signer"`.
+- `crates/evm/src/state/keys.rs`: `KEY_CHAIN_ID = "evm.chain.id"`, `KEY_CHAIN_NAME = "evm.chain.name"`.
+- `crates/evm/src/state/chains.rs`: `insert_chain`, `chain_id`, `chain_name` typed helpers.
+- ERC-20 token-address keys (`evm.erc20.addr.<symbol>`) and forwarder-specific keys (e.g. `evm.forwarder.erc20.v1`, `evm.forwarder.generic-call.v1`) live in the forwarder repositories that own those crates.
 
 ## Do / Do Not
 

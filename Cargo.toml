@@ -1,56 +1,53 @@
-[workspace]
-members = [
-  "crates/harness/core",
-  "crates/harness/evm-action-generic-call",
-  "crates/harness/evm-action-transfer",
-  "crates/harness/evm-action-trivial",
-  "crates/harness/evm-erc20",
-  "crates/harness/evm-erc20-forwarder",
-  "crates/harness/evm-generic-call-forwarder",
-  "crates/harness/evm-mock-permit2",
-  "crates/harness/evm",
-  "crates/tests/evm",
-]
-resolver = "3"
-
-[workspace.package]
+[package]
+name = "anoma-pa-testkit"
+description = "Backend-agnostic risc0 test core for Anoma integration testing."
+version = "0.2.0"
 authors = ["Heliax <hello@heliax.dev>"]
 edition = "2024"
 license = "GPL-3.0"
 readme = "README.md"
-version = "0.2.0"
 
-[workspace.dependencies]
-pa-test-harness-core = { path = "crates/harness/core" }
-pa-test-harness-evm = { path = "crates/harness/evm" }
-pa-test-harness-evm-action-generic-call = { path = "crates/harness/evm-action-generic-call" }
-pa-test-harness-evm-action-transfer = { path = "crates/harness/evm-action-transfer" }
-pa-test-harness-evm-action-trivial = { path = "crates/harness/evm-action-trivial" }
-pa-test-harness-evm-erc20 = { path = "crates/harness/evm-erc20" }
-pa-test-harness-evm-erc20-forwarder = { path = "crates/harness/evm-erc20-forwarder" }
-pa-test-harness-evm-generic-call-forwarder = { path = "crates/harness/evm-generic-call-forwarder" }
-pa-test-harness-evm-mock-permit2 = { path = "crates/harness/evm-mock-permit2" }
+# The fixtures and local prover are the testkit's core, so they are on by
+# default — this also lets `cargo test` run the `tests/trivial_action.rs` smoke
+# tests without extra flags. Lean consumers can opt out with
+# `default-features = false`.
+[features]
+default = ["fixtures", "local"]
+mocks = ["dep:mockall"]
+# Action/resource fixtures and the test identities that drive them. The
+# identities pull in secp256k1 + authority-key material.
+fixtures = ["dep:anoma-rm-risc0-gadgets", "dep:k256", "dep:bincode", "dep:hex"]
 
-alloy = { version = "2.0.5", default-features = false }
-alloy-chains = "0.2.33"
-anoma-pa-evm-bindings = "3.0.0-rc.1"
-anoma-generic-call-forwarder-bindings = "1.0.0-rc.2"
-anomapay-erc20-forwarder-bindings = "3.0.0-rc.1"
-anoma-rm-risc0 = { version = "1.1.1", default-features = false }
-anoma-rm-risc0-gadgets = "1.1.1"
+# proving backends (risc0)
+local = ["dep:bincode", "dep:sha2"]
+e2e = [
+  "dep:bincode",
+  "dep:futures",
+  "dep:heliax-ap-orchestrator-sdk",
+  "dep:serde",
+  "dep:tokio",
+]
+
+[dependencies]
+anoma-rm-risc0 = { version = "1.1.1", default-features = false, features = [
+  "transaction",
+  "compliance_circuit",
+] }
+anoma-rm-risc0-gadgets = { version = "1.1.1", optional = true }
 anyhow = "1.0"
-bincode = "1.3.3"
-futures = "0.3"
-heliax-ap-orchestrator-sdk = "0.14.0"
-serde = "1"
-hex = "0.4"
-generic_call_library = { git = "https://github.com/anoma/generic-call-resource", rev = "2.0.0-rc2" }
-generic_call_witness = { git = "https://github.com/anoma/generic-call-resource", rev = "2.0.0-rc2" }
-mockall = "0.14.0"
-regex = "1.12.3"
+bincode = { version = "1.3.3", optional = true }
+futures = { version = "0.3", optional = true }
+heliax-ap-orchestrator-sdk = { version = "0.14.0", optional = true }
+hex = { version = "0.4", optional = true }
+k256 = { version = "0.13.3", optional = true }
+mockall = { version = "0.14.0", optional = true }
+regex = "1"
 risc0-zkvm = "3.0.3"
-rstest = "0.26.1"
-sha2 = "0.11.0"
-tokio = { version = "1.48", features = ["rt-multi-thread"] }
-transfer_library = { git = "https://github.com/anoma/anomapay-backend-multichain", rev = "0f65cd9104e4664cea2c8b7e11f68c0c9807771d", package = "transfer_library" }
-transfer_witness = { git = "https://github.com/anoma/anomapay-backend-multichain", rev = "0f65cd9104e4664cea2c8b7e11f68c0c9807771d", package = "transfer_witness" }
+serde = { version = "1", optional = true }
+sha2 = { version = "0.11.0", optional = true }
+tokio = { version = "1.48", features = ["time"], optional = true }
+
+[dev-dependencies]
+# For the chain-free trivial-action / local-prover tests under `tests/`
+# (run with `--features local,fixtures`).
+tokio = { version = "1.48", features = ["macros", "rt-multi-thread"] }
