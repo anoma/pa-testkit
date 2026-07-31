@@ -20,7 +20,7 @@ use heliax_ap_orchestrator_sdk::{
 
 mod queue;
 
-use super::constrain::{self, ConstrainedAction};
+use super::constrain::{self, ConstrainedAction, ConstrainedLogic};
 use crate::environment::Prover;
 use crate::transaction::Transaction;
 use crate::witness::{ActionWitnesses, LogicWitness};
@@ -56,12 +56,13 @@ impl Prover for QueueProver {
     }
 }
 
-/// Identifies one base proof within an action: either the logic proof at a given
-/// index in the action's flat logic list, or the compliance proof of a unit.
+/// Identifies one base proof within an action: either the logic proof of the
+/// witness at a given index in the action's logic list, or the compliance
+/// proof of the action's single compliance unit.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 enum BaseJobSlot {
     Logic(usize),
-    Compliance(usize),
+    Compliance,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -140,36 +141,37 @@ async fn prove_via_queue(
 
     let mut actions = Vec::with_capacity(constrained.len());
     for (action_idx, action) in constrained.into_iter().enumerate() {
-        let mut compliance_units = Vec::with_capacity(action.compliance_instances.len());
-        for unit_idx in 0..action.compliance_instances.len() {
-            let result = take_base_result(
-                &mut base_results_by_key,
-                action_idx,
-                BaseJobSlot::Compliance(unit_idx),
-            )?;
-            compliance_units.push(ComplianceUnit {
-                proof: Some(result.receipt),
-                instance: result.instance,
-            });
-        }
+        let compliance_result = take_base_result(
+            &mut base_results_by_key,
+            action_idx,
+            BaseJobSlot::Compliance,
+        )?;
+        let compliance_unit = ComplianceUnit {
+            proof: compliance_result.receipt,
+            instance: compliance_result.instance,
+        };
 
-        let mut logic_verifier_inputs = Vec::with_capacity(action.logics.len());
-        for (logic_idx, logic) in action.logics.into_iter().enumerate() {
+        // The logic verifier inputs must be in the canonical tag order
+        // (consumed nullifiers, then created commitments) — `constrain`
+        // returns them reordered, and `witness_index` correlates each with
+        // its proving job.
+        let logic_count = action.consumed_logics.len() + action.created_logics.len();
+        let mut logic_verifier_inputs = Vec::with_capacity(logic_count);
+        for logic in action
+            .consumed_logics
+            .into_iter()
+            .chain(action.created_logics)
+        {
             let result = take_base_result(
                 &mut base_results_by_key,
                 action_idx,
-                BaseJobSlot::Logic(logic_idx),
+                BaseJobSlot::Logic(logic.witness_index),
             )?;
-            logic_verifier_inputs.push(LogicVerifierInputs {
-                tag: logic.instance.tag,
-                verifying_key: logic.verifying_key,
-                app_data: logic.instance.app_data,
-                proof: Some(result.receipt),
-            });
+            logic_verifier_inputs.push(logic_verifier_inputs_from(logic, result));
         }
 
         actions.push(Action {
-            compliance_units,
+            compliance_unit,
             logic_verifier_inputs,
         });
     }
@@ -227,6 +229,18 @@ fn constrain_actions(
         .collect()
 }
 
+fn logic_verifier_inputs_from(
+    logic: ConstrainedLogic,
+    result: BaseProofResult,
+) -> LogicVerifierInputs {
+    LogicVerifierInputs {
+        tag: logic.instance.tag,
+        verifying_key: logic.verifying_key,
+        app_data: logic.instance.app_data,
+        proof: result.receipt,
+    }
+}
+
 fn take_base_result(
     results: &mut HashMap<BaseJobKey, BaseProofResult>,
     action_idx: usize,
@@ -254,18 +268,16 @@ fn build_base_job_specs(
             });
         }
 
-        for (unit_idx, compliance_witness) in witnesses.compliance_witnesses.iter().enumerate() {
-            specs.push(BaseJobSpec {
-                key: BaseJobKey {
-                    action_idx,
-                    slot: BaseJobSlot::Compliance(unit_idx),
-                },
-                payload: BaseJobPayload::Compliance(build_compliance_proof_payload(
-                    compliance_witness,
-                )?),
-            });
-            rcvs.push(compliance_witness.rcv.clone());
-        }
+        specs.push(BaseJobSpec {
+            key: BaseJobKey {
+                action_idx,
+                slot: BaseJobSlot::Compliance,
+            },
+            payload: BaseJobPayload::Compliance(build_compliance_proof_payload(
+                &witnesses.compliance_witness,
+            )?),
+        });
+        rcvs.push(witnesses.compliance_witness.rcv.clone());
     }
 
     Ok((specs, rcvs))
