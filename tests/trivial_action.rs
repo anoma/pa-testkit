@@ -29,10 +29,29 @@ fn build_trivial_action_with_overrides_builds_nonzero_quantity() {
 }
 
 #[tokio::test]
-async fn local_prover_constrains_trivial_actions() {
+async fn local_prover_mock_aggregates_trivial_actions() {
     let actions = trivial::build_many(8, 1).expect("must build trivial action witnesses");
-    LocalProver
+    let txn = LocalProver
         .prove(&actions)
         .await
         .expect("local prover must constrain trivial actions");
+
+    let arm_txn = txn.as_arm();
+    assert!(
+        arm_txn.aggregation_proof.is_some(),
+        "the transaction must carry an aggregation proof"
+    );
+    for action in &arm_txn.actions {
+        assert!(
+            action
+                .compliance_units
+                .iter()
+                .all(|unit| unit.proof.is_none())
+                && action
+                    .logic_verifier_inputs
+                    .iter()
+                    .all(|input| input.proof.is_none()),
+            "base proofs must stay empty like after real aggregation"
+        );
+    }
 }

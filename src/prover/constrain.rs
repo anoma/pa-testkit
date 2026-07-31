@@ -1,7 +1,7 @@
 //! Shared front-half of proving: constrain an action's witnesses into validated
-//! instances. Both provers run this first — the local prover mints mock seals
-//! from the resulting instances, the queue prover assembles the transaction
-//! while submitting the witnesses for real proving.
+//! instances. Both provers run this first — the local prover mints a mock
+//! aggregation seal over the resulting instances, the queue prover assembles
+//! the transaction while submitting the witnesses for real proving.
 
 use std::collections::HashMap;
 
