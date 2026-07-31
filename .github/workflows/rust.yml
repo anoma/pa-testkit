@@ -26,13 +26,8 @@ jobs:
       - name: Show Rust version
         run: rustc --version
 
-      - name: Restore dependencies cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            target
-          key: rust-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
-          restore-keys: rust-
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
 
       - name: Run rustfmt
         run: just fmt-check
