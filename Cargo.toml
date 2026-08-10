@@ -29,15 +29,12 @@ e2e = [
 ]
 
 [dependencies]
-# Pinned by git rev until arm-risc0 publishes v2 to crates.io (v2.0.0-rc.3;
-# crates.io carries only up to 2.0.0-pre.1, which predates the compact
-# aggregation instance and the action-tree-root delta message).
-anoma-rm-risc0 = { git = "https://github.com/anoma/arm-risc0", rev = "784fb37c27a4fec51b99d7d3f004ee3e4b5b5695", default-features = false, features = [
+anoma-rm-risc0 = { git = "https://github.com/anoma/arm-risc0", rev = "a7d28eb5234a02d3d748a1f46475f2b6efd93bc6", default-features = false, features = [
   "transaction",
   "compliance_circuit",
   "aggregation",
 ] }
-anoma-rm-risc0-gadgets = { git = "https://github.com/anoma/arm-risc0", rev = "784fb37c27a4fec51b99d7d3f004ee3e4b5b5695", optional = true }
+anoma-rm-risc0-gadgets = { git = "https://github.com/anoma/arm-risc0", rev = "a7d28eb5234a02d3d748a1f46475f2b6efd93bc6", optional = true }
 anyhow = "1.0"
 bincode = { version = "1.3.3", optional = true }
 futures = { version = "0.3", optional = true }
