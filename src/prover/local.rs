@@ -135,14 +135,22 @@ fn constrain_txn(action_witnesses: &[ActionWitnesses]) -> anyhow::Result<Transac
         actions,
     };
 
-    let journal_words = risc0_zkvm::serde::to_vec(&instance)
-        .context("failed to serialize the aggregation instance")?;
-    let journal = anoma_rm_risc0::utils::words_to_bytes(&journal_words);
-
-    let proof = encode_seal(
-        *anoma_rm_risc0::constants::BATCH_AGGREGATION_VK,
-        journal_digest(journal),
+    #[cfg(feature = "abi_encoding")]
+    let (journal, verifying_key) = (
+        anoma_rm_risc0::aggregation_instance::abi_encode_instance(instance.clone()),
+        *anoma_rm_risc0::constants::BATCH_AGGREGATION_EVM_VK,
     );
+    #[cfg(not(feature = "abi_encoding"))]
+    let (journal, verifying_key) = {
+        let words = risc0_zkvm::serde::to_vec(&instance)
+            .context("failed to serialize the aggregation instance")?;
+        (
+            anoma_rm_risc0::utils::words_to_bytes(&words).to_vec(),
+            *anoma_rm_risc0::constants::BATCH_AGGREGATION_VK,
+        )
+    };
+
+    let proof = encode_seal(verifying_key, journal_digest(&journal));
 
     let arm_txn = ArmTxn {
         actions: None,

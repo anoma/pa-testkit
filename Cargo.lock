@@ -219,6 +219,8 @@ name = "anoma-rm-risc0"
 version = "2.0.0-rc.3"
 source = "git+https://github.com/anoma/arm-risc0?rev=a7d28eb5234a02d3d748a1f46475f2b6efd93bc6#a7d28eb5234a02d3d748a1f46475f2b6efd93bc6"
 dependencies = [
+ "alloy-primitives",
+ "alloy-sol-types",
  "bincode",
  "bytemuck",
  "hex",

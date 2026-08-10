@@ -20,6 +20,7 @@ fixtures = ["dep:anoma-rm-risc0-gadgets", "dep:k256", "dep:bincode", "dep:hex"]
 
 # proving backends (risc0)
 local = ["dep:bincode", "dep:sha2"]
+abi_encoding = ["anoma-rm-risc0/abi_encoding"]
 e2e = [
   "dep:bincode",
   "dep:futures",
