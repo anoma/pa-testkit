@@ -8,7 +8,7 @@ use anoma_rm_risc0::action::Action;
 use anoma_rm_risc0::compliance_unit::ComplianceUnit;
 use anoma_rm_risc0::constants::{COMPLIANCE_PK, COMPLIANCE_VK};
 use anoma_rm_risc0::delta_proof::DeltaWitness;
-use anoma_rm_risc0::logic_proof::LogicVerifierInputs;
+use anoma_rm_risc0::logic_proof::LogicVerifierInput;
 use anoma_rm_risc0::transaction::{Delta, Transaction as ArmTxn};
 use anyhow::Context;
 use futures::future::try_join_all;
@@ -232,8 +232,8 @@ fn constrain_actions(
 fn logic_verifier_inputs_from(
     logic: ConstrainedLogic,
     result: BaseProofResult,
-) -> LogicVerifierInputs {
-    LogicVerifierInputs {
+) -> LogicVerifierInput {
+    LogicVerifierInput {
         tag: logic.instance.tag,
         verifying_key: logic.verifying_key,
         app_data: logic.instance.app_data,

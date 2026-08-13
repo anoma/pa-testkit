@@ -216,9 +216,11 @@ dependencies = [
 
 [[package]]
 name = "anoma-rm-risc0"
-version = "2.0.0-rc.3"
-source = "git+https://github.com/anoma/arm-risc0?rev=784fb37c27a4fec51b99d7d3f004ee3e4b5b5695#784fb37c27a4fec51b99d7d3f004ee3e4b5b5695"
+version = "2.0.0-rc.4"
+source = "git+https://github.com/anoma/arm-risc0?rev=acd7f75d1ad3a0ec56067e20e33645442290e276#acd7f75d1ad3a0ec56067e20e33645442290e276"
 dependencies = [
+ "alloy-primitives",
+ "alloy-sol-types",
  "bincode",
  "bytemuck",
  "hex",
@@ -235,8 +237,8 @@ dependencies = [
 
 [[package]]
 name = "anoma-rm-risc0-gadgets"
-version = "2.0.0-rc.3"
-source = "git+https://github.com/anoma/arm-risc0?rev=784fb37c27a4fec51b99d7d3f004ee3e4b5b5695#784fb37c27a4fec51b99d7d3f004ee3e4b5b5695"
+version = "2.0.0-rc.4"
+source = "git+https://github.com/anoma/arm-risc0?rev=acd7f75d1ad3a0ec56067e20e33645442290e276#acd7f75d1ad3a0ec56067e20e33645442290e276"
 dependencies = [
  "aes-gcm",
  "alloy-primitives",
