@@ -216,8 +216,8 @@ dependencies = [
 
 [[package]]
 name = "anoma-rm-risc0"
-version = "2.0.0-rc.3"
-source = "git+https://github.com/anoma/arm-risc0?rev=a7d28eb5234a02d3d748a1f46475f2b6efd93bc6#a7d28eb5234a02d3d748a1f46475f2b6efd93bc6"
+version = "2.0.0-rc.4"
+source = "git+https://github.com/anoma/arm-risc0?rev=acd7f75d1ad3a0ec56067e20e33645442290e276#acd7f75d1ad3a0ec56067e20e33645442290e276"
 dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
@@ -237,8 +237,8 @@ dependencies = [
 
 [[package]]
 name = "anoma-rm-risc0-gadgets"
-version = "2.0.0-rc.3"
-source = "git+https://github.com/anoma/arm-risc0?rev=a7d28eb5234a02d3d748a1f46475f2b6efd93bc6#a7d28eb5234a02d3d748a1f46475f2b6efd93bc6"
+version = "2.0.0-rc.4"
+source = "git+https://github.com/anoma/arm-risc0?rev=acd7f75d1ad3a0ec56067e20e33645442290e276#acd7f75d1ad3a0ec56067e20e33645442290e276"
 dependencies = [
  "aes-gcm",
  "alloy-primitives",

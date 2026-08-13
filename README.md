@@ -36,13 +36,3 @@ cargo test
 
 The trivial-action smoke tests live in `tests/trivial_action.rs`. Chain- and
 forwarder-specific suites live in the repos listed above.
-
-## Using as a dependency
-
-Downstream repos pin a git revision so single-repo CI resolves
-([ADR-0002](./docs/adr/0002-cross-repo-dependencies-and-deferred-publishing.md)):
-
-```toml
-[workspace.dependencies]
-anoma-pa-testkit = { git = "https://github.com/anoma/pa-testkit", rev = "..." }
-```

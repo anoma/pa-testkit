@@ -30,12 +30,12 @@ e2e = [
 ]
 
 [dependencies]
-anoma-rm-risc0 = { git = "https://github.com/anoma/arm-risc0", rev = "a7d28eb5234a02d3d748a1f46475f2b6efd93bc6", default-features = false, features = [
+anoma-rm-risc0 = { git = "https://github.com/anoma/arm-risc0", rev = "acd7f75d1ad3a0ec56067e20e33645442290e276", default-features = false, features = [
   "transaction",
   "compliance_circuit",
   "aggregation",
 ] }
-anoma-rm-risc0-gadgets = { git = "https://github.com/anoma/arm-risc0", rev = "a7d28eb5234a02d3d748a1f46475f2b6efd93bc6", optional = true }
+anoma-rm-risc0-gadgets = { git = "https://github.com/anoma/arm-risc0", rev = "acd7f75d1ad3a0ec56067e20e33645442290e276", optional = true }
 anyhow = "1.0"
 bincode = { version = "1.3.3", optional = true }
 futures = { version = "0.3", optional = true }
