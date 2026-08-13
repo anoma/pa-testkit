@@ -25,6 +25,7 @@ e2e = [
   "dep:futures",
   "dep:heliax-ap-orchestrator-sdk",
   "dep:serde",
+  "dep:sha2",
   "dep:tokio",
 ]
 
@@ -51,3 +52,9 @@ tokio = { version = "1.48", features = ["time"], optional = true }
 # For the chain-free trivial-action / local-prover tests under `tests/`
 # (run with `--features local,fixtures`).
 tokio = { version = "1.48", features = ["macros", "rt-multi-thread"] }
+
+# COMPAT EXPERIMENT (issue anoma/dos-pm#23): redirect the ARM deps to the fork
+# the Solana PA consumes, to enumerate API breaks. Not for committing upstream.
+[patch.crates-io]
+anoma-rm-risc0 = { git = "https://github.com/anoma/arm-risc0", branch = "solana" }
+anoma-rm-risc0-gadgets = { git = "https://github.com/anoma/arm-risc0", branch = "solana" }

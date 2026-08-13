@@ -15,6 +15,15 @@ use anyhow::Context;
 use self::environment::{CommitmentTree, Environment, ProtocolAdapter, Prover};
 use self::witness::ActionWitnesses;
 
+/// Delta-proof binding hash used by both provers. The Solana stack binds delta
+/// proofs with SHA-256; a multi-chain testkit should take this as a prover
+/// parameter instead of hard-coding it.
+#[cfg(any(feature = "local", feature = "e2e"))]
+pub fn hash_delta_msg(msg: &[u8]) -> [u8; 32] {
+    use sha2::Digest as _;
+    sha2::Sha256::digest(msg).into()
+}
+
 pub async fn prove_actions<Env: Environment>(
     env: &Env,
     actions: &[ActionWitnesses],

@@ -1,8 +1,8 @@
 use anoma_rm_risc0::nullifier_key::NullifierKey;
 use anoma_rm_risc0::nullifier_key::NullifierKeyCommitment;
 use anoma_rm_risc0::resource::Resource;
+use anoma_rm_risc0::Digest;
 use anyhow::Context;
-use risc0_zkvm::Digest;
 
 /// Overrides for the consumed/created trivial resources, used to build
 /// deliberately-invalid variants for negative tests.

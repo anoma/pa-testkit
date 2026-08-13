@@ -69,7 +69,7 @@ pub(super) fn action(
             logic_index_by_tag
                 .insert(logic.instance.tag, logic_idx)
                 .is_none(),
-            "action {action_idx} has two logic witnesses sharing tag {}",
+            "action {action_idx} has two logic witnesses sharing tag {:?}",
             logic.instance.tag
         );
     }

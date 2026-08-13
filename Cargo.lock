@@ -101,7 +101,7 @@ dependencies = [
  "rustc-hash",
  "secp256k1",
  "serde",
- "sha3 0.11.0",
+ "sha3",
 ]
 
 [[package]]
@@ -141,7 +141,7 @@ dependencies = [
  "proc-macro-error2",
  "proc-macro2",
  "quote",
- "sha3 0.11.0",
+ "sha3",
  "syn 2.0.117",
  "syn-solidity",
 ]
@@ -214,11 +214,26 @@ dependencies = [
 ]
 
 [[package]]
-name = "anoma-rm-risc0"
-version = "1.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d3d19fa05e0ecdb7bf6205e6cb31aff30b531b113f455da6eac8db3550f171b1"
+name = "anoma-rm-core"
+version = "1.2.0"
+source = "git+https://github.com/anoma/arm-risc0?branch=solana#cedb203be4468ad788d9116a0b6661eb13eab8a9"
 dependencies = [
+ "bincode",
+ "borsh",
+ "bytemuck",
+ "hex",
+ "hex-literal",
+ "serde",
+ "serde_with",
+ "thiserror",
+]
+
+[[package]]
+name = "anoma-rm-risc0"
+version = "1.2.0"
+source = "git+https://github.com/anoma/arm-risc0?branch=solana#cedb203be4468ad788d9116a0b6661eb13eab8a9"
+dependencies = [
+ "anoma-rm-core",
  "bincode",
  "bytemuck",
  "hex",
@@ -228,15 +243,13 @@ dependencies = [
  "risc0-zkvm",
  "serde",
  "serde_with",
- "sha3 0.10.8",
  "thiserror",
 ]
 
 [[package]]
 name = "anoma-rm-risc0-gadgets"
-version = "1.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "35107a0e6485de895631e7807bd3709ead5e8c05f17ce0759105cfb5bd8796f5"
+version = "1.2.0"
+source = "git+https://github.com/anoma/arm-risc0?branch=solana#cedb203be4468ad788d9116a0b6661eb13eab8a9"
 dependencies = [
  "aes-gcm",
  "alloy-primitives",
@@ -3852,16 +3865,6 @@ dependencies = [
  "cfg-if",
  "cpufeatures 0.3.0",
  "digest 0.11.3",
-]
-
-[[package]]
-name = "sha3"
-version = "0.10.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "75872d278a8f37ef87fa0ddbda7802605cb18344497949862c0d4dcb291eba60"
-dependencies = [
- "digest 0.10.7",
- "keccak 0.1.6",
 ]
 
 [[package]]

@@ -6,13 +6,16 @@ use anoma_rm_risc0::action::Action;
 use anoma_rm_risc0::compliance::ComplianceInstance;
 use anoma_rm_risc0::compliance_unit::ComplianceUnit;
 use anoma_rm_risc0::delta_proof::DeltaWitness;
-use anoma_rm_risc0::logic_instance::LogicInstance;
-use anoma_rm_risc0::logic_proof::LogicVerifierInputs;
-use anoma_rm_risc0::transaction::{Delta, Transaction as ArmTxn};
+use anoma_rm_risc0::logic_instance::{LogicInstance, LogicVerifierInputs};
+use anoma_rm_risc0::transaction::{Delta, Transaction as ArmTxn, TransactionExt as _};
+use anoma_rm_risc0::utils::core_to_risc0_digest;
+use anoma_rm_risc0::CoreDeltaWitness;
 use anyhow::Context;
 use risc0_zkvm::sha::Digestible;
 use risc0_zkvm::{Digest, Groth16Receipt, InnerReceipt, MaybePruned, ReceiptClaim};
 use sha2::{Digest as _, Sha256};
+
+use crate::hash_delta_msg;
 
 use super::constrain;
 use crate::environment::Prover;
@@ -44,15 +47,18 @@ impl Prover for LocalProver {
     }
 }
 
-fn encode_seal(verifying_key: Digest, journal: Digest) -> Vec<u8> {
+fn encode_seal(verifying_key: anoma_rm_risc0::Digest, journal: Digest) -> Vec<u8> {
     // risc0's RiscZeroMockVerifier accepts a seal of the form
     // `SELECTOR ++ claim_digest`, where the claim is the canonical "ok"
     // `ReceiptClaim` for this image id and journal digest. The bindings'
     // `encode_seal` prepends the selector taken from `verifier_parameters[..4]`,
     // so here we set the seal body to the claim digest and the verifier params to
     // the mock selector (`0xFFFFFFFF`).
-    let claim_digest =
-        ReceiptClaim::ok(verifying_key, MaybePruned::<Vec<u8>>::Pruned(journal)).digest();
+    let claim_digest = ReceiptClaim::ok(
+        core_to_risc0_digest(&verifying_key),
+        MaybePruned::<Vec<u8>>::Pruned(journal),
+    )
+    .digest();
 
     bincode::serialize(&InnerReceipt::Groth16(Groth16Receipt::new(
         claim_digest.as_bytes().to_vec(),
@@ -64,23 +70,25 @@ fn encode_seal(verifying_key: Digest, journal: Digest) -> Vec<u8> {
 
 #[inline]
 fn logic_instance_to_journal(instance: &LogicInstance) -> anyhow::Result<Digest> {
-    let words = risc0_zkvm::serde::to_vec(instance)
-        .context("failed to convert logic instance to risc0-zkvm words")?;
+    let journal = instance
+        .to_journal()
+        .context("failed to convert logic instance to journal bytes")?;
 
-    Ok(journal_digest_from_words(&words))
+    Ok(journal_digest_from_bytes(&journal))
 }
 
 #[inline]
 fn compliance_instance_to_journal(instance: &ComplianceInstance) -> anyhow::Result<Digest> {
-    let words = risc0_zkvm::serde::to_vec(instance)
-        .context("failed to convert compliance instance to risc0-zkvm words")?;
+    let journal = instance
+        .to_journal()
+        .context("failed to convert compliance instance to journal bytes")?;
 
-    Ok(journal_digest_from_words(&words))
+    Ok(journal_digest_from_bytes(&journal))
 }
 
 #[inline]
-fn journal_digest_from_words(words: &[u32]) -> Digest {
-    let raw: [u8; 32] = Sha256::digest(anoma_rm_risc0::utils::words_to_bytes(words)).into();
+fn journal_digest_from_bytes(journal: &[u8]) -> Digest {
+    let raw: [u8; 32] = Sha256::digest(journal).into();
 
     raw.into()
 }
@@ -101,11 +109,9 @@ fn constrain_txn(action_witnesses: &[ActionWitnesses]) -> anyhow::Result<Transac
                         *anoma_rm_risc0::constants::COMPLIANCE_VK,
                         compliance_instance_to_journal(instance)?,
                     )),
-                    instance: anoma_rm_risc0::utils::words_to_bytes(
-                        &risc0_zkvm::serde::to_vec(instance)
-                            .context("failed to serialize compliance instance words")?,
-                    )
-                    .to_vec(),
+                    instance: instance
+                        .to_journal()
+                        .context("failed to serialize compliance instance journal")?,
                 })
             })
             .collect::<anyhow::Result<Vec<_>>>()?;
@@ -136,12 +142,13 @@ fn constrain_txn(action_witnesses: &[ActionWitnesses]) -> anyhow::Result<Transac
         });
     }
 
-    let delta = Delta::Witness(
+    let delta = Delta::Witness(CoreDeltaWitness(
         DeltaWitness::from_bytes_vec(&rcvs)
-            .context("failed to construct delta witness from rcv values")?,
-    );
+            .context("failed to construct delta witness from rcv values")?
+            .to_bytes(),
+    ));
     let arm_txn = ArmTxn::create(actions, delta)
-        .generate_delta_proof()
+        .generate_delta_proof(hash_delta_msg)
         .context("failed to generate delta proof")?;
 
     Ok(Transaction::from_arm(arm_txn))

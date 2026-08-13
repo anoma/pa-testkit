@@ -8,8 +8,9 @@ use anoma_rm_risc0::action::Action;
 use anoma_rm_risc0::compliance_unit::ComplianceUnit;
 use anoma_rm_risc0::constants::{COMPLIANCE_PK, COMPLIANCE_VK};
 use anoma_rm_risc0::delta_proof::DeltaWitness;
-use anoma_rm_risc0::logic_proof::LogicVerifierInputs;
-use anoma_rm_risc0::transaction::{Delta, Transaction as ArmTxn};
+use anoma_rm_risc0::logic_instance::LogicVerifierInputs;
+use anoma_rm_risc0::transaction::{Delta, Transaction as ArmTxn, TransactionExt as _};
+use anoma_rm_risc0::CoreDeltaWitness;
 use anyhow::Context;
 use futures::future::try_join_all;
 use heliax_ap_orchestrator_sdk::QueueClient;
@@ -180,12 +181,13 @@ async fn prove_via_queue(
         base_results_by_key.len()
     );
 
-    let delta = Delta::Witness(
+    let delta = Delta::Witness(CoreDeltaWitness(
         DeltaWitness::from_bytes_vec(&rcvs)
-            .context("failed to construct delta witness from rcv values")?,
-    );
+            .context("failed to construct delta witness from rcv values")?
+            .to_bytes(),
+    ));
     let arm_txn = ArmTxn::create(actions, delta)
-        .generate_delta_proof()
+        .generate_delta_proof(crate::hash_delta_msg)
         .context("failed to generate delta proof")?;
 
     let serialized =
@@ -209,7 +211,7 @@ async fn prove_via_queue(
 
     aggregated
         .clone()
-        .verify()
+        .verify(crate::hash_delta_msg)
         .context("aggregated transaction failed local verification")?;
 
     Ok(Transaction::from_arm(aggregated))

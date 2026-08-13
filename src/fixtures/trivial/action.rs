@@ -1,5 +1,6 @@
 use anoma_rm_risc0::action_tree::MerkleTree as ArmTree;
 use anoma_rm_risc0::compliance::ComplianceWitness;
+use anoma_rm_risc0::nullifier_key::NullifierKeyExt as _;
 use anoma_rm_risc0::resource::Resource;
 use anoma_rm_risc0::resource_logic::TrivialLogicWitness;
 use anyhow::Context;
@@ -29,7 +30,7 @@ pub fn build(seed: u8, overrides: Overrides) -> anyhow::Result<ActionData> {
 
     let compliance_witness = ComplianceWitness::from_resources(
         consumed_ephemeral,
-        *anoma_rm_risc0::compliance::INITIAL_ROOT,
+        anoma_rm_risc0::compliance::initial_root(),
         nf_key.clone(),
         created_ephemeral,
     );

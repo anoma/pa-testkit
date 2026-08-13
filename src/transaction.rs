@@ -90,7 +90,7 @@ impl CoreTransaction for Transaction {
             .iter()
             .flat_map(|action| {
                 action.compliance_units.iter().map(|unit| {
-                    unit.get_instance()
+                    anoma_rm_risc0::compliance::ComplianceInstance::from_journal(&unit.instance)
                         .map(|instance| instance.created_commitment)
                 })
             })
