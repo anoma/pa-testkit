@@ -186,6 +186,16 @@ async fn prove_via_queue(
         DeltaWitness::from_bytes_vec(&rcvs)
             .context("failed to construct delta witness from rcv values")?,
     );
+    // `verify` takes the commitment the transaction is checked against. No global kind table is installed here,
+    // so it comes from the compliance instances, which makes the check compare the aggregation against them.
+    let kind_table_commitment = actions
+        .first()
+        .context("the transaction carries no action")?
+        .compliance_unit
+        .get_instance()
+        .map_err(|error| anyhow::anyhow!("failed to read the compliance instance: {error:?}"))?
+        .kind_table_commitment;
+
     let arm_txn = ArmTxn::create(actions, delta)
         .generate_delta_proof()
         .context("failed to generate delta proof")?;
@@ -211,7 +221,7 @@ async fn prove_via_queue(
 
     aggregated
         .clone()
-        .verify()
+        .verify(kind_table_commitment)
         .context("aggregated transaction failed local verification")?;
 
     Ok(Transaction::from_arm(aggregated))

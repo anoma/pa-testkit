@@ -57,11 +57,11 @@ pub fn build(seed: u8, overrides: Overrides) -> anyhow::Result<ActionData> {
         .collect::<anyhow::Result<_>>()?;
 
     let compliance_witness = ComplianceWitness::from_resources(
-        &consumed_ephemerals
+        consumed_ephemerals
             .iter()
             .map(|consumed| ConsumedResourceWitness::from_resource(*consumed, nf_key.clone()))
             .collect::<Vec<_>>(),
-        &created_ephemerals,
+        created_ephemerals.clone(),
         // The trivial fixtures prove with the empty kind table: every kind
         // falls back to hash-to-curve.
         Vec::new(),
