@@ -216,8 +216,9 @@ dependencies = [
 
 [[package]]
 name = "anoma-rm-risc0"
-version = "2.0.0-rc.4"
-source = "git+https://github.com/anoma/arm-risc0?tag=v2.0.0-rc.4#acd7f75d1ad3a0ec56067e20e33645442290e276"
+version = "2.0.0-rc.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "adf60b4865adfb1bd8203077f3f455de7b53dac928a8acc9640b523ee211be52"
 dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
@@ -237,8 +238,9 @@ dependencies = [
 
 [[package]]
 name = "anoma-rm-risc0-gadgets"
-version = "2.0.0-rc.4"
-source = "git+https://github.com/anoma/arm-risc0?tag=v2.0.0-rc.4#acd7f75d1ad3a0ec56067e20e33645442290e276"
+version = "2.0.0-rc.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0898011820cde42d76c39b1957398da2b31eb6ec7762772f7db4bafcd8e817e8"
 dependencies = [
  "aes-gcm",
  "alloy-primitives",
