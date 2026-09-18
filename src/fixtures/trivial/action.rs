@@ -62,9 +62,8 @@ pub fn build(seed: u8, overrides: Overrides) -> anyhow::Result<ActionData> {
             .map(|consumed| ConsumedResourceWitness::from_resource(*consumed, nf_key.clone()))
             .collect::<Vec<_>>(),
         created_ephemerals.clone(),
-        // The trivial fixtures prove with the empty kind table: every kind
-        // falls back to hash-to-curve.
-        Vec::new(),
+        // The loaded kind table, or the empty one if none is loaded.
+        anoma_rm_risc0::constants::kind_table().to_vec(),
     );
 
     let tags: Vec<Digest> = consumed_nullifiers
