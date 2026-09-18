@@ -5,7 +5,8 @@ use std::time::Duration;
 use heliax_ap_orchestrator_sdk::JobStatus;
 use heliax_ap_orchestrator_sdk::QueueClient;
 
-const POLL_INTERVAL: Duration = Duration::from_millis(500);
+// Every job of a transaction polls at once. At 500 ms, the queue's CDN blocked the client.
+const POLL_INTERVAL: Duration = Duration::from_secs(2);
 const POLL_TIMEOUT: Duration = Duration::from_secs(600);
 const TRANSIENT_ERROR_GRACE: Duration = Duration::from_secs(30);
 
