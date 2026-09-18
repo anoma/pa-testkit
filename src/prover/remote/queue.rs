@@ -13,7 +13,7 @@ pub(super) async fn poll_until_done(queue: &QueueClient, job_id: &str) -> anyhow
     let start = tokio::time::Instant::now();
     let deadline = start + POLL_TIMEOUT;
     loop {
-        match queue.get_job_status(job_id.to_string()).await {
+        match queue.get_job_status(job_id).await {
             Ok(JobStatus::Success) => return Ok(()),
             Ok(JobStatus::Failed) => {
                 anyhow::bail!("queue job {job_id} failed");
@@ -43,7 +43,7 @@ pub(super) async fn fetch_job_result<T: serde::de::DeserializeOwned>(
 
     let start = tokio::time::Instant::now();
     loop {
-        match queue.get_job_result::<T>(job_id.to_string()).await {
+        match queue.get_job_result::<T>(job_id).await {
             Ok(Some(result)) => return Ok(result),
             Ok(None) => {}
             Err(err) => {
