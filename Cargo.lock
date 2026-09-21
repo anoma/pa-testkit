@@ -196,7 +196,7 @@ dependencies = [
 
 [[package]]
 name = "anoma-pa-testkit"
-version = "0.3.0"
+version = "1.0.0-rc.0"
 dependencies = [
  "anoma-rm-risc0",
  "anoma-rm-risc0-gadgets",
