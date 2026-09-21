@@ -6,6 +6,10 @@ use std::panic::AssertUnwindSafe;
 
 use anoma_rm_risc0::action::Action;
 use anoma_rm_risc0::compliance_unit::ComplianceUnit;
+#[cfg(feature = "abi_encoding")]
+use anoma_rm_risc0::constants::BATCH_AGGREGATION_EVM_PK as BATCH_AGGREGATION_PK;
+#[cfg(not(feature = "abi_encoding"))]
+use anoma_rm_risc0::constants::BATCH_AGGREGATION_PK;
 use anoma_rm_risc0::constants::{COMPLIANCE_PK, COMPLIANCE_VK};
 use anoma_rm_risc0::delta_proof::DeltaWitness;
 use anoma_rm_risc0::logic_proof::LogicVerifierInput;
@@ -203,8 +207,11 @@ async fn prove_via_queue(
     let serialized =
         bincode::serialize(&arm_txn).context("failed to serialize transaction for aggregation")?;
 
+    // Without these keys the worker aggregates with its own compiled-in circuits.
     let agg_payload = GpuAggregationProofPayload {
         transaction: serialized,
+        batch_aggregation_pk: Some(BATCH_AGGREGATION_PK.to_vec()),
+        compliance_vk: Some(COMPLIANCE_VK.as_bytes().to_vec()),
     };
     let agg_job_id = queue
         .submit(agg_payload)
