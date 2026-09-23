@@ -1,26 +1,30 @@
-//! Local prover: constrains circuits natively and emits mock Groth16 seals.
+//! Local prover: constrains circuits natively and emits a mock Groth16
+//! aggregation seal.
 
 use std::panic::AssertUnwindSafe;
 
-use anoma_rm_risc0::action::Action;
-use anoma_rm_risc0::compliance::ComplianceInstance;
-use anoma_rm_risc0::compliance_unit::ComplianceUnit;
-use anoma_rm_risc0::delta_proof::DeltaWitness;
-use anoma_rm_risc0::logic_instance::LogicInstance;
-use anoma_rm_risc0::logic_proof::LogicVerifierInputs;
-use anoma_rm_risc0::transaction::{Delta, Transaction as ArmTxn};
+use anoma_rm_risc0::action_tree::ActionTree;
+use anoma_rm_risc0::aggregation_instance::{
+    ActionAggregated, AggregationInstance, ConsumedResourceAggregated, CreatedResourceAggregated,
+};
+use anoma_rm_risc0::delta_proof;
+use anoma_rm_risc0::proving_system::JournalEncoding;
+use anoma_rm_risc0::transaction::{self, Aggregation, Delta, Transaction as ArmTxn};
 use anyhow::Context;
 use risc0_zkvm::sha::Digestible;
 use risc0_zkvm::{Digest, Groth16Receipt, InnerReceipt, MaybePruned, ReceiptClaim};
 use sha2::{Digest as _, Sha256};
 
+use super::JOURNAL_ENCODING;
 use super::constrain;
 use crate::environment::Prover;
 use crate::transaction::Transaction;
 use crate::witness::ActionWitnesses;
 
 /// Prover for the local environment: runs resource logic and compliance via
-/// `constrain` and emits mock Groth16 seals. No real proving — fast and offline.
+/// `constrain` and replicates the aggregation guest host-side, emitting one
+/// mock Groth16 seal over the aggregation instance — mirroring real
+/// aggregation, the base proofs are erased. No real proving — fast and offline.
 #[derive(Default)]
 pub struct LocalProver;
 
@@ -62,87 +66,104 @@ fn encode_seal(verifying_key: Digest, journal: Digest) -> Vec<u8> {
     .unwrap()
 }
 
-#[inline]
-fn logic_instance_to_journal(instance: &LogicInstance) -> anyhow::Result<Digest> {
-    let words = risc0_zkvm::serde::to_vec(instance)
-        .context("failed to convert logic instance to risc0-zkvm words")?;
-
-    Ok(journal_digest_from_words(&words))
-}
-
-#[inline]
-fn compliance_instance_to_journal(instance: &ComplianceInstance) -> anyhow::Result<Digest> {
-    let words = risc0_zkvm::serde::to_vec(instance)
-        .context("failed to convert compliance instance to risc0-zkvm words")?;
-
-    Ok(journal_digest_from_words(&words))
-}
-
-#[inline]
-fn journal_digest_from_words(words: &[u32]) -> Digest {
-    let raw: [u8; 32] = Sha256::digest(anoma_rm_risc0::utils::words_to_bytes(words)).into();
+fn journal_digest(journal: &[u8]) -> Digest {
+    let raw: [u8; 32] = Sha256::digest(journal).into();
 
     raw.into()
 }
 
+/// Constrains every action and builds the aggregation instance the way the
+/// batch aggregation guest does: the action tree roots are recomputed from the
+/// compliance tags, the per-resource app data is merged in canonical tag order,
+/// and all actions must share one kind table commitment.
 fn constrain_txn(action_witnesses: &[ActionWitnesses]) -> anyhow::Result<Transaction> {
     let mut actions = Vec::with_capacity(action_witnesses.len());
     let mut rcvs = Vec::new();
+    let mut kind_table_commitment: Option<Digest> = None;
 
     for (action_idx, witnesses) in action_witnesses.iter().enumerate() {
         let constrained = constrain::action(witnesses, action_idx)?;
+        let instance = &constrained.compliance_instance;
 
-        let compliance_units = constrained
-            .compliance_instances
+        let shared = *kind_table_commitment.get_or_insert(instance.kind_table_commitment);
+        anyhow::ensure!(
+            instance.kind_table_commitment == shared,
+            "action {action_idx} commits to a different kind table than the transaction"
+        );
+
+        let tags: Vec<Digest> = instance.tags().collect();
+        let action_tree_root = ActionTree::new(tags).root().with_context(|| {
+            format!("failed to compute the action tree root of action {action_idx}")
+        })?;
+
+        let consumed_publics = instance
+            .consumed_publics
             .iter()
-            .map(|instance| {
-                Ok(ComplianceUnit {
-                    proof: Some(encode_seal(
-                        *anoma_rm_risc0::constants::COMPLIANCE_VK,
-                        compliance_instance_to_journal(instance)?,
-                    )),
-                    instance: anoma_rm_risc0::utils::words_to_bytes(
-                        &risc0_zkvm::serde::to_vec(instance)
-                            .context("failed to serialize compliance instance words")?,
-                    )
-                    .to_vec(),
-                })
+            .zip(constrained.consumed_logics)
+            .map(|(consumed, logic)| ConsumedResourceAggregated {
+                resource_nullifier: consumed.resource_nullifier,
+                resource_logic_ref: consumed.resource_logic_ref,
+                commitment_tree_root: consumed.commitment_tree_root,
+                app_data: logic.instance.app_data,
             })
-            .collect::<anyhow::Result<Vec<_>>>()?;
+            .collect();
 
-        let logic_verifier_inputs = constrained
-            .logics
-            .into_iter()
-            .map(|logic| {
-                Ok(LogicVerifierInputs {
-                    tag: logic.instance.tag,
-                    verifying_key: logic.verifying_key,
-                    proof: Some(encode_seal(
-                        logic.verifying_key,
-                        logic_instance_to_journal(&logic.instance)?,
-                    )),
-                    app_data: logic.instance.app_data,
-                })
+        let created_publics = instance
+            .created_publics
+            .iter()
+            .zip(constrained.created_logics)
+            .map(|(created, logic)| CreatedResourceAggregated {
+                resource_commitment: created.resource_commitment,
+                resource_logic_ref: created.resource_logic_ref,
+                app_data: logic.instance.app_data,
             })
-            .collect::<anyhow::Result<Vec<_>>>()?;
+            .collect();
 
-        for compliance_witness in &witnesses.compliance_witnesses {
-            rcvs.push(compliance_witness.rcv.clone());
-        }
-
-        actions.push(Action {
-            compliance_units,
-            logic_verifier_inputs,
+        actions.push(ActionAggregated {
+            consumed_publics,
+            created_publics,
+            delta_x: instance.delta_x,
+            delta_y: instance.delta_y,
+            action_tree_root,
         });
+
+        rcvs.push(witnesses.compliance_witness.rcv.clone());
     }
 
-    let delta = Delta::Witness(
-        DeltaWitness::from_bytes_vec(&rcvs)
-            .context("failed to construct delta witness from rcv values")?,
-    );
-    let arm_txn = ArmTxn::create(actions, delta)
-        .generate_delta_proof()
-        .context("failed to generate delta proof")?;
+    let instance = AggregationInstance {
+        compliance_key: anoma_rm_risc0::constants::COMPLIANCE_VK,
+        kind_table_commitment: kind_table_commitment
+            .context("cannot aggregate a transaction without actions")?,
+        actions,
+    };
+
+    let (journal, verifying_key) = match JOURNAL_ENCODING {
+        JournalEncoding::Abi => (
+            anoma_rm_risc0::aggregation_instance::abi_encode_instance(instance.clone()),
+            anoma_rm_risc0::constants::BATCH_AGGREGATION_EVM_VK,
+        ),
+        JournalEncoding::Risc0Serde => {
+            let words = risc0_zkvm::serde::to_vec(&instance)
+                .context("failed to serialize the aggregation instance")?;
+            (
+                anoma_rm_risc0::utils::words_to_bytes(&words).to_vec(),
+                anoma_rm_risc0::constants::BATCH_AGGREGATION_VK,
+            )
+        }
+    };
+
+    let proof = encode_seal(verifying_key, journal_digest(&journal));
+
+    let arm_txn = transaction::generate_delta_proof(ArmTxn {
+        actions: None,
+        delta_proof: Delta::Witness(
+            delta_proof::from_bytes_vec(&rcvs)
+                .context("failed to construct delta witness from rcv values")?,
+        ),
+        expected_balance: None,
+        aggregation: Some(Aggregation { proof, instance }),
+    })
+    .context("failed to generate delta proof")?;
 
     Ok(Transaction::from_arm(arm_txn))
 }

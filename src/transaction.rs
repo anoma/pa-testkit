@@ -1,6 +1,7 @@
 //! The proven ARM transaction produced by a [`crate::prover`].
 
 use anoma_rm_risc0::Digest;
+use anoma_rm_risc0::compliance_unit;
 use anoma_rm_risc0::transaction::Transaction as ArmTxn;
 
 use crate::environment::Transaction as CoreTransaction;
@@ -40,26 +41,19 @@ impl Transaction {
         self.arm_txn
     }
 
-    /// Flip one byte of the first logic proof's inner Groth16 seal — used by
-    /// negative tests to check that a protocol adapter rejects tampered
-    /// proofs.
+    /// Flip all bits of one byte of the aggregation proof's inner Groth16
+    /// seal — used by negative tests to check that a protocol adapter rejects
+    /// tampered proofs.
     #[cfg(any(feature = "local", feature = "e2e"))]
-    pub fn tamper_first_logic_seal(&mut self) -> anyhow::Result<()> {
+    pub fn tamper_aggregation_seal(&mut self) -> anyhow::Result<()> {
         use anyhow::Context;
 
-        let logic_input = self
+        let proof = &mut self
             .arm_txn
-            .actions
-            .first_mut()
-            .context("tamper requires at least one action")?
-            .logic_verifier_inputs
-            .first_mut()
-            .context("tamper requires at least one logic verifier input")?;
-
-        let proof = logic_input
-            .proof
+            .aggregation
             .as_mut()
-            .context("tamper requires first logic proof")?;
+            .context("tamper requires an aggregation proof")?
+            .proof;
 
         let mut inner: risc0_zkvm::InnerReceipt = bincode::deserialize(proof)
             .context("tamper requires bincode-encoded inner receipt proof")?;
@@ -73,7 +67,7 @@ impl Transaction {
             .seal
             .first_mut()
             .context("tamper requires non-empty inner seal")?;
-        *byte ^= 0x01;
+        *byte ^= 0xff;
 
         *proof = bincode::serialize(&inner)
             .context("tamper must re-serialize modified inner receipt")?;
@@ -84,17 +78,41 @@ impl Transaction {
 
 impl CoreTransaction for Transaction {
     fn created_commitments(&self) -> anyhow::Result<impl Iterator<Item = Digest> + '_> {
-        let commitments = self
-            .arm_txn
-            .actions
-            .iter()
-            .flat_map(|action| {
-                action.compliance_units.iter().map(|unit| {
-                    unit.get_instance()
-                        .map(|instance| instance.created_commitment)
+        // When the transaction is aggregated, the proof-backed aggregation
+        // instance is authoritative; before aggregation the commitments come
+        // from the compliance instances.
+        let commitments: Vec<Digest> = if let Some(aggregation) = &self.arm_txn.aggregation {
+            aggregation
+                .instance
+                .actions
+                .iter()
+                .flat_map(|action| {
+                    action
+                        .created_publics
+                        .iter()
+                        .map(|created| created.resource_commitment)
                 })
-            })
-            .collect::<Result<Vec<_>, _>>()?;
+                .collect()
+        } else {
+            self.arm_txn
+                .actions
+                .as_deref()
+                .unwrap_or(&[])
+                .iter()
+                .map(|action| {
+                    compliance_unit::get_instance(&action.compliance_unit).map(|instance| {
+                        instance
+                            .created_publics
+                            .iter()
+                            .map(|created| created.resource_commitment)
+                            .collect::<Vec<_>>()
+                    })
+                })
+                .collect::<Result<Vec<_>, _>>()?
+                .into_iter()
+                .flatten()
+                .collect()
+        };
 
         Ok(commitments.into_iter())
     }

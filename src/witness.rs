@@ -11,16 +11,17 @@ pub use anoma_rm_risc0::logic_instance::{AppData, ExpirableBlob};
 
 /// Witness data of an individual action, mirroring [`anoma_rm_risc0::action::Action`].
 ///
-/// The compliance witnesses and the per-resource logic witnesses are two
-/// independent lists, correlated by tag rather than by position: each compliance
-/// unit's consumed nullifier and created commitment identify the two logic
-/// witnesses that belong to it.
+/// An action corresponds to exactly one compliance unit constraining its n
+/// consumed and m created resources. The per-resource logic witnesses are
+/// correlated to the compliance witness by tag rather than by position: each
+/// consumed nullifier and created commitment identifies the logic witness that
+/// belongs to it.
 pub struct ActionWitnesses {
-    /// One compliance witness per compliance unit; each unit pairs one consumed
-    /// and one created resource.
-    pub compliance_witnesses: Vec<Box<ComplianceWitness>>,
-    /// One logic witness per resource in the action, matched to a compliance
-    /// unit by the tag it produces when constrained.
+    /// The action's compliance witness constraining its consumed and created
+    /// resources.
+    pub compliance_witness: Box<ComplianceWitness>,
+    /// One logic witness per resource in the action, matched to the compliance
+    /// witness by the tag it produces when constrained.
     pub logic_witnesses: Vec<Box<dyn LogicWitness>>,
 }
 

@@ -1,37 +1,38 @@
-# Protocol Adapter Test Harness
+# Anoma Protocol Adapter Testkit
 
-A lightweight, multi-backend test harness for Protocol Adapter integration and end-to-end testing.
+The backend-agnostic risc0 test core for Anoma protocol-adapter integration
+testing: the `Environment` / `Prover` / `Transaction` traits, the trivial
+action fixtures, the local mock prover, and the remote-queue prover for e2e
+runs. It knows nothing about any target chain — chain-specific harnesses live
+in the protocol-adapter repos and implement the traits from here:
 
-This repository provides a backend-agnostic harness core and an EVM-specific harness. The same test logic can run in local integration-style setups or end-to-end flows against real deployments by injecting backend behavior through shared core traits.
+- EVM: [anoma-pa-evm](https://github.com/anoma/pa-evm)
+  (`anoma-pa-evm-integration-test`)
+- Forwarder-specific extensions, action builders, and their test suites:
+  [anomapay-erc20-forwarder](https://github.com/anoma/anomapay-erc20-forwarder),
+  [generic-call-forwarder](https://github.com/anoma/generic-call-forwarder)
 
-Forwarder-specific harness extensions, action builders, and the integration/e2e tests that use them live alongside each forwarder contract:
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for module responsibilities and data
+flow, [CONTEXT.md](./CONTEXT.md) for the glossary, and [docs/adr/](./docs/adr)
+for decisions.
 
-- ERC20 forwarder: [anomapay-erc20-forwarder](https://github.com/anoma/anomapay-erc20-forwarder)
-- Generic call forwarder: [generic-call-forwarder](https://github.com/anoma/generic-call-forwarder)
+## Layout
 
-For a deeper walkthrough of crate responsibilities and data flow, see [ARCHITECTURE.md](./ARCHITECTURE.md).
+A single flat crate, `anoma-pa-testkit` — no workspace. Feature-gated parts:
 
-## Workspace overview
-
-- `crates/core` - shared traits, state container, witness types, test helpers
-- `crates/evm` - EVM environment, setup/prover/execute paths, EVM state helpers
-
-ERC-20 / Permit2 deploy helpers and forwarder-specific action builders now live in the forwarder repositories listed above.
+- `fixtures` (default) — the trivial action kind and the test identities
+- `local` (default) — `LocalProver`: native `constrain` plus mock Groth16
+  seals, no real proving
+- `e2e` — `QueueProver`: submits witnesses to the remote proving queue
+- `abi_encoding` — the EVM-ABI aggregation journal encoding (what the EVM
+  protocol adapter reconstructs); off by default
+- `mocks` — `mockall` doubles of the core traits
 
 ## Quick start
 
 ```bash
-cargo test --workspace
+cargo test
 ```
 
-A trivial-action self-test lives at `crates/evm/tests/integration.rs` and exercises the local environment end-to-end. Its trivial-action fixtures live next to it under `crates/evm/tests/trivial_action/` (test-only — never compiled into the library). Forwarder-specific suites live in the forwarder repositories listed above.
-
-## Using as a dependency
-
-Forwarder repositories depend on this crate via a pinned git revision, e.g.:
-
-```toml
-[workspace.dependencies]
-anoma-pa-testkit-core = { git = "https://github.com/anoma/pa-tests.git", rev = "..." }
-anoma-pa-testkit-evm = { git = "https://github.com/anoma/pa-tests.git", rev = "..." }
-```
+The trivial-action smoke tests live in `tests/trivial_action.rs`. Chain- and
+forwarder-specific suites live in the repos listed above.

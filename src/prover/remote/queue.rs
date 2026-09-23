@@ -5,7 +5,8 @@ use std::time::Duration;
 use heliax_ap_orchestrator_sdk::JobStatus;
 use heliax_ap_orchestrator_sdk::QueueClient;
 
-const POLL_INTERVAL: Duration = Duration::from_millis(500);
+// Every job of a transaction polls at once. At 500 ms, the queue's CDN blocked the client.
+const POLL_INTERVAL: Duration = Duration::from_secs(2);
 const POLL_TIMEOUT: Duration = Duration::from_secs(600);
 const TRANSIENT_ERROR_GRACE: Duration = Duration::from_secs(30);
 
@@ -13,7 +14,7 @@ pub(super) async fn poll_until_done(queue: &QueueClient, job_id: &str) -> anyhow
     let start = tokio::time::Instant::now();
     let deadline = start + POLL_TIMEOUT;
     loop {
-        match queue.get_job_status(job_id.to_string()).await {
+        match queue.get_job_status(job_id).await {
             Ok(JobStatus::Success) => return Ok(()),
             Ok(JobStatus::Failed) => {
                 anyhow::bail!("queue job {job_id} failed");
@@ -43,7 +44,7 @@ pub(super) async fn fetch_job_result<T: serde::de::DeserializeOwned>(
 
     let start = tokio::time::Instant::now();
     loop {
-        match queue.get_job_result::<T>(job_id.to_string()).await {
+        match queue.get_job_result::<T>(job_id).await {
             Ok(Some(result)) => return Ok(result),
             Ok(None) => {}
             Err(err) => {

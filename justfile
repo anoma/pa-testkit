@@ -21,6 +21,10 @@ build *args:
 test *args:
     cargo test {{ args }}
 
+# Publish
+publish *args:
+    cargo publish {{ args }}
+
 # Lint (clippy)
 lint:
     cargo clippy --no-deps -- -Dwarnings
