@@ -1,7 +1,7 @@
 [package]
 name = "anoma-pa-testkit"
 description = "Backend-agnostic risc0 test core for Anoma integration testing."
-version = "1.0.0-rc.0"
+version = "1.0.0-rc.1"
 authors = ["Heliax <hello@heliax.dev>"]
 edition = "2024"
 license = "GPL-3.0"
