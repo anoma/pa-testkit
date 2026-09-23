@@ -56,7 +56,7 @@ pub(super) fn consumed(
     default_nonce[31] = index as u8;
 
     Resource {
-        logic_ref: *anoma_rm_risc0::constants::PADDING_LOGIC_VK,
+        logic_ref: anoma_rm_risc0::constants::PADDING_LOGIC_VK,
         label_ref: Digest::default(),
         quantity: overrides.consumed_quantity.unwrap_or(0),
         value_ref: Digest::default(),
@@ -74,7 +74,7 @@ pub(super) fn created(
     overrides: &Overrides,
 ) -> Resource {
     Resource {
-        logic_ref: *anoma_rm_risc0::constants::PADDING_LOGIC_VK,
+        logic_ref: anoma_rm_risc0::constants::PADDING_LOGIC_VK,
         label_ref: Digest::default(),
         quantity: overrides.created_quantity.unwrap_or(0),
         value_ref: Digest::default(),

@@ -17,3 +17,17 @@ mod remote;
 pub use local::LocalProver;
 #[cfg(feature = "e2e")]
 pub use remote::QueueProver;
+
+/// How both provers encode the aggregation journal, which also selects the
+/// batch aggregation circuit.
+#[cfg(any(feature = "local", feature = "e2e"))]
+const JOURNAL_ENCODING: anoma_rm_risc0::proving_system::JournalEncoding = {
+    #[cfg(feature = "abi_encoding")]
+    {
+        anoma_rm_risc0::proving_system::JournalEncoding::Abi
+    }
+    #[cfg(not(feature = "abi_encoding"))]
+    {
+        anoma_rm_risc0::proving_system::JournalEncoding::Risc0Serde
+    }
+};

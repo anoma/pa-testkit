@@ -1,6 +1,7 @@
 //! The proven ARM transaction produced by a [`crate::prover`].
 
 use anoma_rm_risc0::Digest;
+use anoma_rm_risc0::compliance_unit;
 use anoma_rm_risc0::transaction::Transaction as ArmTxn;
 
 use crate::environment::Transaction as CoreTransaction;
@@ -99,7 +100,7 @@ impl CoreTransaction for Transaction {
                 .unwrap_or(&[])
                 .iter()
                 .map(|action| {
-                    action.compliance_unit.get_instance().map(|instance| {
+                    compliance_unit::get_instance(&action.compliance_unit).map(|instance| {
                         instance
                             .created_publics
                             .iter()

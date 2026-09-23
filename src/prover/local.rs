@@ -7,13 +7,15 @@ use anoma_rm_risc0::action_tree::ActionTree;
 use anoma_rm_risc0::aggregation_instance::{
     ActionAggregated, AggregationInstance, ConsumedResourceAggregated, CreatedResourceAggregated,
 };
-use anoma_rm_risc0::delta_proof::DeltaWitness;
-use anoma_rm_risc0::transaction::{Aggregation, Delta, Transaction as ArmTxn};
+use anoma_rm_risc0::delta_proof;
+use anoma_rm_risc0::proving_system::JournalEncoding;
+use anoma_rm_risc0::transaction::{self, Aggregation, Delta, Transaction as ArmTxn};
 use anyhow::Context;
 use risc0_zkvm::sha::Digestible;
 use risc0_zkvm::{Digest, Groth16Receipt, InnerReceipt, MaybePruned, ReceiptClaim};
 use sha2::{Digest as _, Sha256};
 
+use super::JOURNAL_ENCODING;
 use super::constrain;
 use crate::environment::Prover;
 use crate::transaction::Transaction;
@@ -129,39 +131,38 @@ fn constrain_txn(action_witnesses: &[ActionWitnesses]) -> anyhow::Result<Transac
     }
 
     let instance = AggregationInstance {
-        compliance_key: *anoma_rm_risc0::constants::COMPLIANCE_VK,
+        compliance_key: anoma_rm_risc0::constants::COMPLIANCE_VK,
         kind_table_commitment: kind_table_commitment
             .context("cannot aggregate a transaction without actions")?,
         actions,
     };
 
-    #[cfg(feature = "abi_encoding")]
-    let (journal, verifying_key) = (
-        anoma_rm_risc0::aggregation_instance::abi_encode_instance(instance.clone()),
-        *anoma_rm_risc0::constants::BATCH_AGGREGATION_EVM_VK,
-    );
-    #[cfg(not(feature = "abi_encoding"))]
-    let (journal, verifying_key) = {
-        let words = risc0_zkvm::serde::to_vec(&instance)
-            .context("failed to serialize the aggregation instance")?;
-        (
-            anoma_rm_risc0::utils::words_to_bytes(&words).to_vec(),
-            *anoma_rm_risc0::constants::BATCH_AGGREGATION_VK,
-        )
+    let (journal, verifying_key) = match JOURNAL_ENCODING {
+        JournalEncoding::Abi => (
+            anoma_rm_risc0::aggregation_instance::abi_encode_instance(instance.clone()),
+            anoma_rm_risc0::constants::BATCH_AGGREGATION_EVM_VK,
+        ),
+        JournalEncoding::Risc0Serde => {
+            let words = risc0_zkvm::serde::to_vec(&instance)
+                .context("failed to serialize the aggregation instance")?;
+            (
+                anoma_rm_risc0::utils::words_to_bytes(&words).to_vec(),
+                anoma_rm_risc0::constants::BATCH_AGGREGATION_VK,
+            )
+        }
     };
 
     let proof = encode_seal(verifying_key, journal_digest(&journal));
 
-    let arm_txn = ArmTxn {
+    let arm_txn = transaction::generate_delta_proof(ArmTxn {
         actions: None,
         delta_proof: Delta::Witness(
-            DeltaWitness::from_bytes_vec(&rcvs)
+            delta_proof::from_bytes_vec(&rcvs)
                 .context("failed to construct delta witness from rcv values")?,
         ),
         expected_balance: None,
         aggregation: Some(Aggregation { proof, instance }),
-    }
-    .generate_delta_proof()
+    })
     .context("failed to generate delta proof")?;
 
     Ok(Transaction::from_arm(arm_txn))

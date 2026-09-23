@@ -6,7 +6,7 @@
 use std::collections::HashMap;
 
 use anoma_rm_risc0::Digest;
-use anoma_rm_risc0::compliance::ComplianceInstance;
+use anoma_rm_risc0::compliance::{self, ComplianceInstance};
 use anoma_rm_risc0::logic_instance::LogicInstance;
 use anyhow::Context;
 
@@ -45,9 +45,10 @@ pub(super) fn action(
     witnesses: &ActionWitnesses,
     action_idx: usize,
 ) -> anyhow::Result<ConstrainedAction> {
-    let compliance_instance = witnesses.compliance_witness.constrain().with_context(|| {
-        format!("failed to constrain the compliance unit of action {action_idx}")
-    })?;
+    let compliance_instance =
+        compliance::constrain(&witnesses.compliance_witness).with_context(|| {
+            format!("failed to constrain the compliance unit of action {action_idx}")
+        })?;
 
     let resource_count =
         compliance_instance.consumed_publics.len() + compliance_instance.created_publics.len();
