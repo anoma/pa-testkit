@@ -1,5 +1,5 @@
 use anoma_rm_risc0::action_tree::ActionTree;
-use anoma_rm_risc0::compliance::ComplianceWitness;
+use anoma_rm_risc0::compliance;
 use anoma_rm_risc0::resource::{ConsumedResourceWitness, Resource};
 use anoma_rm_risc0::resource_logic::TrivialLogicWitness;
 use anyhow::Context;
@@ -56,7 +56,7 @@ pub fn build(seed: u8, overrides: Overrides) -> anyhow::Result<ActionData> {
         })
         .collect::<anyhow::Result<_>>()?;
 
-    let compliance_witness = ComplianceWitness::from_resources(
+    let compliance_witness = compliance::from_resources(
         consumed_ephemerals
             .iter()
             .map(|consumed| ConsumedResourceWitness::from_resource(*consumed, nf_key.clone()))

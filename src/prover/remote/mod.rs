@@ -5,15 +5,14 @@ use std::collections::HashMap;
 use std::panic::AssertUnwindSafe;
 
 use anoma_rm_risc0::action::Action;
-use anoma_rm_risc0::compliance_unit::ComplianceUnit;
-#[cfg(feature = "abi_encoding")]
-use anoma_rm_risc0::constants::BATCH_AGGREGATION_EVM_PK as BATCH_AGGREGATION_PK;
-#[cfg(not(feature = "abi_encoding"))]
-use anoma_rm_risc0::constants::BATCH_AGGREGATION_PK;
-use anoma_rm_risc0::constants::{COMPLIANCE_PK, COMPLIANCE_VK};
-use anoma_rm_risc0::delta_proof::DeltaWitness;
+use anoma_rm_risc0::compliance_unit::{self, ComplianceUnit};
+use anoma_rm_risc0::constants::{
+    BATCH_AGGREGATION_EVM_PK, BATCH_AGGREGATION_PK, COMPLIANCE_PK, COMPLIANCE_VK,
+};
+use anoma_rm_risc0::delta_proof;
 use anoma_rm_risc0::logic_proof::LogicVerifierInput;
-use anoma_rm_risc0::transaction::{Delta, Transaction as ArmTxn};
+use anoma_rm_risc0::proving_system::JournalEncoding;
+use anoma_rm_risc0::transaction::{self, Delta, Transaction as ArmTxn};
 use anyhow::Context;
 use futures::future::try_join_all;
 use heliax_ap_orchestrator_sdk::QueueClient;
@@ -24,6 +23,7 @@ use heliax_ap_orchestrator_sdk::{
 
 mod queue;
 
+use super::JOURNAL_ENCODING;
 use super::constrain::{self, ConstrainedAction, ConstrainedLogic};
 use crate::environment::Prover;
 use crate::transaction::Transaction;
@@ -187,30 +187,35 @@ async fn prove_via_queue(
     );
 
     let delta = Delta::Witness(
-        DeltaWitness::from_bytes_vec(&rcvs)
+        delta_proof::from_bytes_vec(&rcvs)
             .context("failed to construct delta witness from rcv values")?,
     );
     // `verify` takes the commitment the transaction is checked against. No global kind table is installed here,
     // so it comes from the compliance instances, which makes the check compare the aggregation against them.
-    let kind_table_commitment = actions
-        .first()
-        .context("the transaction carries no action")?
-        .compliance_unit
-        .get_instance()
-        .map_err(|error| anyhow::anyhow!("failed to read the compliance instance: {error:?}"))?
-        .kind_table_commitment;
+    let kind_table_commitment = compliance_unit::get_instance(
+        &actions
+            .first()
+            .context("the transaction carries no action")?
+            .compliance_unit,
+    )
+    .map_err(|error| anyhow::anyhow!("failed to read the compliance instance: {error:?}"))?
+    .kind_table_commitment;
 
-    let arm_txn = ArmTxn::create(actions, delta)
-        .generate_delta_proof()
+    let arm_txn = transaction::generate_delta_proof(ArmTxn::create(actions, delta))
         .context("failed to generate delta proof")?;
 
     let serialized =
         bincode::serialize(&arm_txn).context("failed to serialize transaction for aggregation")?;
 
+    let batch_aggregation_pk = match JOURNAL_ENCODING {
+        JournalEncoding::Abi => BATCH_AGGREGATION_EVM_PK,
+        JournalEncoding::Risc0Serde => BATCH_AGGREGATION_PK,
+    };
+
     // Without these keys the worker aggregates with its own compiled-in circuits.
     let agg_payload = GpuAggregationProofPayload {
         transaction: serialized,
-        batch_aggregation_pk: Some(BATCH_AGGREGATION_PK.to_vec()),
+        batch_aggregation_pk: Some(batch_aggregation_pk.to_vec()),
         compliance_vk: Some(COMPLIANCE_VK.as_bytes().to_vec()),
     };
     let agg_job_id = queue
@@ -226,9 +231,7 @@ async fn prove_via_queue(
     let aggregated: ArmTxn = bincode::deserialize(&agg_result.transaction)
         .context("failed to decode aggregated transaction")?;
 
-    aggregated
-        .clone()
-        .verify(kind_table_commitment)
+    transaction::verify(&aggregated, kind_table_commitment, JOURNAL_ENCODING)
         .context("aggregated transaction failed local verification")?;
 
     Ok(Transaction::from_arm(aggregated))
