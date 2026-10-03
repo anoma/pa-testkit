@@ -55,6 +55,17 @@ fn items_pair_by_path_with_the_crate_name_replaced() {
         find("rust crate::addresses::Environment impl core::clone::Clone").outcome(),
         Outcome::Match
     );
+    let field = find("rust crate::addresses::Deployment::chain_id member");
+    assert_eq!(field.outcome(), Outcome::Differs, "{field:#?}");
+    assert_eq!(
+        (field.evm.clone(), field.solana.clone()),
+        (
+            vec!["pub crate::addresses::Deployment::chain_id: u64".to_owned()],
+            vec!["pub crate::addresses::Deployment::chain_id: alloc::string::String".to_owned()]
+        )
+    );
+    let variant = find("rust crate::addresses::Cluster::Devnet member");
+    assert_eq!(variant.outcome(), Outcome::Differs, "{variant:#?}");
     let root = find("rust crate mod");
     assert_eq!(root.outcome(), Outcome::Match, "{root:#?}");
     assert_eq!(root.evm, vec!["pub mod crate"]);

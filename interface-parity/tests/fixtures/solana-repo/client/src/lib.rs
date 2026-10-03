@@ -11,4 +11,12 @@ pub mod addresses {
             Environment::Production => None,
         }
     }
+
+    pub struct Deployment {
+        pub chain_id: String,
+    }
+
+    pub enum Cluster {
+        Devnet(String),
+    }
 }

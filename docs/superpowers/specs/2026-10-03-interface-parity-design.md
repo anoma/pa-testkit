@@ -90,11 +90,13 @@ The test needs network access to fetch the pinned commits, a pinned nightly tool
 Small fixture packages inside `interface-parity` (one EVM-like, one Solana-like, with known differences) test each outcome:
 
 - an identical item gives a match;
-- an item on one side only gives only on EVM or only on Solana;
-- a changed signature, struct field, enum variant, JSON value or tag prefix gives differs, with both values;
+- an item or a tag prefix on one side only gives only on EVM or only on Solana;
+- a changed signature, struct field, enum variant or JSON value gives differs, with both values;
 - an excuse covering a difference gives excused, with its explanation;
 - an excuse whose EVM value or Solana value no longer matches gives a stale excuse, and the difference fails again;
 - a package with `publish = false` or `"private": true` is not extracted;
-- a published package in no pair is reported item by item.
+- a published package in no pair is reported item by item;
+- a package that fails to extract is reported as a failure carrying the error, and every other package is still compared;
+- a pair naming a repository or package that is not pinned is an error.
 
-Each test asserts the exact report lines it expects.
+Each test asserts the outcome and the values of the lines it checks.

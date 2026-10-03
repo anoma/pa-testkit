@@ -13,4 +13,12 @@ pub mod addresses {
     }
 
     pub fn only_on_evm() {}
+
+    pub struct Deployment {
+        pub chain_id: u64,
+    }
+
+    pub enum Cluster {
+        Devnet(u64),
+    }
 }
