@@ -3,4 +3,6 @@
 
 pub mod compare;
 pub mod excuses;
+pub mod fetch;
 pub mod report;
+pub mod tags;
