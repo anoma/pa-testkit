@@ -38,6 +38,8 @@ The published packages are read from each repository's own manifests, with no li
 - every Cargo package whose manifest does not declare `publish = false`, found with `cargo metadata --no-deps` on every `Cargo.toml` in the repository;
 - every npm package whose `package.json` has a `name` and does not declare `"private": true` (npm refuses to publish a package without a name).
 
+This rule is provisional. The repositories do not set `publish = false` consistently, so some packages it counts as published are test or tooling crates. The report shows them, and a review that finds the rule wrong changes the rule.
+
 For each published package, the test extracts:
 
 1. **Package metadata:** name, version, features and their contents, and dependencies with their version requirements.
@@ -67,7 +69,9 @@ The first `pairs.toml`:
 | package `anoma-pa-evm-bindings` | package `anoma-pa-solana-client` |
 | package `anomapay-erc20-forwarder-bindings` | package `anoma-pa-solana-client` |
 
-One Solana package or repository may appear in several pairs, because today one Solana client and one Solana repository serve both the adapter and the forwarder. Each pair is compared on its own. anoma/forwarder-bases and its package `anoma-forwarder-bases-bindings` start unpaired, so all of their items are reported as only on EVM.
+One Solana package or repository may appear in several pairs, and each pair is compared on its own. At the first pin, one Solana client and one Solana repository still serve both the adapter and the forwarder. anoma/forwarder-bases and its package `anoma-forwarder-bases-bindings` start unpaired, so all of their items are reported as only on EVM.
+
+The same work splits the SPL token forwarder into its own repository, anoma/anomapay-spl-token-forwarder, with its program, its client crate and npm package, and its deployment record (anoma/dos-pm#90). After the split, a repin changes the forwarder pairs to anoma/anomapay-erc20-forwarder ↔ anoma/anomapay-spl-token-forwarder and `anomapay-erc20-forwarder-bindings` ↔ the new repository's client crate.
 
 The first run will report thousands of unexcused differences. The EVM generated contract bindings alone contribute hundreds of public items with no Solana counterpart. The Solana adapter repository declares no `publish = false`, so its test programs and `fixture-gen` count as published and are reported as only on Solana. Neither Solana repository has tags yet. The test reports all of these; deciding which become excuses and which become Solana changes is the review.
 
@@ -75,7 +79,7 @@ The first run will report thousands of unexcused differences. The EVM generated 
 
 pa-testkit becomes a Cargo workspace with two members: the existing `anoma-pa-testkit` crate, unchanged, and a new `interface-parity` crate declared `publish = false`. Consumers of the testkit library never build the comparison's dependencies (`public-api`, git fetching).
 
-The comparison runs as `cargo test -p interface-parity`. It needs network access to fetch the pinned commits, the pinned nightly for rustdoc JSON, and Node for the TypeScript extraction. It writes the full report to `target/interface-parity/report.md` and prints the failing lines. A separate CI job in `.github/workflows/rust.yml` runs it.
+The comparison runs as `cargo test -p interface-parity`. It needs network access to fetch the pinned commits, the pinned nightly for rustdoc JSON, and Node for the TypeScript extraction. It writes the full report to `target/interface-parity/report.md` and prints the failing lines. A separate CI job in `.github/workflows/rust.yml` runs it. anoma/solana-protocol-adapter and anoma/anomapay-spl-token-forwarder are private while pa-testkit is public, so the job fetches with a repository secret holding a token that can read them. Locally the test fetches with the developer's `gh` credentials.
 
 ## Testing the comparison itself
 
