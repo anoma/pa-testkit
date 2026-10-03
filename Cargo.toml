@@ -54,3 +54,6 @@ tokio = { version = "1.48", features = ["time"], optional = true }
 # For the chain-free trivial-action / local-prover tests under `tests/`
 # (run with `--features local,fixtures`).
 tokio = { version = "1.48", features = ["macros", "rt-multi-thread"] }
+
+[workspace]
+members = [".", "interface-parity"]

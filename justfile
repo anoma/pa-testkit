@@ -7,19 +7,19 @@ default:
 
 # Format
 fmt *args:
-    cargo fmt {{ args }}
+    cargo fmt --all {{ args }}
 
 # Check formatting
 fmt-check:
-    cargo fmt -- --check
+    cargo fmt --all -- --check
 
 # Build
 build *args:
-    cargo build {{ args }}
+    cargo build --workspace {{ args }}
 
 # Test
 test *args:
-    cargo test {{ args }}
+    cargo test --workspace {{ args }}
 
 # Publish
 publish *args:
@@ -27,5 +27,5 @@ publish *args:
 
 # Lint (clippy)
 lint:
-    cargo clippy --no-deps -- -Dwarnings
-    cargo clippy --no-deps --tests -- -Dwarnings
+    cargo clippy --workspace --no-deps -- -Dwarnings
+    cargo clippy --workspace --no-deps --tests -- -Dwarnings
