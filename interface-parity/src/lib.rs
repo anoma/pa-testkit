@@ -9,3 +9,4 @@ pub mod packages;
 pub mod report;
 pub mod rust_api;
 pub mod tags;
+pub mod ts_api;
