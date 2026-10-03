@@ -2,3 +2,5 @@
 //! publish. The design is `docs/superpowers/specs/2026-10-03-interface-parity-design.md`.
 
 pub mod compare;
+pub mod excuses;
+pub mod report;
