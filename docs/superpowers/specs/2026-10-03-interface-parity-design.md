@@ -25,7 +25,7 @@ only on EVM  anoma-pa-evm-bindings ↔ anoma-pa-solana-client
 
 ## Inputs: three reviewed files
 
-The test reads three files in the `interface-parity` crate. Each is edited by hand and reviewed like code. Nothing else in the comparison is hand-written.
+The test reads three files committed next to it in pa-testkit. Each is edited by hand and reviewed like code. Nothing else in the comparison is hand-written.
 
 - **`pins.toml`** names each repository by URL and exact commit. The test compares those commits and nothing else. Comparing newer code means changing a pin in a commit, and the report for that commit shows every difference the change introduced.
 - **`pairs.toml`** declares which EVM repository corresponds to which Solana repository, and which EVM package to which Solana package. Pairing is needed because items pair by literal path inside a package, and package names differ across chains (`anoma-pa-evm-bindings` vs `anoma-pa-solana-client`). A published package that appears in no pair is still reported, item by item, as only on its side. The report prints the pairs first.
@@ -73,13 +73,15 @@ One Solana package or repository may appear in several pairs, and each pair is c
 
 The same work splits the SPL token forwarder into its own repository, anoma/anomapay-spl-token-forwarder, with its program, its client crate and npm package, and its deployment record (anoma/dos-pm#90). After the split, a repin changes the forwarder pairs to anoma/anomapay-erc20-forwarder ↔ anoma/anomapay-spl-token-forwarder and `anomapay-erc20-forwarder-bindings` ↔ the new repository's client crate.
 
-The first run will report thousands of unexcused differences. The EVM generated contract bindings alone contribute hundreds of public items with no Solana counterpart. The Solana adapter repository declares no `publish = false`, so its test programs and `fixture-gen` count as published and are reported as only on Solana. Neither Solana repository has tags yet. The test reports all of these; deciding which become excuses and which become Solana changes is the review.
+The first run will report tens of thousands of unexcused differences. At its pin, `anoma-pa-evm-bindings` alone has 47,087 public items, most of them generated contract bindings and the trait methods every type gets from blanket impls; `anoma-pa-solana-client` has 2,680. The Solana adapter repository declares no `publish = false`, so its test programs and `fixture-gen` count as published and are reported as only on Solana. Neither Solana repository has tags yet. The test reports all of these; deciding which become excuses and which become Solana changes is the review.
 
 ## Where it lives
 
-pa-testkit becomes a Cargo workspace with two members: the existing `anoma-pa-testkit` crate, unchanged, and a new `interface-parity` crate declared `publish = false`. Consumers of the testkit library never build the comparison's dependencies (`public-api`, git fetching).
+Everything lives in pa-testkit, which holds every chain-agnostic test. pa-testkit becomes a Cargo workspace with two members: the existing `anoma-pa-testkit` crate, unchanged, and `interface-parity`, declared `publish = false`, which holds the comparison library, its own tests, the EVM-to-Solana comparison test and the three input files. Consumers of the testkit library never build the comparison's dependencies.
 
-The comparison runs as `cargo test -p interface-parity`. It needs network access to fetch the pinned commits, the pinned nightly for rustdoc JSON, and Node for the TypeScript extraction. It writes the full report to `target/interface-parity/report.md` and prints the failing lines. A separate CI job in `.github/workflows/rust.yml` runs it. anoma/solana-protocol-adapter and anoma/anomapay-spl-token-forwarder are private while pa-testkit is public, so the job fetches with a repository secret holding a token that can read them. Locally the test fetches with the developer's `gh` credentials.
+pa-testkit's CI runs only the tool's own tests on its fixture packages (see below). The EVM-to-Solana comparison test carries `#[ignore = "compares the pinned EVM and Solana repositories; run with just interface-parity"]`, so `cargo test` and CI skip it by that explicit filter, and the recipe `just interface-parity` runs it with `cargo test -p interface-parity -- --ignored`. It runs when the pins, pairs or excuses change and for each review.
+
+The test needs network access to fetch the pinned commits, a pinned nightly toolchain for rustdoc JSON, and Node for the TypeScript extraction. The tool runs that nightly's `rustc` and `rustdoc` explicitly, because rustdoc JSON fails when the dependencies were compiled by another `rustc`. It writes the full report to `target/interface-parity/report.md` and prints the failing lines.
 
 ## Testing the comparison itself
 
