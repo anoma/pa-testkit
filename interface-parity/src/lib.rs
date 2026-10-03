@@ -5,8 +5,12 @@ pub mod compare;
 pub mod excuses;
 pub mod fetch;
 pub mod files;
+pub mod inputs;
 pub mod packages;
 pub mod report;
+pub mod run;
 pub mod rust_api;
 pub mod tags;
 pub mod ts_api;
+
+pub use run::run;

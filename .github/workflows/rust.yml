@@ -23,6 +23,16 @@ jobs:
         with:
           components: rustfmt, clippy
 
+      # interface-parity's tests read rustdoc JSON from this nightly and
+      # TypeScript exports through Node.
+      - name: Install the interface-parity nightly
+        run: rustup toolchain install nightly-2026-02-08 --profile minimal
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
       - name: Show Rust version
         run: rustc --version
 

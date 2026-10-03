@@ -1,0 +1,18 @@
+# Which EVM repository and package is compared with which Solana one. A name
+# may sit in several pairs; a published package in no pair is reported alone.
+
+[[repository]]
+evm = "pa-evm"
+solana = "solana-protocol-adapter"
+
+[[repository]]
+evm = "anomapay-erc20-forwarder"
+solana = "solana-protocol-adapter"
+
+[[package]]
+evm = "pa-evm/cargo:anoma-pa-evm-bindings"
+solana = "anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+
+[[package]]
+evm = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings"
+solana = "anoma-pa-solana-client/cargo:anoma-pa-solana-client"

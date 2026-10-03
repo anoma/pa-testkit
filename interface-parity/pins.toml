@@ -1,0 +1,32 @@
+# Each repository is compared at exactly this commit. Comparing newer code
+# means changing a commit here, and the report then shows what changed.
+
+[[repository]]
+name = "pa-evm"
+side = "evm"
+url = "https://github.com/anoma/pa-evm"
+commit = "dbac05ae68776199ac904aae4376e886d11f199f"
+
+[[repository]]
+name = "anomapay-erc20-forwarder"
+side = "evm"
+url = "https://github.com/anoma/anomapay-erc20-forwarder"
+commit = "8e2d30f246d595bf6b91231f76d4c25b5c0d24bf"
+
+[[repository]]
+name = "forwarder-bases"
+side = "evm"
+url = "https://github.com/anoma/forwarder-bases"
+commit = "08f2f2e8b147fc6c9394031063664a6f3cd6a58c"
+
+[[repository]]
+name = "anoma-pa-solana-client"
+side = "solana"
+url = "https://github.com/anoma/anoma-pa-solana-client"
+commit = "ba957aa38246cc3906cc1dc1e9c5cacd36ac5f10"
+
+[[repository]]
+name = "solana-protocol-adapter"
+side = "solana"
+url = "https://github.com/anoma/solana-protocol-adapter"
+commit = "866d11ed20bfec13d77ac880528206f2eaa5113d"

@@ -29,3 +29,9 @@ publish *args:
 lint:
     cargo clippy --workspace --no-deps -- -Dwarnings
     cargo clippy --workspace --no-deps --tests -- -Dwarnings
+
+# Compare the pinned EVM and Solana repositories (interface-parity/pins.toml);
+# the full report is target/interface-parity/report.md
+interface-parity:
+    rustup toolchain install nightly-2026-02-08 --profile minimal
+    cargo test -p interface-parity --test evm_solana -- --ignored
