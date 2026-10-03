@@ -48,7 +48,7 @@ For each published package, the test extracts:
 4. **Shipped files** other than source files, whose content items 2 and 3 already cover: `.rs` files for a crate; `.ts`, `.js`, `.mjs`, `.cjs` and `.map` files for an npm package. A file is shipped if `cargo package --list` or `npm publish --dry-run --json` lists it. Files pair by path within the package. JSON files such as `deployments.json` are compared key by key, so a difference names the JSON path; any other file is compared byte for byte.
 5. **Tag schemes of the repository:** each remote tag is split into a prefix and a semver version (`bindings/v3.0.0` gives `bindings/v`). Paired repositories are compared by their sets of prefixes.
 
-A package that fails to extract, for example because it does not compile with all features enabled, is reported as a failing line carrying the error output, and every other package is still compared. At the first pin this happens to `protocol-adapter` and `spl-token-forwarder`: their `cpi` feature does not compile.
+A package that fails to extract, for example because it does not compile with all features enabled, is reported as a failing line carrying the error output, and every other package is still compared. At the first pin this happens to four packages of anoma/solana-protocol-adapter: `protocol-adapter`, `spl-token-forwarder` and `test-forwarder`, whose `cpi` feature does not compile, and `passthrough-logic-methods`, whose build script builds a RISC0 guest and panics.
 
 ## Repositories at the first pin
 
