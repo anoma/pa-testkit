@@ -4,6 +4,7 @@
 pub mod compare;
 pub mod excuses;
 pub mod fetch;
+pub mod files;
 pub mod packages;
 pub mod report;
 pub mod rust_api;
