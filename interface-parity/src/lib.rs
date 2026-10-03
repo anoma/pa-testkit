@@ -4,5 +4,6 @@
 pub mod compare;
 pub mod excuses;
 pub mod fetch;
+pub mod packages;
 pub mod report;
 pub mod tags;
