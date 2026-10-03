@@ -26,7 +26,7 @@ jobs:
       # interface-parity's tests read rustdoc JSON from this nightly and
       # TypeScript exports through Node.
       - name: Install the interface-parity nightly
-        run: rustup toolchain install nightly-2026-02-08 --profile minimal
+        run: just install-nightly
 
       - name: Install Node
         uses: actions/setup-node@v4

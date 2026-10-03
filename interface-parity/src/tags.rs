@@ -4,7 +4,7 @@ use crate::compare::Surface;
 
 /// The part of a tag before its semver version: `bindings/v3.0.0` gives
 /// `bindings/v`. A tag with no version suffix is its own scheme.
-pub fn prefix(tag: &str) -> &str {
+fn prefix(tag: &str) -> &str {
     tag.char_indices()
         .find(|(i, _)| semver::Version::parse(&tag[*i..]).is_ok())
         .map_or(tag, |(i, _)| &tag[..i])

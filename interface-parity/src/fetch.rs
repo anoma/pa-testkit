@@ -1,26 +1,17 @@
 use std::path::Path;
 use std::process::Command;
 
-use anyhow::{Context, bail};
+use anyhow::Context;
 
-/// Runs git and returns its stdout; a non-zero exit is an error carrying stderr.
+use crate::cmd;
+
+/// Runs git, in `dir` if given, and returns its stdout.
 pub fn git(dir: Option<&Path>, args: &[&str]) -> anyhow::Result<String> {
-    let mut cmd = Command::new("git");
+    let mut command = Command::new("git");
     if let Some(dir) = dir {
-        cmd.current_dir(dir);
+        command.current_dir(dir);
     }
-    let out = cmd
-        .args(args)
-        .output()
-        .with_context(|| format!("running git {args:?}"))?;
-    if !out.status.success() {
-        bail!(
-            "git {} failed: {}",
-            args.join(" "),
-            String::from_utf8_lossy(&out.stderr)
-        );
-    }
-    Ok(String::from_utf8(out.stdout)?)
+    cmd::stdout(command.args(args))
 }
 
 /// Makes `dir` a checkout of exactly `commit` from `url`.
@@ -38,14 +29,13 @@ pub fn checkout(url: &str, commit: &str, dir: &Path) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Every tag of the remote, without the peeled `^{}` entries.
+/// Every tag of the remote, sorted.
 pub fn tags(url: &str) -> anyhow::Result<Vec<String>> {
-    let out = git(None, &["ls-remote", "--tags", url])?;
+    let out = git(None, &["ls-remote", "--tags", "--refs", url])?;
     let mut tags: Vec<String> = out
         .lines()
         .filter_map(|l| l.split('\t').nth(1))
         .filter_map(|r| r.strip_prefix("refs/tags/"))
-        .filter(|t| !t.ends_with("^{}"))
         .map(str::to_owned)
         .collect();
     tags.sort();

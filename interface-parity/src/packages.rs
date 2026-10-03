@@ -1,14 +1,14 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use crate::compare::Surface;
 use crate::report::Failure;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// What a package is, with its parsed manifest.
+#[derive(Clone, Debug)]
 pub enum Kind {
-    Cargo,
-    Npm,
+    Cargo(Box<cargo_metadata::Package>),
+    Npm(serde_json::Value),
 }
 
 #[derive(Clone, Debug)]
@@ -16,59 +16,61 @@ pub struct Package {
     /// `<repo>/cargo:<name>` or `<repo>/npm:<name>`.
     pub id: String,
     pub kind: Kind,
-    pub name: String,
-    pub dir: PathBuf,
     pub manifest: PathBuf,
-    /// The crate name of the library target, if the package has one.
-    pub lib_name: Option<String>,
-    /// The package's entry in `cargo metadata`.
-    pub cargo: Option<serde_json::Value>,
 }
 
-const LIBRARY_KINDS: [&str; 6] = ["lib", "rlib", "dylib", "cdylib", "staticlib", "proc-macro"];
+impl Package {
+    pub fn dir(&self) -> &Path {
+        self.manifest
+            .parent()
+            .expect("a manifest path names a file inside a directory")
+    }
 
-fn manifests(dir: &Path, file: &str, found: &mut Vec<PathBuf>) -> std::io::Result<()> {
+    pub fn name(&self) -> &str {
+        match &self.kind {
+            Kind::Cargo(pkg) => &pkg.name,
+            Kind::Npm(json) => json["name"]
+                .as_str()
+                .expect("discover keeps only npm packages with a name"),
+        }
+    }
+
+    /// The crate name of a Cargo package's library target, if it has one.
+    pub fn lib_name(&self) -> Option<String> {
+        let Kind::Cargo(pkg) = &self.kind else {
+            return None;
+        };
+        pkg.targets
+            .iter()
+            .find(|t| {
+                t.is_lib()
+                    || t.is_rlib()
+                    || t.is_dylib()
+                    || t.is_cdylib()
+                    || t.is_staticlib()
+                    || t.is_proc_macro()
+            })
+            .map(|t| t.name.replace('-', "_"))
+    }
+}
+
+/// Every `Cargo.toml` and `package.json` under `dir`, outside build outputs.
+fn manifests(dir: &Path, cargo: &mut Vec<PathBuf>, npm: &mut Vec<PathBuf>) -> std::io::Result<()> {
     let mut entries = std::fs::read_dir(dir)?.collect::<Result<Vec<_>, _>>()?;
     entries.sort_by_key(|e| e.file_name());
     for entry in entries {
         let name = entry.file_name();
         if entry.file_type()?.is_dir() {
             if !matches!(name.to_str(), Some("target" | "node_modules" | ".git")) {
-                manifests(&entry.path(), file, found)?;
+                manifests(&entry.path(), cargo, npm)?;
             }
-        } else if name == file {
-            found.push(entry.path());
+        } else if name == "Cargo.toml" {
+            cargo.push(entry.path());
+        } else if name == "package.json" {
+            npm.push(entry.path());
         }
     }
     Ok(())
-}
-
-fn cargo_metadata(manifest: &Path) -> Result<serde_json::Value, String> {
-    let out = Command::new("cargo")
-        .args([
-            "metadata",
-            "--no-deps",
-            "--format-version",
-            "1",
-            "--manifest-path",
-        ])
-        .arg(manifest)
-        .output()
-        .map_err(|e| format!("running cargo metadata: {e}"))?;
-    if !out.status.success() {
-        return Err(String::from_utf8_lossy(&out.stderr).into_owned());
-    }
-    serde_json::from_slice(&out.stdout).map_err(|e| e.to_string())
-}
-
-fn lib_name(pkg: &serde_json::Value) -> Option<String> {
-    pkg["targets"].as_array()?.iter().find_map(|t| {
-        let is_library = t["kind"]
-            .as_array()?
-            .iter()
-            .any(|k| k.as_str().is_some_and(|k| LIBRARY_KINDS.contains(&k)));
-        is_library.then(|| t["name"].as_str().unwrap_or_default().replace('-', "_"))
-    })
 }
 
 /// Every published Cargo and npm package under `root`, sorted by id. A
@@ -77,44 +79,45 @@ pub fn discover(repo: &str, root: &Path) -> (Vec<Package>, Vec<Failure>) {
     let mut packages = BTreeMap::new();
     let mut failures = vec![];
     let (mut cargo_manifests, mut npm_manifests) = (vec![], vec![]);
-    if let Err(e) = manifests(root, "Cargo.toml", &mut cargo_manifests)
-        .and_then(|()| manifests(root, "package.json", &mut npm_manifests))
-    {
+    if let Err(e) = manifests(root, &mut cargo_manifests, &mut npm_manifests) {
         failures.push(Failure {
             subject: format!("{repo} (walking {})", root.display()),
             error: e.to_string(),
         });
         return (vec![], failures);
     }
+    // One `cargo metadata` call returns every member of a workspace, so a
+    // manifest an earlier call already returned needs no call of its own.
+    let mut seen = BTreeSet::new();
     for manifest in cargo_manifests {
-        let metadata = match cargo_metadata(&manifest) {
+        if seen.contains(&manifest) {
+            continue;
+        }
+        let metadata = match cargo_metadata::MetadataCommand::new()
+            .manifest_path(&manifest)
+            .no_deps()
+            .exec()
+        {
             Ok(m) => m,
-            Err(error) => {
+            Err(e) => {
                 failures.push(Failure {
                     subject: format!("{repo} (cargo metadata {})", manifest.display()),
-                    error,
+                    error: e.to_string(),
                 });
                 continue;
             }
         };
-        for pkg in metadata["packages"].as_array().into_iter().flatten() {
-            if pkg["publish"]
-                .as_array()
-                .is_some_and(|registries| registries.is_empty())
-            {
+        for pkg in metadata.packages {
+            let manifest = pkg.manifest_path.clone().into_std_path_buf();
+            seen.insert(manifest.clone());
+            if pkg.publish.as_ref().is_some_and(Vec::is_empty) {
                 continue;
             }
-            let name = pkg["name"].as_str().unwrap_or_default().to_owned();
-            let manifest = PathBuf::from(pkg["manifest_path"].as_str().unwrap_or_default());
-            let id = format!("{repo}/cargo:{name}");
+            let id = format!("{repo}/cargo:{}", pkg.name);
             packages.entry(id.clone()).or_insert_with(|| Package {
                 id,
-                kind: Kind::Cargo,
-                name,
-                dir: manifest.parent().map(Path::to_owned).unwrap_or_default(),
+                kind: Kind::Cargo(Box::new(pkg)),
                 manifest,
-                lib_name: lib_name(pkg),
-                cargo: Some(pkg.clone()),
             });
         }
     }
@@ -142,57 +145,37 @@ pub fn discover(repo: &str, root: &Path) -> (Vec<Package>, Vec<Failure>) {
         let id = format!("{repo}/npm:{name}");
         packages.entry(id.clone()).or_insert_with(|| Package {
             id,
-            kind: Kind::Npm,
-            name: name.to_owned(),
-            dir: manifest.parent().map(Path::to_owned).unwrap_or_default(),
+            kind: Kind::Npm(json.clone()),
             manifest,
-            lib_name: None,
-            cargo: None,
         });
     }
     (packages.into_values().collect(), failures)
 }
 
 /// Name, version, features, targets and dependencies of a Cargo package.
-pub fn cargo_metadata_surface(pkg: &Package) -> Surface {
+pub fn cargo_metadata_surface(pkg: &cargo_metadata::Package) -> Surface {
     let mut s = Surface::default();
-    let Some(m) = &pkg.cargo else {
-        return s;
-    };
-    s.insert("package name", m["name"].as_str().unwrap_or_default());
-    s.insert("package version", m["version"].as_str().unwrap_or_default());
-    for (feature, enables) in m["features"].as_object().into_iter().flatten() {
-        s.insert(format!("package feature {feature}"), enables.to_string());
+    s.insert("package name", pkg.name.as_str());
+    s.insert("package version", pkg.version.to_string());
+    for (feature, enables) in &pkg.features {
+        s.insert(format!("package feature {feature}"), format!("{enables:?}"));
     }
-    for target in m["targets"].as_array().into_iter().flatten() {
-        let kinds: Vec<&str> = target["kind"]
-            .as_array()
-            .into_iter()
-            .flatten()
-            .filter_map(|k| k.as_str())
-            .collect();
-        s.insert(
-            format!(
-                "package target {}",
-                target["name"].as_str().unwrap_or_default()
-            ),
-            kinds.join(","),
-        );
+    for target in &pkg.targets {
+        let kinds: Vec<String> = target.kind.iter().map(ToString::to_string).collect();
+        s.insert(format!("package target {}", target.name), kinds.join(","));
     }
-    for dep in m["dependencies"].as_array().into_iter().flatten() {
+    for dep in &pkg.dependencies {
         s.insert(
+            format!("package dependency {} {}", dep.name, dep.kind),
             format!(
-                "package dependency {} {}",
-                dep["name"].as_str().unwrap_or_default(),
-                dep["kind"].as_str().unwrap_or("normal")
-            ),
-            format!(
-                "req={} optional={} default-features={} features={} target={}",
-                dep["req"],
-                dep["optional"],
-                dep["uses_default_features"],
-                dep["features"],
-                dep["target"]
+                "req={} optional={} default-features={} features={:?} target={}",
+                dep.req,
+                dep.optional,
+                dep.uses_default_features,
+                dep.features,
+                dep.target
+                    .as_ref()
+                    .map_or_else(|| "any".to_owned(), ToString::to_string)
             ),
         );
     }

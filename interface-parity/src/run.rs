@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
+use std::process::Command;
 
 use anyhow::{Context, bail};
 
@@ -7,24 +8,41 @@ use crate::compare::{Line, Surface, compare};
 use crate::inputs::{PairEntry, Side, load_pairs, load_pins};
 use crate::packages::{Kind, Package, cargo_metadata_surface, discover};
 use crate::report::{Failure, Report};
-use crate::{excuses, fetch, files, rust_api, tags, ts_api};
+use crate::{cmd, excuses, fetch, files, rust_api, tags, ts_api};
 
 /// Each repository or package with its side and, unless extraction failed, its surface.
 type Surfaces = BTreeMap<String, (Side, Option<Surface>)>;
 
-fn package_surface(pkg: &Package, work: &Path) -> Result<Surface, String> {
-    match pkg.kind {
-        Kind::Cargo => {
-            let mut s = cargo_metadata_surface(pkg);
+/// Everything a package publishes: its metadata or manifest, its API and its
+/// non-source shipped files.
+pub fn package_surface(pkg: &Package, work: &Path) -> anyhow::Result<Surface> {
+    let mut s = match &pkg.kind {
+        Kind::Cargo(meta) => {
+            let mut s = cargo_metadata_surface(meta);
             s.extend(rust_api::surface(pkg)?);
-            s.extend(files::cargo_files(pkg)?);
-            Ok(s)
+            s
         }
-        Kind::Npm => ts_api::surface(
-            pkg,
-            &work.join("ts").join(pkg.id.replace(['/', ':', '@'], "_")),
-        ),
-    }
+        Kind::Npm(_) => {
+            // Install, then build the package as publishing would.
+            cmd::stdout(Command::new("npm").current_dir(pkg.dir()).args([
+                "ci",
+                "--ignore-scripts",
+                "--no-audit",
+                "--no-fund",
+            ]))?;
+            cmd::stdout(
+                Command::new("npm")
+                    .current_dir(pkg.dir())
+                    .args(["publish", "--dry-run"]),
+            )?;
+            ts_api::exports(pkg)?
+        }
+    };
+    s.extend(match pkg.kind {
+        Kind::Cargo(_) => files::cargo_files(pkg, work)?,
+        Kind::Npm(_) => files::npm_files(pkg, work)?,
+    });
+    Ok(s)
 }
 
 /// Compares the pinned repositories named by `inputs/pins.toml`, paired by
@@ -49,10 +67,10 @@ pub fn run(inputs: &Path, work: &Path) -> anyhow::Result<Report> {
         failures.extend(discovery_failures);
         for pkg in found {
             let surface = package_surface(&pkg, work)
-                .map_err(|error| {
+                .map_err(|e| {
                     failures.push(Failure {
                         subject: pkg.id.clone(),
-                        error,
+                        error: format!("{e:#}"),
                     })
                 })
                 .ok();

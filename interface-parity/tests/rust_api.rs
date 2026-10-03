@@ -1,15 +1,10 @@
+mod checkout;
 mod common;
 
+use checkout::checkout;
 use interface_parity::compare::{Outcome, Surface, compare};
 use interface_parity::packages::discover;
 use interface_parity::rust_api;
-
-fn checkout(fixture: &str) -> std::path::PathBuf {
-    let (url, commit) = common::fixture_repo(fixture);
-    let dir = common::scratch(&format!("checkout-{fixture}"));
-    interface_parity::fetch::checkout(&url, &commit, &dir).unwrap();
-    dir
-}
 
 fn surface(fixture: &str, repo: &str) -> Surface {
     let (packages, _) = discover(repo, &checkout(fixture));
@@ -80,6 +75,6 @@ fn a_package_that_fails_to_build_is_an_error_carrying_the_compiler_output() {
     )
     .unwrap();
     let (packages, _) = discover("evm", &dir);
-    let err = rust_api::surface(&packages[0]).unwrap_err();
+    let err = format!("{:#}", rust_api::surface(&packages[0]).unwrap_err());
     assert!(err.contains("cannot find type `NoSuchType`"), "{err}");
 }

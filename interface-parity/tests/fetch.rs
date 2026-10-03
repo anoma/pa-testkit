@@ -26,5 +26,9 @@ fn checkout_of_an_unknown_commit_fails_loudly() {
         &dir.join("x"),
     )
     .unwrap_err();
-    assert!(err.to_string().contains("git fetch"), "{err:#}");
+    let err = format!("{err:#}");
+    assert!(
+        err.contains("\"fetch\"") && err.contains("0000000000000000000000000000000000000001"),
+        "{err}"
+    );
 }

@@ -2357,6 +2357,7 @@ name = "interface-parity"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "cargo_metadata 0.23.1",
  "hex",
  "public-api",
  "rustdoc-json",

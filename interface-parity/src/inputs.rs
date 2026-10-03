@@ -43,7 +43,7 @@ pub struct Pairs {
     pub package: Vec<PairEntry>,
 }
 
-fn read<T: for<'de> Deserialize<'de>>(path: &Path) -> anyhow::Result<T> {
+pub(crate) fn read<T: for<'de> Deserialize<'de>>(path: &Path) -> anyhow::Result<T> {
     let text =
         std::fs::read_to_string(path).with_context(|| format!("reading {}", path.display()))?;
     toml::from_str(&text).with_context(|| format!("parsing {}", path.display()))

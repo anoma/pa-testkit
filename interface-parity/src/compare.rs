@@ -14,15 +14,15 @@ impl Surface {
     }
 
     pub fn extend(&mut self, other: Surface) {
-        for (key, values) in other.0 {
-            for value in values {
-                self.insert(key.clone(), value);
-            }
+        for (key, mut values) in other.0 {
+            let existing = self.0.entry(key).or_default();
+            existing.append(&mut values);
+            existing.sort();
         }
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Outcome {
     Match,
     OnlyEvm,
@@ -61,6 +61,17 @@ pub fn compare(pair: &str, evm: &Surface, solana: &Surface) -> Vec<Line> {
             solana: solana.0.get(key).cloned().unwrap_or_default(),
         })
         .collect()
+}
+
+/// A line of the pair `E ↔ S`, for tests.
+#[cfg(test)]
+pub(crate) fn test_line(key: &str, evm: &[&str], solana: &[&str]) -> Line {
+    Line {
+        pair: "E ↔ S".into(),
+        key: key.into(),
+        evm: evm.iter().map(|s| s.to_string()).collect(),
+        solana: solana.iter().map(|s| s.to_string()).collect(),
+    }
 }
 
 #[cfg(test)]

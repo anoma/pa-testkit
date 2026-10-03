@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fmt::Write;
 
 use crate::compare::{Line, Outcome};
@@ -27,12 +28,23 @@ impl Report {
         lines: Vec<Line>,
         excuses: Vec<Excuse>,
     ) -> Report {
+        // Excuses are unique per pair and key, so one lookup finds the only
+        // excuse that could cover a line.
+        let by_line: HashMap<(&str, &str), usize> = excuses
+            .iter()
+            .enumerate()
+            .map(|(i, e)| ((e.pair.as_str(), e.key.as_str()), i))
+            .collect();
         let mut used = vec![false; excuses.len()];
         let (mut unexcused, mut excused, mut matches) = (vec![], vec![], vec![]);
         for line in lines {
+            let covering = by_line
+                .get(&(line.pair.as_str(), line.key.as_str()))
+                .filter(|&&i| excuses[i].covers(&line))
+                .copied();
             if line.outcome() == Outcome::Match {
                 matches.push(line);
-            } else if let Some(i) = excuses.iter().position(|e| e.covers(&line)) {
+            } else if let Some(i) = covering {
                 used[i] = true;
                 excused.push((line, excuses[i].clone()));
             } else {
@@ -154,17 +166,8 @@ fn write_lines<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::compare::Line;
+    use crate::compare::test_line as line;
     use crate::excuses::parse;
-
-    fn line(key: &str, evm: &[&str], solana: &[&str]) -> Line {
-        Line {
-            pair: "E ↔ S".into(),
-            key: key.into(),
-            evm: evm.iter().map(|s| s.to_string()).collect(),
-            solana: solana.iter().map(|s| s.to_string()).collect(),
-        }
-    }
 
     const EXCUSES: &str = r#"
         [[excuse]]

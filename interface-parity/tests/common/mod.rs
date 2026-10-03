@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::sync::atomic::{AtomicUsize, Ordering};
+
+use interface_parity::fetch::git;
 
 /// A new empty directory under the tests' temporary directory, unique to this
 /// call, so tests running in parallel never share one.
@@ -16,20 +17,6 @@ pub fn scratch(name: &str) -> PathBuf {
     }
     std::fs::create_dir_all(&dir).unwrap();
     dir
-}
-
-fn git(dir: &Path, args: &[&str]) -> String {
-    let out = Command::new("git")
-        .current_dir(dir)
-        .args(args)
-        .output()
-        .unwrap();
-    assert!(
-        out.status.success(),
-        "git {args:?} failed: {}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-    String::from_utf8(out.stdout).unwrap().trim().to_owned()
 }
 
 fn copy(from: &Path, to: &Path) {
@@ -55,26 +42,24 @@ pub fn fixture_repo(name: &str) -> (String, String) {
             .join(name),
         &dir,
     );
-    git(&dir, &["init", "-q"]);
-    git(&dir, &["add", "-A"]);
-    git(
-        &dir,
-        &[
-            "-c",
-            "user.name=fixture",
-            "-c",
-            "user.email=fixture@example.com",
-            "commit",
-            "-qm",
-            name,
-        ],
-    );
+    let git = |args: &[&str]| git(Some(&dir), args).unwrap().trim().to_owned();
+    git(&["init", "-q"]);
+    git(&["add", "-A"]);
+    git(&[
+        "-c",
+        "user.name=fixture",
+        "-c",
+        "user.email=fixture@example.com",
+        "commit",
+        "-qm",
+        name,
+    ]);
     let tags = std::fs::read_to_string(dir.join("TAGS")).unwrap();
     for tag in tags.lines().filter(|l| !l.is_empty()) {
-        git(&dir, &["tag", tag]);
+        git(&["tag", tag]);
     }
     (
         format!("file://{}", dir.display()),
-        git(&dir, &["rev-parse", "HEAD"]),
+        git(&["rev-parse", "HEAD"]),
     )
 }

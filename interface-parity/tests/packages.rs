@@ -1,14 +1,9 @@
+mod checkout;
 mod common;
 
+use checkout::checkout;
 use interface_parity::compare::compare;
 use interface_parity::packages::{Kind, cargo_metadata_surface, discover};
-
-fn checkout(fixture: &str) -> std::path::PathBuf {
-    let (url, commit) = common::fixture_repo(fixture);
-    let dir = common::scratch(&format!("checkout-{fixture}"));
-    interface_parity::fetch::checkout(&url, &commit, &dir).unwrap();
-    dir
-}
 
 #[test]
 fn discovery_finds_published_packages_only() {
@@ -20,8 +15,8 @@ fn discovery_finds_published_packages_only() {
         vec!["evm/cargo:evm-bindings", "evm/cargo:evm-extra"],
         "publish = false must be left out"
     );
-    assert_eq!(packages[0].kind, Kind::Cargo);
-    assert_eq!(packages[0].lib_name.as_deref(), Some("evm_bindings"));
+    assert!(matches!(packages[0].kind, Kind::Cargo(_)));
+    assert_eq!(packages[0].lib_name().as_deref(), Some("evm_bindings"));
 }
 
 #[test]
@@ -36,11 +31,10 @@ fn private_npm_packages_are_left_out() {
 #[test]
 fn cargo_metadata_items_cover_name_version_features_and_targets() {
     let (packages, _) = discover("evm", &checkout("evm-repo"));
-    let lines = compare(
-        "p",
-        &cargo_metadata_surface(&packages[0]),
-        &Default::default(),
-    );
+    let Kind::Cargo(meta) = &packages[0].kind else {
+        panic!("{:?} is not a Cargo package", packages[0].id);
+    };
+    let lines = compare("p", &cargo_metadata_surface(meta), &Default::default());
     let rendered: Vec<String> = lines
         .iter()
         .map(|l| format!("{} = {:?}", l.key, l.evm))

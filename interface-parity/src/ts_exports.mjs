@@ -1,5 +1,5 @@
 // Prints one JSON object per exported item of a package's types entry:
-// {"key": ..., "value": ...}. Usage: node ts_exports.mjs <package dir> <types entry>
+// {"key": ..., "value": ...}. Usage: node --input-type=module - <package dir> <types entry> < ts_exports.mjs
 import { createRequire } from "node:module";
 import path from "node:path";
 

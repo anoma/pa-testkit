@@ -8,6 +8,7 @@ publish = false
 
 [dependencies]
 anyhow = "1.0"
+cargo_metadata = "0.23"
 hex = "0.4"
 public-api = "=0.52.2"
 rustdoc-json = "=0.9.10"

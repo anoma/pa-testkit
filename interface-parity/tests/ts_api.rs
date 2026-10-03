@@ -1,20 +1,19 @@
+mod checkout;
 mod common;
 
+use checkout::checkout;
 use interface_parity::compare::compare;
 use interface_parity::packages::{Kind, discover};
 
 #[test]
-fn exports_and_their_members_are_items_and_built_sources_are_left_out() {
-    let (url, commit) = common::fixture_repo("solana-repo");
-    let dir = common::scratch("checkout-solana-repo");
-    interface_parity::fetch::checkout(&url, &commit, &dir).unwrap();
-    let (packages, failures) = discover("solana", &dir);
+fn an_npm_package_is_built_then_its_exports_and_packed_files_are_items() {
+    let (packages, failures) = discover("solana", &checkout("solana-repo"));
     assert!(failures.is_empty(), "{failures:#?}");
     let pkg = packages
         .iter()
-        .find(|p| p.kind == Kind::Npm)
+        .find(|p| matches!(p.kind, Kind::Npm(_)))
         .expect("npm package");
-    let s = interface_parity::ts_api::surface(pkg, &common::scratch("ts-work")).unwrap();
+    let s = interface_parity::run::package_surface(pkg, &common::scratch("ts-work")).unwrap();
     let lines = compare("p", &s, &Default::default());
     let rendered: Vec<String> = lines
         .iter()
@@ -35,6 +34,6 @@ fn exports_and_their_members_are_items_and_built_sources_are_left_out() {
     }
     assert!(
         !rendered.iter().any(|r| r.starts_with("file dist/")),
-        "{rendered:#?}"
+        "built sources are left to the export extraction: {rendered:#?}"
     );
 }
