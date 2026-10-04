@@ -43,8 +43,12 @@ nesting.
   proof-tamper counterpart lives on `Transaction` (`tamper_first_logic_seal`).
 - `fixtures` (`feature = "fixtures"`): the trivial action kind — one `build`
   (plus batch `build_many`) returning `ActionData`, with `Overrides` for negative
-  tests (ADR-0003). App- and chain-agnostic, exposed for reuse by every
-  integration-test crate.
+  tests (ADR-0003) — and the pass-through action kind, whose resources carry
+  the app data a test gives them (an external call, in the encoding of the
+  chain under test), under a logic whose guest commits its instance as given
+  (`circuits/passthrough-logic`, committed as `elfs/passthrough-logic-guest.bin`,
+  rebuilt reproducibly by `scripts/update_elfs.sh`). App- and chain-agnostic,
+  exposed for reuse by every integration-test crate.
 - `suite` (`feature = "fixtures"`): the chain-agnostic integration tests, each
   a function over any `Environment` (settle a trivial, an n:m, a multi-action
   and two consume-only transactions; refuse invalid witnesses; refuse a
