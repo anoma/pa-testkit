@@ -17,6 +17,10 @@ fmt-check:
 build *args:
     cargo build {{ args }}
 
+# Check that each feature builds on its own, as a consumer enabling only it
+check-features:
+    for feature in fixtures local e2e mocks abi_encoding; do cargo check --no-default-features --features "$feature"; done
+
 # Test
 test *args:
     cargo test {{ args }}
