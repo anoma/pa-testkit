@@ -29,6 +29,7 @@ pub(super) struct ConstrainedLogic {
 /// tag-correlation rules.
 pub(super) struct ConstrainedAction {
     /// The action's compliance instance.
+    #[cfg_attr(not(feature = "local"), allow(dead_code))]
     pub compliance_instance: ComplianceInstance,
     /// Logic inputs for the consumed resources, in `consumed_publics` order.
     pub consumed_logics: Vec<ConstrainedLogic>,
