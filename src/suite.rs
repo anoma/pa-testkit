@@ -1,15 +1,17 @@
 //! Chain-agnostic integration tests. Each one proves and settles, or refuses,
 //! one kind of transaction through any [`Environment`]; a chain's harness runs
-//! them against each of its environments. Only the error a chain reports for a
-//! refused settlement is chain-specific, so the test that expects one takes it
-//! as a [`Needle`].
+//! them against each of its environments. The error a chain reports for a
+//! refused settlement is chain-specific, so a test that expects one takes it
+//! as a [`Needle`]; so is the encoding of an external call, which an
+//! environment supplies as a [`BlockTimeForwarder`].
 
 use anyhow::Context;
 
 use crate::assert::{Needle, expect_integration_panic};
 use crate::environment::Environment;
-use crate::fixtures::trivial;
+use crate::fixtures::{passthrough, trivial};
 use crate::transaction::Transaction;
+use crate::witness::{AppData, ExpirableBlob};
 use crate::{commitment_root, execute_tx, prove_actions};
 
 /// The nonce of the trivial transaction's consumed resource, outside the
@@ -120,9 +122,58 @@ where
     expect_integration_panic(refusal)(execute_tx(env, tx).await)
 }
 
+/// How a block-time forwarder finds the time it is asked about compared with
+/// the block's: the byte both chains' example forwarders return (`LT`, `EQ`
+/// and `GT` in pa-evm's `BlockTimeForwarder.TimeComparison` and the Solana
+/// adapter's `block_time_forwarder`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
+pub enum TimeComparison {
+    Before = 0,
+    At = 1,
+    After = 2,
+}
+
+/// An environment whose protocol adapter can call its chain's example
+/// block-time forwarder.
+pub trait BlockTimeForwarder: Environment {
+    /// The external payload blob of a call to the block-time forwarder asking
+    /// how `time`, in seconds since the Unix epoch, compares with the block's,
+    /// expecting `expected`. The forwarder is ready for the call once this
+    /// returns.
+    #[allow(async_fn_in_trait)]
+    async fn block_time_call(
+        &mut self,
+        time: u32,
+        expected: TimeComparison,
+    ) -> anyhow::Result<Vec<u32>>;
+}
+
+/// A transaction whose external call expects what the forwarder returns
+/// settles: time 0 is before every block.
+pub async fn settles_an_external_call_whose_output_matches<Env: BlockTimeForwarder>(
+    env: &mut Env,
+) -> anyhow::Result<()> {
+    let call = env.block_time_call(0, TimeComparison::Before).await?;
+    let tx = prove_external_call(env, 61, call).await?;
+    execute_tx(env, tx).await
+}
+
+/// The protocol adapter refuses a transaction whose external call expects
+/// other than what the forwarder returns, with the error `refusal` finds.
+pub async fn settlement_refuses_an_external_call_whose_output_differs<Env: BlockTimeForwarder>(
+    env: &mut Env,
+    refusal: Needle,
+) -> anyhow::Result<()> {
+    let call = env.block_time_call(0, TimeComparison::After).await?;
+    let tx = prove_external_call(env, 62, call).await?;
+    expect_integration_panic(refusal)(execute_tx(env, tx).await)
+}
+
 #[cfg(all(test, feature = "local"))]
 mod tests {
     use std::collections::HashSet;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     use anoma_rm_risc0::Digest;
     use anoma_rm_risc0::merkle_path::PADDING_LEAF;
@@ -135,7 +186,9 @@ mod tests {
     use crate::prover::{LocalProver, mock_aggregation_seal};
 
     /// A protocol adapter in memory, checking what both chains' adapters
-    /// check: the local prover's seal, the consumed roots and the nullifiers.
+    /// check: the local prover's seal, the consumed roots, the nullifiers and
+    /// each external call's output. Its one forwarder is a block-time
+    /// forwarder whose calls are `[time, expected output]`.
     struct InMemoryAdapter {
         tree: FrontierCommitmentTree,
         roots: HashSet<Digest>,
@@ -176,6 +229,13 @@ mod tests {
                     c.resource_nullifier
                 );
             }
+            for action in &aggregation.instance.actions {
+                let consumed = action.consumed_publics.iter().map(|c| &c.app_data);
+                let created = action.created_publics.iter().map(|c| &c.app_data);
+                for call in consumed.chain(created).flat_map(|a| &a.external_payload) {
+                    call_block_time_forwarder(&call.blob)?;
+                }
+            }
             self.nullifiers.extend(spent);
             if !created.is_empty() {
                 self.tree.add(created);
@@ -187,6 +247,23 @@ mod tests {
         fn commitment_tree(&self) -> &FrontierCommitmentTree {
             &self.tree
         }
+    }
+
+    fn call_block_time_forwarder(call: &[u32]) -> anyhow::Result<()> {
+        let [time, expected] = call else {
+            anyhow::bail!("an external call is [time, expected output], not {call:?}");
+        };
+        let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+        let output = match u64::from(*time).cmp(&now) {
+            std::cmp::Ordering::Less => TimeComparison::Before,
+            std::cmp::Ordering::Equal => TimeComparison::At,
+            std::cmp::Ordering::Greater => TimeComparison::After,
+        };
+        anyhow::ensure!(
+            output as u32 == *expected,
+            "the external call returned {output:?}, not {expected}"
+        );
+        Ok(())
     }
 
     struct InMemoryEnvironment {
@@ -231,6 +308,16 @@ mod tests {
         }
     }
 
+    impl BlockTimeForwarder for InMemoryEnvironment {
+        async fn block_time_call(
+            &mut self,
+            time: u32,
+            expected: TimeComparison,
+        ) -> anyhow::Result<Vec<u32>> {
+            Ok(vec![time, expected as u32])
+        }
+    }
+
     /// The whole suite against the adapter in memory.
     mod in_memory {
         use super::*;
@@ -238,6 +325,7 @@ mod tests {
         crate::suite_tests!(
             async { anyhow::Ok(InMemoryEnvironment::new()) },
             refusal = Needle::Static("the aggregation seal does not verify"),
+            output_mismatch = Needle::Static("the external call returned Before, not 2"),
         );
     }
 
@@ -278,6 +366,26 @@ async fn proving_refuses_an_invalid_padding_resource<Env: Environment>(
     )
 }
 
+/// Proves a pass-through action, with nonces from `seed`, whose consumed
+/// resource makes the external call `call`.
+async fn prove_external_call<Env: Environment>(
+    env: &Env,
+    seed: u8,
+    call: Vec<u32>,
+) -> anyhow::Result<Env::Transaction> {
+    let app_data = AppData {
+        external_payload: vec![ExpirableBlob {
+            blob: call,
+            deletion_criterion: 0,
+        }],
+        ..AppData::default()
+    };
+    let action = passthrough::build(seed, app_data, passthrough::Overrides::default())
+        .context("failed to build a pass-through action")?
+        .witnesses;
+    prove_actions(env, &[action]).await
+}
+
 async fn settles_and_moves_the_root<Env: Environment>(
     env: &mut Env,
     actions: Vec<crate::witness::ActionWitnesses>,
@@ -299,13 +407,19 @@ async fn settles_and_moves_the_root<Env: Environment>(
 /// depends on `tokio` with `macros` and `rt-multi-thread`.
 ///
 /// With a `refusal` (the [`Needle`] the chain's error for a tampered
-/// aggregation seal matches), every suite test; without one, the three that
+/// aggregation seal matches) and an `output_mismatch` (the one its error for
+/// an external call's differing output matches), every suite test, for an
+/// environment that is a [`BlockTimeForwarder`]; without them, the three that
 /// settle a transaction, which pa-evm also runs against a fork of a live
 /// chain, where each proof is a proving-queue job.
 ///
 /// ```ignore
 /// mod local {
-///     anoma_pa_testkit::suite_tests!(Env::setup_bare(), refusal = Needle::Static("..."));
+///     anoma_pa_testkit::suite_tests!(
+///         Env::setup_bare(),
+///         refusal = Needle::Static("..."),
+///         output_mismatch = Needle::Static("..."),
+///     );
 /// }
 /// mod e2e_test {
 ///     anoma_pa_testkit::suite_tests!(E2eEnv::setup_bare());
@@ -313,7 +427,7 @@ async fn settles_and_moves_the_root<Env: Environment>(
 /// ```
 #[macro_export]
 macro_rules! suite_tests {
-    ($setup:expr, refusal = $refusal:expr $(,)?) => {
+    ($setup:expr, refusal = $refusal:expr, output_mismatch = $output_mismatch:expr $(,)?) => {
         $crate::suite_tests!($setup);
 
         #[tokio::test(flavor = "multi_thread")]
@@ -339,6 +453,21 @@ macro_rules! suite_tests {
             $crate::suite::settlement_refuses_a_tampered_aggregation_seal(
                 &mut $setup.await?,
                 $refusal,
+            )
+            .await
+        }
+
+        #[tokio::test(flavor = "multi_thread")]
+        async fn settles_an_external_call_whose_output_matches() -> ::anyhow::Result<()> {
+            $crate::suite::settles_an_external_call_whose_output_matches(&mut $setup.await?).await
+        }
+
+        #[tokio::test(flavor = "multi_thread")]
+        async fn settlement_refuses_an_external_call_whose_output_differs() -> ::anyhow::Result<()>
+        {
+            $crate::suite::settlement_refuses_an_external_call_whose_output_differs(
+                &mut $setup.await?,
+                $output_mismatch,
             )
             .await
         }
