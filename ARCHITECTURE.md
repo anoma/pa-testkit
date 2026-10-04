@@ -49,8 +49,10 @@ nesting.
   a function over any `Environment` (settle a trivial, an n:m, a multi-action
   and two consume-only transactions; refuse invalid witnesses; refuse a
   tampered aggregation seal, with the chain's error passed as a `Needle`).
-  Every chain's harness runs them against each of its environments; the
-  testkit runs them against an adapter in memory.
+  `suite_tests!` emits one test per suite function for an environment (every
+  test given the chain's seal refusal, the three settlement tests without
+  one, as pa-evm runs against a live fork), so a harness cannot miss one;
+  the testkit runs it against an adapter in memory.
 - `identities` — well-known test signing keys.
 - `mocks` (`feature = "mocks"`): `mockall` doubles of the core traits.
 

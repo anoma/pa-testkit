@@ -19,22 +19,22 @@ const TRIVIAL_NONCE: [u8; 32] = *b"anoma pa-testkit suite trivial 1";
 
 /// A transaction of one trivial action settles and moves the root.
 pub async fn settles_a_trivial_transaction<Env: Environment>(env: &mut Env) -> anyhow::Result<()> {
-    let action = trivial::build(
+    settles_one_action(
+        env,
         1,
         trivial::Overrides {
             consumed_nonce: Some(TRIVIAL_NONCE),
             ..trivial::Overrides::default()
         },
     )
-    .context("failed to build trivial action")?
-    .witnesses;
-    settles_and_moves_the_root(env, vec![action]).await
+    .await
 }
 
 /// An action consuming two resources and creating three settles and moves the
 /// root.
 pub async fn settles_an_n_to_m_transaction<Env: Environment>(env: &mut Env) -> anyhow::Result<()> {
-    let action = trivial::build(
+    settles_one_action(
+        env,
         21,
         trivial::Overrides {
             consumed_count: Some(2),
@@ -42,9 +42,7 @@ pub async fn settles_an_n_to_m_transaction<Env: Environment>(env: &mut Env) -> a
             ..trivial::Overrides::default()
         },
     )
-    .context("failed to build an n:m trivial action")?
-    .witnesses;
-    settles_and_moves_the_root(env, vec![action]).await
+    .await
 }
 
 /// A transaction of three actions settles and moves the root.
@@ -84,22 +82,24 @@ pub async fn settles_consume_only_transactions_without_a_root_change<Env: Enviro
 
 /// The prover refuses a padding resource of nonzero quantity.
 pub async fn proving_refuses_a_nonzero_quantity<Env: Environment>(env: &Env) -> anyhow::Result<()> {
-    let bad = trivial::build(7, trivial::Overrides::invalid_nonzero_quantity())
-        .context("failed to build invalid trivial action")?;
-    expect_integration_panic(Needle::Static("Invalid padding resource"))(
-        prove_actions(env, &[bad.witnesses]).await,
+    proving_refuses_an_invalid_padding_resource(
+        env,
+        7,
+        trivial::Overrides::invalid_nonzero_quantity(),
     )
+    .await
 }
 
 /// The prover refuses a consumed padding resource that is not ephemeral.
 pub async fn proving_refuses_a_non_ephemeral_consumed_resource<Env: Environment>(
     env: &Env,
 ) -> anyhow::Result<()> {
-    let bad = trivial::build(8, trivial::Overrides::invalid_consumed_non_ephemeral())
-        .context("failed to build invalid trivial action")?;
-    expect_integration_panic(Needle::Static("Invalid padding resource"))(
-        prove_actions(env, &[bad.witnesses]).await,
+    proving_refuses_an_invalid_padding_resource(
+        env,
+        8,
+        trivial::Overrides::invalid_consumed_non_ephemeral(),
     )
+    .await
 }
 
 /// The protocol adapter refuses a transaction whose aggregation seal was
@@ -129,7 +129,9 @@ mod tests {
 
     use super::*;
     use crate::commitment_tree::FrontierCommitmentTree;
-    use crate::environment::{CommitmentTree, ProtocolAdapter, State, StateBuilder};
+    use crate::environment::{
+        CommitmentTree, ProtocolAdapter, State, StateBuilder, Transaction as _,
+    };
     use crate::prover::{LocalProver, mock_aggregation_seal};
 
     /// A protocol adapter in memory, checking what both chains' adapters
@@ -145,6 +147,7 @@ mod tests {
         type CommitmentTree = FrontierCommitmentTree;
 
         async fn execute(&mut self, transaction: Transaction) -> anyhow::Result<()> {
+            let created: Vec<Digest> = transaction.created_commitments()?.collect();
             let aggregation = transaction
                 .into_arm()
                 .aggregation
@@ -174,12 +177,6 @@ mod tests {
                 );
             }
             self.nullifiers.extend(spent);
-            let created: Vec<Digest> = aggregation
-                .instance
-                .actions
-                .iter()
-                .flat_map(|a| a.created_publics.iter().map(|c| c.resource_commitment))
-                .collect();
             if !created.is_empty() {
                 self.tree.add(created);
                 self.roots.insert(self.tree.root()?);
@@ -234,32 +231,14 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn the_suite_passes_on_an_adapter_in_memory() {
-        settles_a_trivial_transaction(&mut InMemoryEnvironment::new())
-            .await
-            .unwrap();
-        settles_an_n_to_m_transaction(&mut InMemoryEnvironment::new())
-            .await
-            .unwrap();
-        settles_a_multi_action_transaction(&mut InMemoryEnvironment::new())
-            .await
-            .unwrap();
-        settles_consume_only_transactions_without_a_root_change(&mut InMemoryEnvironment::new())
-            .await
-            .unwrap();
-        proving_refuses_a_nonzero_quantity(&InMemoryEnvironment::new())
-            .await
-            .unwrap();
-        proving_refuses_a_non_ephemeral_consumed_resource(&InMemoryEnvironment::new())
-            .await
-            .unwrap();
-        settlement_refuses_a_tampered_aggregation_seal(
-            &mut InMemoryEnvironment::new(),
-            Needle::Static("the aggregation seal does not verify"),
-        )
-        .await
-        .unwrap();
+    /// The whole suite against the adapter in memory.
+    mod in_memory {
+        use super::*;
+
+        crate::suite_tests!(
+            async { anyhow::Ok(InMemoryEnvironment::new()) },
+            refusal = Needle::Static("the aggregation seal does not verify"),
+        );
     }
 
     #[tokio::test]
@@ -277,6 +256,28 @@ mod tests {
     }
 }
 
+async fn settles_one_action<Env: Environment>(
+    env: &mut Env,
+    seed: u8,
+    overrides: trivial::Overrides,
+) -> anyhow::Result<()> {
+    let action = trivial::build(seed, overrides)
+        .with_context(|| format!("failed to build trivial action {seed}"))?
+        .witnesses;
+    settles_and_moves_the_root(env, vec![action]).await
+}
+
+async fn proving_refuses_an_invalid_padding_resource<Env: Environment>(
+    env: &Env,
+    seed: u8,
+    overrides: trivial::Overrides,
+) -> anyhow::Result<()> {
+    let bad = trivial::build(seed, overrides).context("failed to build invalid trivial action")?;
+    expect_integration_panic(Needle::Static("Invalid padding resource"))(
+        prove_actions(env, &[bad.witnesses]).await,
+    )
+}
+
 async fn settles_and_moves_the_root<Env: Environment>(
     env: &mut Env,
     actions: Vec<crate::witness::ActionWitnesses>,
@@ -289,4 +290,73 @@ async fn settles_and_moves_the_root<Env: Environment>(
         "the commitment tree root must change"
     );
     Ok(())
+}
+
+/// Emits one test per suite function against the environment `$setup`
+/// builds (an expression evaluating to `anyhow::Result<Env>`), each test
+/// with an environment of its own. Invoke it inside a module per
+/// environment; the tests run on tokio's multi-thread runtime, so the crate
+/// depends on `tokio` with `macros` and `rt-multi-thread`.
+///
+/// With a `refusal` (the [`Needle`] the chain's error for a tampered
+/// aggregation seal matches), every suite test; without one, the three that
+/// settle a transaction, which pa-evm also runs against a fork of a live
+/// chain, where each proof is a proving-queue job.
+///
+/// ```ignore
+/// mod local {
+///     anoma_pa_testkit::suite_tests!(Env::setup_bare(), refusal = Needle::Static("..."));
+/// }
+/// mod e2e_test {
+///     anoma_pa_testkit::suite_tests!(E2eEnv::setup_bare());
+/// }
+/// ```
+#[macro_export]
+macro_rules! suite_tests {
+    ($setup:expr, refusal = $refusal:expr $(,)?) => {
+        $crate::suite_tests!($setup);
+
+        #[tokio::test(flavor = "multi_thread")]
+        async fn settles_consume_only_transactions_without_a_root_change() -> ::anyhow::Result<()> {
+            $crate::suite::settles_consume_only_transactions_without_a_root_change(
+                &mut $setup.await?,
+            )
+            .await
+        }
+
+        #[tokio::test(flavor = "multi_thread")]
+        async fn proving_refuses_a_nonzero_quantity() -> ::anyhow::Result<()> {
+            $crate::suite::proving_refuses_a_nonzero_quantity(&$setup.await?).await
+        }
+
+        #[tokio::test(flavor = "multi_thread")]
+        async fn proving_refuses_a_non_ephemeral_consumed_resource() -> ::anyhow::Result<()> {
+            $crate::suite::proving_refuses_a_non_ephemeral_consumed_resource(&$setup.await?).await
+        }
+
+        #[tokio::test(flavor = "multi_thread")]
+        async fn settlement_refuses_a_tampered_aggregation_seal() -> ::anyhow::Result<()> {
+            $crate::suite::settlement_refuses_a_tampered_aggregation_seal(
+                &mut $setup.await?,
+                $refusal,
+            )
+            .await
+        }
+    };
+    ($setup:expr $(,)?) => {
+        #[tokio::test(flavor = "multi_thread")]
+        async fn settles_a_trivial_transaction() -> ::anyhow::Result<()> {
+            $crate::suite::settles_a_trivial_transaction(&mut $setup.await?).await
+        }
+
+        #[tokio::test(flavor = "multi_thread")]
+        async fn settles_an_n_to_m_transaction() -> ::anyhow::Result<()> {
+            $crate::suite::settles_an_n_to_m_transaction(&mut $setup.await?).await
+        }
+
+        #[tokio::test(flavor = "multi_thread")]
+        async fn settles_a_multi_action_transaction() -> ::anyhow::Result<()> {
+            $crate::suite::settles_a_multi_action_transaction(&mut $setup.await?).await
+        }
+    };
 }
