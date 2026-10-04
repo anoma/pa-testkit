@@ -15,6 +15,8 @@ mod remote;
 
 #[cfg(feature = "local")]
 pub use local::LocalProver;
+#[cfg(all(test, feature = "local"))]
+pub(crate) use local::mock_aggregation_seal;
 #[cfg(feature = "e2e")]
 pub use remote::QueueProver;
 

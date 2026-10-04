@@ -45,6 +45,12 @@ nesting.
   (plus batch `build_many`) returning `ActionData`, with `Overrides` for negative
   tests (ADR-0003). App- and chain-agnostic, exposed for reuse by every
   integration-test crate.
+- `suite` (`feature = "fixtures"`): the chain-agnostic integration tests, each
+  a function over any `Environment` (settle a trivial, an n:m, a multi-action
+  and two consume-only transactions; refuse invalid witnesses; refuse a
+  tampered aggregation seal, with the chain's error passed as a `Needle`).
+  Every chain's harness runs them against each of its environments; the
+  testkit runs them against an adapter in memory.
 - `identities` — well-known test signing keys.
 - `mocks` (`feature = "mocks"`): `mockall` doubles of the core traits.
 
