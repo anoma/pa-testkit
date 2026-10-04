@@ -43,8 +43,9 @@ impl Transaction {
 
     /// Flip all bits of one byte of the aggregation proof's inner Groth16
     /// seal — used by negative tests to check that a protocol adapter rejects
-    /// tampered proofs.
-    #[cfg(any(feature = "local", feature = "e2e"))]
+    /// tampered proofs. Available with every feature that brings in the
+    /// bincode decoding it needs.
+    #[cfg(any(feature = "local", feature = "e2e", feature = "fixtures"))]
     pub fn tamper_aggregation_seal(&mut self) -> anyhow::Result<()> {
         use anyhow::Context;
 
