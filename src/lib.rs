@@ -1,4 +1,5 @@
 pub mod assert;
+pub mod commitment_tree;
 pub mod environment;
 #[cfg(feature = "fixtures")]
 pub mod fixtures;
