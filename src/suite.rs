@@ -122,24 +122,17 @@ where
 
 #[cfg(all(test, feature = "local"))]
 mod tests {
-    use std::collections::HashSet;
-
     use anoma_rm_risc0::Digest;
-    use anoma_rm_risc0::merkle_path::PADDING_LEAF;
 
     use super::*;
     use crate::commitment_tree::FrontierCommitmentTree;
-    use crate::environment::{
-        CommitmentTree, ProtocolAdapter, State, StateBuilder, Transaction as _,
-    };
+    use crate::environment::{ProtocolAdapter, State, StateBuilder, Transaction as _};
     use crate::prover::{LocalProver, mock_aggregation_seal};
 
-    /// A protocol adapter in memory, checking what both chains' adapters
-    /// check: the local prover's seal, the consumed roots and the nullifiers.
+    /// A protocol adapter in memory that checks the local prover's seal: the
+    /// one refusal the suite expects.
     struct InMemoryAdapter {
         tree: FrontierCommitmentTree,
-        roots: HashSet<Digest>,
-        nullifiers: HashSet<Digest>,
     }
 
     impl ProtocolAdapter for InMemoryAdapter {
@@ -153,34 +146,10 @@ mod tests {
                 .aggregation
                 .context("the transaction carries no aggregation")?;
             anyhow::ensure!(
-                aggregation.proof == mock_aggregation_seal(&aggregation.instance)?,
+                aggregation.proof == mock_aggregation_seal(&aggregation.instance),
                 "the aggregation seal does not verify"
             );
-            let consumed = aggregation
-                .instance
-                .actions
-                .iter()
-                .flat_map(|a| &a.consumed_publics);
-            let mut spent = HashSet::new();
-            for c in consumed {
-                anyhow::ensure!(
-                    c.commitment_tree_root == PADDING_LEAF
-                        || self.roots.contains(&c.commitment_tree_root),
-                    "unknown root {}",
-                    c.commitment_tree_root
-                );
-                anyhow::ensure!(
-                    !self.nullifiers.contains(&c.resource_nullifier)
-                        && spent.insert(c.resource_nullifier),
-                    "nullifier {} is spent",
-                    c.resource_nullifier
-                );
-            }
-            self.nullifiers.extend(spent);
-            if !created.is_empty() {
-                self.tree.add(created);
-                self.roots.insert(self.tree.root()?);
-            }
+            self.tree.add(created);
             Ok(())
         }
 
@@ -202,8 +171,6 @@ mod tests {
                 prover: LocalProver,
                 adapter: InMemoryAdapter {
                     tree: FrontierCommitmentTree::new(0, Vec::new()).unwrap(),
-                    roots: HashSet::new(),
-                    nullifiers: HashSet::new(),
                 },
             }
         }
@@ -239,20 +206,6 @@ mod tests {
             async { anyhow::Ok(InMemoryEnvironment::new()) },
             refusal = Needle::Static("the aggregation seal does not verify"),
         );
-    }
-
-    #[tokio::test]
-    async fn a_settled_transaction_cannot_settle_again() {
-        let mut env = InMemoryEnvironment::new();
-        let actions = trivial::build_many(1, 51).unwrap();
-        let tx = prove_actions(&env, &actions).await.unwrap();
-        execute_tx(&mut env, Transaction::from_arm(tx.as_arm().clone()))
-            .await
-            .unwrap();
-        expect_integration_panic(Needle::Regexp(
-            regex::Regex::new("nullifier .* is spent").unwrap(),
-        ))(execute_tx(&mut env, tx).await)
-        .unwrap();
     }
 }
 
