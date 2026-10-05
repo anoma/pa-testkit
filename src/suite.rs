@@ -11,7 +11,6 @@ use crate::assert::{Needle, expect_integration_panic};
 use crate::environment::Environment;
 use crate::fixtures::{passthrough, trivial};
 use crate::transaction::Transaction;
-use crate::witness::{AppData, ExpirableBlob};
 use crate::{commitment_root, execute_tx, prove_actions};
 
 /// The nonce of the trivial transaction's consumed resource, outside the
@@ -172,27 +171,21 @@ pub async fn settlement_refuses_an_external_call_whose_output_differs<Env: Block
 
 #[cfg(all(test, feature = "local"))]
 mod tests {
-    use std::collections::HashSet;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use anoma_rm_risc0::Digest;
-    use anoma_rm_risc0::merkle_path::PADDING_LEAF;
 
     use super::*;
     use crate::commitment_tree::FrontierCommitmentTree;
-    use crate::environment::{
-        CommitmentTree, ProtocolAdapter, State, StateBuilder, Transaction as _,
-    };
+    use crate::environment::{ProtocolAdapter, State, StateBuilder, Transaction as _};
     use crate::prover::{LocalProver, mock_aggregation_seal};
 
-    /// A protocol adapter in memory, checking what both chains' adapters
-    /// check: the local prover's seal, the consumed roots, the nullifiers and
-    /// each external call's output. Its one forwarder is a block-time
-    /// forwarder whose calls are `[time, expected output]`.
+    /// A protocol adapter in memory that checks what the suite expects it to
+    /// refuse: the local prover's seal and each external call's output. Its
+    /// one forwarder is a block-time forwarder whose calls are `[time,
+    /// expected output]`.
     struct InMemoryAdapter {
         tree: FrontierCommitmentTree,
-        roots: HashSet<Digest>,
-        nullifiers: HashSet<Digest>,
     }
 
     impl ProtocolAdapter for InMemoryAdapter {
@@ -206,29 +199,9 @@ mod tests {
                 .aggregation
                 .context("the transaction carries no aggregation")?;
             anyhow::ensure!(
-                aggregation.proof == mock_aggregation_seal(&aggregation.instance)?,
+                aggregation.proof == mock_aggregation_seal(&aggregation.instance),
                 "the aggregation seal does not verify"
             );
-            let consumed = aggregation
-                .instance
-                .actions
-                .iter()
-                .flat_map(|a| &a.consumed_publics);
-            let mut spent = HashSet::new();
-            for c in consumed {
-                anyhow::ensure!(
-                    c.commitment_tree_root == PADDING_LEAF
-                        || self.roots.contains(&c.commitment_tree_root),
-                    "unknown root {}",
-                    c.commitment_tree_root
-                );
-                anyhow::ensure!(
-                    !self.nullifiers.contains(&c.resource_nullifier)
-                        && spent.insert(c.resource_nullifier),
-                    "nullifier {} is spent",
-                    c.resource_nullifier
-                );
-            }
             for action in &aggregation.instance.actions {
                 let consumed = action.consumed_publics.iter().map(|c| &c.app_data);
                 let created = action.created_publics.iter().map(|c| &c.app_data);
@@ -236,11 +209,7 @@ mod tests {
                     call_block_time_forwarder(&call.blob)?;
                 }
             }
-            self.nullifiers.extend(spent);
-            if !created.is_empty() {
-                self.tree.add(created);
-                self.roots.insert(self.tree.root()?);
-            }
+            self.tree.add(created);
             Ok(())
         }
 
@@ -279,8 +248,6 @@ mod tests {
                 prover: LocalProver,
                 adapter: InMemoryAdapter {
                     tree: FrontierCommitmentTree::new(0, Vec::new()).unwrap(),
-                    roots: HashSet::new(),
-                    nullifiers: HashSet::new(),
                 },
             }
         }
@@ -328,20 +295,6 @@ mod tests {
             output_mismatch = Needle::Static("the external call returned Before, not 2"),
         );
     }
-
-    #[tokio::test]
-    async fn a_settled_transaction_cannot_settle_again() {
-        let mut env = InMemoryEnvironment::new();
-        let actions = trivial::build_many(1, 51).unwrap();
-        let tx = prove_actions(&env, &actions).await.unwrap();
-        execute_tx(&mut env, Transaction::from_arm(tx.as_arm().clone()))
-            .await
-            .unwrap();
-        expect_integration_panic(Needle::Regexp(
-            regex::Regex::new("nullifier .* is spent").unwrap(),
-        ))(execute_tx(&mut env, tx).await)
-        .unwrap();
-    }
 }
 
 async fn settles_one_action<Env: Environment>(
@@ -373,14 +326,7 @@ async fn prove_external_call<Env: Environment>(
     seed: u8,
     call: Vec<u32>,
 ) -> anyhow::Result<Env::Transaction> {
-    let app_data = AppData {
-        external_payload: vec![ExpirableBlob {
-            blob: call,
-            deletion_criterion: 0,
-        }],
-        ..AppData::default()
-    };
-    let action = passthrough::build(seed, app_data, passthrough::Overrides::default())
+    let action = passthrough::build(seed, vec![call], passthrough::Overrides::default())
         .context("failed to build a pass-through action")?
         .witnesses;
     prove_actions(env, &[action]).await

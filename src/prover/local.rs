@@ -55,22 +55,18 @@ fn encode_seal(verifying_key: Digest, journal: Digest) -> Vec<u8> {
 /// The mock aggregation seal over `instance`: the claim of the batch
 /// aggregation circuit over the instance's journal, in the journal encoding the
 /// provers use.
-pub(crate) fn mock_aggregation_seal(instance: &AggregationInstance) -> anyhow::Result<Vec<u8>> {
+pub(crate) fn mock_aggregation_seal(instance: &AggregationInstance) -> Vec<u8> {
     let (journal, verifying_key) = match JOURNAL_ENCODING {
         JournalEncoding::Abi => (
             anoma_rm_risc0::aggregation_instance::abi_encode_instance(instance.clone()),
             anoma_rm_risc0::constants::BATCH_AGGREGATION_EVM_VK,
         ),
-        JournalEncoding::Risc0Serde => {
-            let words = risc0_zkvm::serde::to_vec(instance)
-                .context("failed to serialize the aggregation instance")?;
-            (
-                anoma_rm_risc0::utils::words_to_bytes(&words).to_vec(),
-                anoma_rm_risc0::constants::BATCH_AGGREGATION_VK,
-            )
-        }
+        JournalEncoding::Risc0Serde => (
+            instance.to_journal(),
+            anoma_rm_risc0::constants::BATCH_AGGREGATION_VK,
+        ),
     };
-    Ok(encode_seal(verifying_key, journal_digest(&journal)))
+    encode_seal(verifying_key, journal_digest(&journal))
 }
 
 fn journal_digest(journal: &[u8]) -> Digest {
@@ -144,7 +140,7 @@ fn constrain_txn(action_witnesses: &[ActionWitnesses]) -> anyhow::Result<Transac
         actions,
     };
 
-    let proof = mock_aggregation_seal(&instance)?;
+    let proof = mock_aggregation_seal(&instance);
 
     let arm_txn = transaction::generate_delta_proof(ArmTxn {
         actions: None,

@@ -8,15 +8,15 @@ set -euo pipefail
 
 # The tool and builder image the committed guest was built with: another
 # builder's toolchain produces another binary, so another image id.
-CARGO_RISCZERO_VERSION="cargo-risczero 3.0.5"
+CARGO_RISCZERO_VERSION="3.0.5"
 export RISC0_DOCKER_CONTAINER_TAG="r0.1.88.0"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
-if [[ "$(cargo risczero --version)" != "$CARGO_RISCZERO_VERSION" ]]; then
-  echo "❌ The guest is built with ${CARGO_RISCZERO_VERSION}; cargo risczero is $(cargo risczero --version)." >&2
-  echo "   Install it with: rzup install cargo-risczero 3.0.5" >&2
+if [[ "$(cargo risczero --version)" != "cargo-risczero $CARGO_RISCZERO_VERSION" ]]; then
+  echo "❌ The guest is built with cargo-risczero ${CARGO_RISCZERO_VERSION}; cargo risczero is $(cargo risczero --version)." >&2
+  echo "   Install it with: rzup install cargo-risczero ${CARGO_RISCZERO_VERSION}" >&2
   exit 1
 fi
 

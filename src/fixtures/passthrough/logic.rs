@@ -8,8 +8,7 @@ use crate::witness::LogicWitness;
 /// `scripts/update_elfs.sh` builds it reproducibly.
 pub const PASSTHROUGH_LOGIC_PK: &[u8] = include_bytes!("../../../elfs/passthrough-logic-guest.bin");
 
-/// The image id of [`PASSTHROUGH_LOGIC_PK`]:
-/// 7e0b3501e71a2cf402e6b06484b1c47ef8d98ece5a74b9a74a72a9ed896077ee.
+/// The image id of [`PASSTHROUGH_LOGIC_PK`].
 pub const PASSTHROUGH_LOGIC_VK: Digest = Digest::new([
     0x01350b7e, 0xf42c1ae7, 0x64b0e602, 0x7ec4b184, 0xce8ed9f8, 0xa7b9745a, 0xeda9724a, 0xee776089,
 ]);
