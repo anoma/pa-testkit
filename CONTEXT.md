@@ -35,10 +35,11 @@ later. The backend determines the concrete `Transaction` type and `Prover`
 implementations, all of which live in the testkit.
 
 **Prover**:
-The component that turns action witnesses into a proven ARM transaction. Two
+The component that turns action witnesses into a proven ARM transaction. Three
 risc0 variants live in the testkit and are agnostic to the target chain: a local
-prover (runs circuits via `constrain`, emits mock seals, no real proving) and a
-queue prover (submits to the real remote proving queue).
+prover (runs circuits via `constrain`, emits mock seals, no real proving), a
+queue prover (submits to the real remote proving queue), and a risc0 prover
+(makes the queue's real proofs in-process, for an e2e run without the queue).
 _Avoid_: proof generator
 
 **ARM transaction**:
@@ -100,8 +101,8 @@ sensitive logic (e.g. EIP-712 / Permit2 signing) can be exercised.
 **E2e environment**:
 Test mode running against an Anvil fork of a real chain on which the contracts
 are already deployed; the harness reads their addresses + chain IDs from the
-`bindings` crates and deploys nothing, and uses the queue prover for real proof
-generation. Forking isolates the test so real on-chain state is never mutated.
+`bindings` crates and deploys nothing, and uses the queue prover (or, without a
+queue, the risc0 prover) for real proof generation. Forking isolates the test so real on-chain state is never mutated.
 _Avoid_: end-to-end (spell as "e2e" for the environment name)
 
 **Chain / queue selection**:

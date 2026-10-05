@@ -1,8 +1,6 @@
 //! Local prover: constrains circuits natively and emits a mock Groth16
 //! aggregation seal.
 
-use std::panic::AssertUnwindSafe;
-
 use anoma_rm_risc0::action_tree::ActionTree;
 use anoma_rm_risc0::aggregation_instance::{
     ActionAggregated, AggregationInstance, ConsumedResourceAggregated, CreatedResourceAggregated,
@@ -32,19 +30,7 @@ impl Prover for LocalProver {
     type Transaction = Transaction;
 
     async fn prove(&self, actions: &[ActionWitnesses]) -> anyhow::Result<Self::Transaction> {
-        // NOTE: this may not actually be unwind safe, but we don't care, because
-        // we will hardly ever run into unwind safety issues during these tests.
-        std::panic::catch_unwind(AssertUnwindSafe(|| constrain_txn(actions))).unwrap_or_else(
-            |cause| {
-                if let Some(panic_msg) = cause.downcast_ref::<String>() {
-                    anyhow::bail!("proving failed: {panic_msg}");
-                }
-                if let Some(panic_msg) = cause.downcast_ref::<&'static str>() {
-                    anyhow::bail!("proving failed: {panic_msg}");
-                }
-                std::panic::resume_unwind(cause)
-            },
-        )
+        constrain::catching_panics(|| constrain_txn(actions))
     }
 }
 
