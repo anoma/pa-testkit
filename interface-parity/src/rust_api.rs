@@ -1,13 +1,12 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::OnceLock;
 
 use anyhow::{Context, anyhow};
 use public_api::tokens::Token;
 
 use crate::cmd;
 use crate::compare::Surface;
-use crate::packages::Package;
+use crate::packages::has_lib;
 
 /// The toolchain whose rustdoc JSON `public-api` 0.52.2 reads. The justfile's
 /// `nightly` variable names the same toolchain for `just install-nightly`.
@@ -17,41 +16,33 @@ pub(crate) const NIGHTLY: &str = "nightly-2026-02-08";
 /// concurrent installs of one toolchain fail; a missing toolchain is an error.
 const NO_AUTO_INSTALL: (&str, &str) = ("RUSTUP_AUTO_INSTALL", "0");
 
-/// The pinned toolchain's `rustc` and `rustdoc`.
-fn nightly_binaries() -> anyhow::Result<&'static (PathBuf, PathBuf)> {
-    static BINARIES: OnceLock<Result<(PathBuf, PathBuf), String>> = OnceLock::new();
-    let which = |name: &str| {
-        cmd::stdout(
-            Command::new("rustup")
-                .env(NO_AUTO_INSTALL.0, NO_AUTO_INSTALL.1)
-                .args(["which", "--toolchain", NIGHTLY, name]),
-        )
-        .map(|path| PathBuf::from(path.trim()))
-        .map_err(|e| format!("{e:#}\ninstall the toolchain with `just install-nightly`"))
-    };
-    BINARIES
-        .get_or_init(|| Ok((which("rustc")?, which("rustdoc")?)))
-        .as_ref()
-        .map_err(|e| anyhow!("{e}"))
+/// The pinned toolchain's binary `name`.
+fn nightly_binary(name: &str) -> anyhow::Result<PathBuf> {
+    let path = cmd::stdout(
+        Command::new("rustup")
+            .env(NO_AUTO_INSTALL.0, NO_AUTO_INSTALL.1)
+            .args(["which", "--toolchain", NIGHTLY, name]),
+    )
+    .context("install the toolchain with `just install-nightly`")?;
+    Ok(PathBuf::from(path.trim()))
 }
 
 /// The public API of the package's library target, built with all features.
 /// A package without a library target exposes no Rust items.
-pub fn surface(pkg: &Package) -> anyhow::Result<Surface> {
-    if pkg.lib_name().is_none() {
+pub fn surface(meta: &cargo_metadata::Package) -> anyhow::Result<Surface> {
+    if !has_lib(meta) {
         return Ok(Surface::default());
     }
-    let (rustc, rustdoc) = nightly_binaries()?;
     let (mut stdout, mut stderr) = (Vec::new(), Vec::new());
     // rustdoc JSON only loads dependencies compiled by the same rustc, so both
     // binaries come from the pinned toolchain whatever PATH resolves first.
     let json = rustdoc_json::Builder::default()
         .toolchain(NIGHTLY)
         .env(NO_AUTO_INSTALL.0, NO_AUTO_INSTALL.1)
-        .env("RUSTC", rustc)
-        .env("RUSTDOC", rustdoc)
-        .manifest_path(&pkg.manifest)
-        .package(pkg.name())
+        .env("RUSTC", nightly_binary("rustc")?)
+        .env("RUSTDOC", nightly_binary("rustdoc")?)
+        .manifest_path(&meta.manifest_path)
+        .package(meta.name.as_str())
         .all_features(true)
         .build_with_captured_output(&mut stdout, &mut stderr)
         .map_err(|e| anyhow!("{e}\n{}", String::from_utf8_lossy(&stderr)))?;
@@ -61,18 +52,23 @@ pub fn surface(pkg: &Package) -> anyhow::Result<Surface> {
     let mut s = Surface::default();
     for item in api.items() {
         let tokens: Vec<&Token> = item.tokens().collect();
-        s.insert(key(&tokens), render(&tokens));
+        s.insert(key(&tokens), item.to_string());
     }
     Ok(s)
 }
 
 /// Writes a copy of the rustdoc JSON in which the documented crate is named
-/// `crate`, so the paths of paired crates with different names line up.
+/// `crate`, so the paths of paired crates with different names line up. Like
+/// `public-api`, it reads the JSON without serde_json's recursion limit, which
+/// deeply nested types exceed.
 fn rename_crate(json: &Path) -> anyhow::Result<PathBuf> {
     let text =
         std::fs::read_to_string(json).with_context(|| format!("reading {}", json.display()))?;
-    let mut doc: serde_json::Value =
-        serde_json::from_str(&text).with_context(|| format!("parsing {}", json.display()))?;
+    let mut de = serde_json::Deserializer::from_str(&text);
+    de.disable_recursion_limit();
+    let mut doc: serde_json::Value = serde::Deserialize::deserialize(&mut de)
+        .and_then(|doc| de.end().map(|()| doc))
+        .with_context(|| format!("parsing {}", json.display()))?;
     let root = doc["root"].to_string();
     doc["index"][&root]["name"] = "crate".into();
     for summary in doc["paths"]

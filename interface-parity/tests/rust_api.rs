@@ -3,20 +3,24 @@ mod common;
 
 use checkout::checkout;
 use interface_parity::compare::{Outcome, Surface, compare};
-use interface_parity::packages::discover;
+use interface_parity::packages::{Kind, discover};
 use interface_parity::rust_api;
 
-fn surface(fixture: &str, repo: &str) -> Surface {
+/// The Rust API of the first package of the fixture repository.
+fn surface(fixture: &str, repo: &str) -> anyhow::Result<Surface> {
     let (packages, _) = discover(repo, &checkout(fixture));
-    rust_api::surface(&packages[0]).unwrap()
+    let Kind::Cargo(meta) = &packages[0].kind else {
+        panic!("{:?} is not a Cargo package", packages[0].id);
+    };
+    rust_api::surface(meta)
 }
 
 #[test]
 fn items_pair_by_path_with_the_crate_name_replaced() {
     let lines = compare(
         "p",
-        &surface("evm-repo", "evm"),
-        &surface("solana-repo", "solana"),
+        &surface("evm-repo", "evm").unwrap(),
+        &surface("solana-repo", "solana").unwrap(),
     );
     let find = |key: &str| {
         lines
@@ -68,13 +72,6 @@ fn items_pair_by_path_with_the_crate_name_replaced() {
 
 #[test]
 fn a_package_that_fails_to_build_is_an_error_carrying_the_compiler_output() {
-    let dir = checkout("evm-repo");
-    std::fs::write(
-        dir.join("bindings/src/lib.rs"),
-        "pub fn broken() -> NoSuchType { todo!() }",
-    )
-    .unwrap();
-    let (packages, _) = discover("evm", &dir);
-    let err = format!("{:#}", rust_api::surface(&packages[0]).unwrap_err());
+    let err = format!("{:#}", surface("broken-repo", "broken").unwrap_err());
     assert!(err.contains("cannot find type `NoSuchType`"), "{err}");
 }

@@ -1,33 +1,38 @@
 mod common;
 
+use std::fmt::Write;
+use std::path::PathBuf;
+
 use interface_parity::compare::Line;
+use interface_parity::run::run;
+
+/// An inputs directory pinning each `(name, side, fixture)` repository at its
+/// fixture commit, with `pairs` as pairs.toml and `excuses` as excuses.toml.
+fn inputs(dir: &str, repositories: &[(&str, &str, &str)], pairs: &str, excuses: &str) -> PathBuf {
+    let inputs = common::scratch(dir);
+    let mut pins = String::new();
+    for (name, side, fixture) in repositories {
+        let (url, commit) = common::fixture_repo(fixture);
+        writeln!(
+            pins,
+            "[[repository]]\nname = \"{name}\"\nside = \"{side}\"\nurl = \"{url}\"\ncommit = \"{commit}\"\n"
+        )
+        .unwrap();
+    }
+    std::fs::write(inputs.join("pins.toml"), pins).unwrap();
+    std::fs::write(inputs.join("pairs.toml"), pairs).unwrap();
+    std::fs::write(inputs.join("excuses.toml"), excuses).unwrap();
+    inputs
+}
 
 #[test]
 fn the_report_classifies_every_line_of_the_fixture_repositories() {
-    let (evm_url, evm_commit) = common::fixture_repo("evm-repo");
-    let (sol_url, sol_commit) = common::fixture_repo("solana-repo");
-    let inputs = common::scratch("run-inputs");
-    std::fs::write(
-        inputs.join("pins.toml"),
-        format!(
-            r#"
-            [[repository]]
-            name = "evm"
-            side = "evm"
-            url = "{evm_url}"
-            commit = "{evm_commit}"
-
-            [[repository]]
-            name = "solana"
-            side = "solana"
-            url = "{sol_url}"
-            commit = "{sol_commit}"
-            "#
-        ),
-    )
-    .unwrap();
-    std::fs::write(
-        inputs.join("pairs.toml"),
+    let inputs = inputs(
+        "run-inputs",
+        &[
+            ("evm", "evm", "evm-repo"),
+            ("solana", "solana", "solana-repo"),
+        ],
         r#"
         [[repository]]
         evm = "evm"
@@ -37,10 +42,6 @@ fn the_report_classifies_every_line_of_the_fixture_repositories() {
         evm = "evm/cargo:evm-bindings"
         solana = "solana/cargo:solana-client"
         "#,
-    )
-    .unwrap();
-    std::fs::write(
-        inputs.join("excuses.toml"),
         r#"
         [[excuse]]
         id = "names"
@@ -58,10 +59,9 @@ fn the_report_classifies_every_line_of_the_fixture_repositories() {
         solana = []
         reason = "Removed."
         "#,
-    )
-    .unwrap();
+    );
 
-    let report = interface_parity::run(&inputs, &common::scratch("run-work")).unwrap();
+    let report = run(&inputs, &common::scratch("run-work")).unwrap();
     let md = report.to_markdown();
 
     assert!(report.failures.is_empty(), "{md}");
@@ -117,57 +117,29 @@ fn the_report_classifies_every_line_of_the_fixture_repositories() {
 
 #[test]
 fn a_pair_naming_something_unpinned_is_an_error() {
-    let (evm_url, evm_commit) = common::fixture_repo("evm-repo");
-    let inputs = common::scratch("run-bad-inputs");
-    std::fs::write(
-        inputs.join("pins.toml"),
-        format!(
-            "[[repository]]\nname = \"evm\"\nside = \"evm\"\nurl = \"{evm_url}\"\ncommit = \"{evm_commit}\"\n"
-        ),
-    )
-    .unwrap();
-    std::fs::write(
-        inputs.join("pairs.toml"),
+    let inputs = inputs(
+        "run-bad-inputs",
+        &[("evm", "evm", "evm-repo")],
         "[[package]]\nevm = \"evm/cargo:evm-bindings\"\nsolana = \"solana/cargo:nowhere\"\n",
-    )
-    .unwrap();
-    std::fs::write(inputs.join("excuses.toml"), "").unwrap();
-    let err = interface_parity::run(&inputs, &common::scratch("run-bad-work")).unwrap_err();
+        "",
+    );
+    let err = run(&inputs, &common::scratch("run-bad-work")).unwrap_err();
     assert!(err.to_string().contains("solana/cargo:nowhere"), "{err:#}");
 }
 
 #[test]
 fn a_package_that_fails_to_extract_is_a_failure_and_the_rest_is_still_compared() {
-    let (evm_url, evm_commit) = common::fixture_repo("evm-repo");
-    let (broken_url, broken_commit) = common::fixture_repo("broken-repo");
-    let inputs = common::scratch("run-broken-inputs");
-    std::fs::write(
-        inputs.join("pins.toml"),
-        format!(
-            r#"
-            [[repository]]
-            name = "evm"
-            side = "evm"
-            url = "{evm_url}"
-            commit = "{evm_commit}"
-
-            [[repository]]
-            name = "broken"
-            side = "solana"
-            url = "{broken_url}"
-            commit = "{broken_commit}"
-            "#
-        ),
-    )
-    .unwrap();
-    std::fs::write(
-        inputs.join("pairs.toml"),
+    let inputs = inputs(
+        "run-broken-inputs",
+        &[
+            ("evm", "evm", "evm-repo"),
+            ("broken", "solana", "broken-repo"),
+        ],
         "[[package]]\nevm = \"evm/cargo:evm-bindings\"\nsolana = \"broken/cargo:broken-client\"\n",
-    )
-    .unwrap();
-    std::fs::write(inputs.join("excuses.toml"), "").unwrap();
+        "",
+    );
 
-    let report = interface_parity::run(&inputs, &common::scratch("run-broken-work")).unwrap();
+    let report = run(&inputs, &common::scratch("run-broken-work")).unwrap();
     let md = report.to_markdown();
     assert_eq!(
         report

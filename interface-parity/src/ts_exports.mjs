@@ -1,12 +1,18 @@
 // Prints one JSON object per exported item of a package's types entry:
-// {"key": ..., "value": ...}. Usage: node --input-type=module - <package dir> <types entry> < ts_exports.mjs
+// {"key": ..., "value": ...}. Usage:
+// node --input-type=module --eval "$(cat ts_exports.mjs)" <package dir> <import specifier>
+// The types entry is the file TypeScript resolves the specifier to from
+// inside the package directory.
 import { createRequire } from "node:module";
 import path from "node:path";
 
-const [pkgArg, entry] = process.argv.slice(2);
+const [pkgArg, spec] = process.argv.slice(1);
 const pkgDir = path.resolve(pkgArg);
 const ts = createRequire(path.join(pkgDir, "package.json"))("typescript");
-const entryPath = path.resolve(pkgDir, entry);
+const resolution = { module: ts.ModuleKind.ESNext, moduleResolution: ts.ModuleResolutionKind.Bundler };
+const resolved = ts.resolveModuleName(spec, path.join(pkgDir, "__entry__.ts"), resolution, ts.sys).resolvedModule;
+if (!resolved) throw new Error(`${spec} resolves to no types entry in ${pkgDir}`);
+const entryPath = resolved.resolvedFileName;
 const configPath = ts.findConfigFile(pkgDir, ts.sys.fileExists, "tsconfig.json");
 const options = configPath
   ? ts.parseJsonConfigFileContent(ts.readConfigFile(configPath, ts.sys.readFile).config, ts.sys, path.dirname(configPath)).options

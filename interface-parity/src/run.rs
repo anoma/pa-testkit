@@ -5,7 +5,7 @@ use std::process::Command;
 use anyhow::{Context, bail};
 
 use crate::compare::{Line, Surface, compare};
-use crate::inputs::{PairEntry, Side, load_pairs, load_pins};
+use crate::inputs::{PairEntry, Pairs, Side, load_pins, read};
 use crate::packages::{Kind, Package, cargo_metadata_surface, discover};
 use crate::report::{Failure, Report};
 use crate::{cmd, excuses, fetch, files, rust_api, tags, ts_api};
@@ -16,13 +16,14 @@ type Surfaces = BTreeMap<String, (Side, Option<Surface>)>;
 /// Everything a package publishes: its metadata or manifest, its API and its
 /// non-source shipped files.
 pub fn package_surface(pkg: &Package, work: &Path) -> anyhow::Result<Surface> {
-    let mut s = match &pkg.kind {
+    match &pkg.kind {
         Kind::Cargo(meta) => {
             let mut s = cargo_metadata_surface(meta);
-            s.extend(rust_api::surface(pkg)?);
-            s
+            s.extend(rust_api::surface(meta)?);
+            s.extend(files::cargo_files(pkg, meta, work)?);
+            Ok(s)
         }
-        Kind::Npm(_) => {
+        Kind::Npm(manifest) => {
             // Install, then build the package as publishing would.
             cmd::stdout(Command::new("npm").current_dir(pkg.dir()).args([
                 "ci",
@@ -35,14 +36,11 @@ pub fn package_surface(pkg: &Package, work: &Path) -> anyhow::Result<Surface> {
                     .current_dir(pkg.dir())
                     .args(["publish", "--dry-run"]),
             )?;
-            ts_api::exports(pkg)?
+            let mut s = ts_api::exports(pkg, manifest)?;
+            s.extend(files::npm_files(pkg, work)?);
+            Ok(s)
         }
-    };
-    s.extend(match pkg.kind {
-        Kind::Cargo(_) => files::cargo_files(pkg, work)?,
-        Kind::Npm(_) => files::npm_files(pkg, work)?,
-    });
-    Ok(s)
+    }
 }
 
 /// Compares the pinned repositories named by `inputs/pins.toml`, paired by
@@ -50,7 +48,7 @@ pub fn package_surface(pkg: &Package, work: &Path) -> anyhow::Result<Surface> {
 /// out under `work`.
 pub fn run(inputs: &Path, work: &Path) -> anyhow::Result<Report> {
     let pins = load_pins(&inputs.join("pins.toml"))?;
-    let pairs = load_pairs(&inputs.join("pairs.toml"))?;
+    let pairs: Pairs = read(&inputs.join("pairs.toml"))?;
     let excuses = excuses::load(&inputs.join("excuses.toml"))?;
 
     let mut failures = vec![];

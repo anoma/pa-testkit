@@ -5,7 +5,6 @@ use anyhow::{Context, bail};
 use serde::Deserialize;
 
 use crate::compare::Line;
-use crate::inputs::read;
 
 /// A reviewed difference: the exact values both sides publish under one key
 /// of one pair, and why that difference is accepted.
@@ -37,13 +36,16 @@ struct ExcusesFile {
 }
 
 pub fn load(path: &Path) -> anyhow::Result<Vec<Excuse>> {
-    validated(read::<ExcusesFile>(path)?.excuse)
-        .with_context(|| format!("checking {}", path.display()))
+    let text =
+        std::fs::read_to_string(path).with_context(|| format!("reading {}", path.display()))?;
+    parse(&text).with_context(|| format!("parsing {}", path.display()))
 }
 
-/// Sorts each excuse's values as surfaces sort them. A pair has one line per
-/// key, so a second excuse for the same pair and key could never apply.
-fn validated(mut excuses: Vec<Excuse>) -> anyhow::Result<Vec<Excuse>> {
+/// Parses an excuses file and sorts each excuse's values as surfaces sort
+/// them. A pair has one line per key, so a second excuse for the same pair
+/// and key could never apply.
+pub(crate) fn parse(text: &str) -> anyhow::Result<Vec<Excuse>> {
+    let mut excuses = toml::from_str::<ExcusesFile>(text)?.excuse;
     let mut ids = BTreeSet::new();
     let mut lines = BTreeSet::new();
     for excuse in &mut excuses {
@@ -62,11 +64,6 @@ fn validated(mut excuses: Vec<Excuse>) -> anyhow::Result<Vec<Excuse>> {
         excuse.solana.sort();
     }
     Ok(excuses)
-}
-
-#[cfg(test)]
-pub(crate) fn parse(text: &str) -> anyhow::Result<Vec<Excuse>> {
-    validated(toml::from_str::<ExcusesFile>(text)?.excuse)
 }
 
 #[cfg(test)]

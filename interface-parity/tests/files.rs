@@ -4,7 +4,7 @@ mod common;
 use checkout::checkout;
 use interface_parity::compare::{Outcome, compare};
 use interface_parity::files::cargo_files;
-use interface_parity::packages::discover;
+use interface_parity::packages::{Kind, discover};
 
 #[test]
 fn cargo_shipped_files_are_read_from_the_package_archive() {
@@ -12,7 +12,15 @@ fn cargo_shipped_files_are_read_from_the_package_archive() {
         .into_iter()
         .map(|(fixture, repo)| {
             let (packages, _) = discover(repo, &checkout(fixture));
-            cargo_files(&packages[0], &common::scratch(&format!("files-{repo}"))).unwrap()
+            let Kind::Cargo(meta) = &packages[0].kind else {
+                panic!("{:?} is not a Cargo package", packages[0].id);
+            };
+            cargo_files(
+                &packages[0],
+                meta,
+                &common::scratch(&format!("files-{repo}")),
+            )
+            .unwrap()
         })
         .collect();
     let lines = compare("p", &surfaces[0], &surfaces[1]);

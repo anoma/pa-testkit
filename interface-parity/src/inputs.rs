@@ -52,7 +52,3 @@ pub(crate) fn read<T: for<'de> Deserialize<'de>>(path: &Path) -> anyhow::Result<
 pub fn load_pins(path: &Path) -> anyhow::Result<Vec<Pin>> {
     Ok(read::<PinsFile>(path)?.repository)
 }
-
-pub fn load_pairs(path: &Path) -> anyhow::Result<Pairs> {
-    read(path)
-}

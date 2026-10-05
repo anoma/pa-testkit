@@ -1,4 +1,5 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
+use std::collections::btree_map::Entry;
 use std::fmt::Write;
 
 use crate::compare::{Line, Outcome};
@@ -29,34 +30,26 @@ impl Report {
         excuses: Vec<Excuse>,
     ) -> Report {
         // Excuses are unique per pair and key, so one lookup finds the only
-        // excuse that could cover a line.
-        let by_line: HashMap<(&str, &str), usize> = excuses
-            .iter()
-            .enumerate()
-            .map(|(i, e)| ((e.pair.as_str(), e.key.as_str()), i))
+        // excuse that could cover a line. An excuse leaves the map when it
+        // covers a line; the ones left over are stale.
+        let mut unused: BTreeMap<(String, String), Excuse> = excuses
+            .into_iter()
+            .map(|e| ((e.pair.clone(), e.key.clone()), e))
             .collect();
-        let mut used = vec![false; excuses.len()];
         let (mut unexcused, mut excused, mut matches) = (vec![], vec![], vec![]);
         for line in lines {
-            let covering = by_line
-                .get(&(line.pair.as_str(), line.key.as_str()))
-                .filter(|&&i| excuses[i].covers(&line))
-                .copied();
             if line.outcome() == Outcome::Match {
                 matches.push(line);
-            } else if let Some(i) = covering {
-                used[i] = true;
-                excused.push((line, excuses[i].clone()));
+            } else if let Entry::Occupied(excuse) =
+                unused.entry((line.pair.clone(), line.key.clone()))
+                && excuse.get().covers(&line)
+            {
+                excused.push((line, excuse.remove()));
             } else {
                 unexcused.push(line);
             }
         }
-        let stale = excuses
-            .into_iter()
-            .zip(used)
-            .filter(|(_, used)| !used)
-            .map(|(e, _)| e)
-            .collect();
+        let stale = unused.into_values().collect();
         Report {
             pairs,
             failures,

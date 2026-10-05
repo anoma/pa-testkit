@@ -3,7 +3,7 @@ mod common;
 
 use checkout::checkout;
 use interface_parity::compare::compare;
-use interface_parity::packages::{Kind, cargo_metadata_surface, discover};
+use interface_parity::packages::{Kind, cargo_metadata_surface, discover, has_lib};
 
 #[test]
 fn discovery_finds_published_packages_only() {
@@ -15,8 +15,10 @@ fn discovery_finds_published_packages_only() {
         vec!["evm/cargo:evm-bindings", "evm/cargo:evm-extra"],
         "publish = false must be left out"
     );
-    assert!(matches!(packages[0].kind, Kind::Cargo(_)));
-    assert_eq!(packages[0].lib_name().as_deref(), Some("evm_bindings"));
+    let Kind::Cargo(meta) = &packages[0].kind else {
+        panic!("{:?} is not a Cargo package", packages[0].id);
+    };
+    assert!(has_lib(meta), "{meta:#?} has a library target");
 }
 
 #[test]
@@ -26,6 +28,17 @@ fn private_npm_packages_are_left_out() {
     let ids: Vec<&str> = packages.iter().map(|p| p.id.as_str()).collect();
     assert!(!ids.iter().any(|i| i.contains("private-thing")), "{ids:?}");
     assert!(ids.contains(&"solana/cargo:solana-client"), "{ids:?}");
+}
+
+#[test]
+fn a_workspace_member_is_found_once_under_a_root_path_with_dot_dot() {
+    // The comparison's work directory is `interface-parity/../target/...`,
+    // while cargo reports manifest paths with `..` resolved.
+    let root = checkout("workspace-repo").join("member/..");
+    let (packages, failures) = discover("ws", &root);
+    assert!(failures.is_empty(), "{failures:#?}");
+    let ids: Vec<&str> = packages.iter().map(|p| p.id.as_str()).collect();
+    assert_eq!(ids, vec!["ws/cargo:member"]);
 }
 
 #[test]

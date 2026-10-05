@@ -1,8 +1,6 @@
 use std::path::Path;
 use std::process::Command;
 
-use anyhow::Context;
-
 use crate::cmd;
 
 /// Runs git, in `dir` if given, and returns its stdout.
@@ -19,10 +17,7 @@ pub fn checkout(url: &str, commit: &str, dir: &Path) -> anyhow::Result<()> {
     if dir.join(".git").exists() && git(Some(dir), &["rev-parse", "HEAD"])?.trim() == commit {
         return Ok(());
     }
-    if dir.exists() {
-        std::fs::remove_dir_all(dir).with_context(|| format!("removing {}", dir.display()))?;
-    }
-    std::fs::create_dir_all(dir).with_context(|| format!("creating {}", dir.display()))?;
+    cmd::fresh_dir(dir)?;
     git(Some(dir), &["init", "-q"])?;
     git(Some(dir), &["fetch", "-q", "--depth", "1", url, commit])?;
     git(Some(dir), &["checkout", "-q", "--detach", "FETCH_HEAD"])?;

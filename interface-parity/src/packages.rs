@@ -1,7 +1,11 @@
+use std::collections::btree_map::Entry;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
+use anyhow::Context;
+
 use crate::compare::Surface;
+use crate::files::walk;
 use crate::report::Failure;
 
 /// What a package is, with its parsed manifest.
@@ -25,67 +29,68 @@ impl Package {
             .parent()
             .expect("a manifest path names a file inside a directory")
     }
+}
 
-    pub fn name(&self) -> &str {
-        match &self.kind {
-            Kind::Cargo(pkg) => &pkg.name,
-            Kind::Npm(json) => json["name"]
-                .as_str()
-                .expect("discover keeps only npm packages with a name"),
+/// Whether a Cargo package has a library target.
+pub fn has_lib(pkg: &cargo_metadata::Package) -> bool {
+    pkg.targets.iter().any(|t| {
+        t.is_lib()
+            || t.is_rlib()
+            || t.is_dylib()
+            || t.is_cdylib()
+            || t.is_staticlib()
+            || t.is_proc_macro()
+    })
+}
+
+/// Adds `pkg` under its id; two packages with one id are an error.
+fn collect(packages: &mut BTreeMap<String, Package>, pkg: Package) -> anyhow::Result<()> {
+    match packages.entry(pkg.id.clone()) {
+        Entry::Occupied(first) => anyhow::bail!(
+            "two packages have the id {}: {} and {}",
+            pkg.id,
+            first.get().manifest.display(),
+            pkg.manifest.display()
+        ),
+        Entry::Vacant(slot) => {
+            slot.insert(pkg);
+            Ok(())
         }
-    }
-
-    /// The crate name of a Cargo package's library target, if it has one.
-    pub fn lib_name(&self) -> Option<String> {
-        let Kind::Cargo(pkg) = &self.kind else {
-            return None;
-        };
-        pkg.targets
-            .iter()
-            .find(|t| {
-                t.is_lib()
-                    || t.is_rlib()
-                    || t.is_dylib()
-                    || t.is_cdylib()
-                    || t.is_staticlib()
-                    || t.is_proc_macro()
-            })
-            .map(|t| t.name.replace('-', "_"))
     }
 }
 
-/// Every `Cargo.toml` and `package.json` under `dir`, outside build outputs.
-fn manifests(dir: &Path, cargo: &mut Vec<PathBuf>, npm: &mut Vec<PathBuf>) -> std::io::Result<()> {
-    let mut entries = std::fs::read_dir(dir)?.collect::<Result<Vec<_>, _>>()?;
-    entries.sort_by_key(|e| e.file_name());
-    for entry in entries {
-        let name = entry.file_name();
-        if entry.file_type()?.is_dir() {
-            if !matches!(name.to_str(), Some("target" | "node_modules" | ".git")) {
-                manifests(&entry.path(), cargo, npm)?;
-            }
-        } else if name == "Cargo.toml" {
-            cargo.push(entry.path());
-        } else if name == "package.json" {
-            npm.push(entry.path());
-        }
-    }
-    Ok(())
-}
-
-/// Every published Cargo and npm package under `root`, sorted by id. A
-/// manifest that cannot be read becomes a failure.
+/// Every published Cargo and npm package under `root`, outside build outputs,
+/// sorted by id. A manifest that cannot be read, or a second package with an
+/// id already taken, becomes a failure.
 pub fn discover(repo: &str, root: &Path) -> (Vec<Package>, Vec<Failure>) {
     let mut packages = BTreeMap::new();
     let mut failures = vec![];
-    let (mut cargo_manifests, mut npm_manifests) = (vec![], vec![]);
-    if let Err(e) = manifests(root, &mut cargo_manifests, &mut npm_manifests) {
+    let mut files = vec![];
+    let build_output = |dir: &Path| {
+        dir.file_name()
+            .is_some_and(|n| n == "target" || n == "node_modules" || n == ".git")
+    };
+    // cargo reports manifest paths with `..` resolved, so the walked paths
+    // must be too for `seen` below to recognise a manifest cargo returned.
+    let walked = std::fs::canonicalize(root)
+        .with_context(|| format!("resolving {}", root.display()))
+        .and_then(|root| walk(&root, &build_output, &mut files));
+    if let Err(e) = walked {
         failures.push(Failure {
             subject: format!("{repo} (walking {})", root.display()),
-            error: e.to_string(),
+            error: format!("{e:#}"),
         });
         return (vec![], failures);
     }
+    let named = |name: &str| -> Vec<PathBuf> {
+        files
+            .iter()
+            .filter(|f| f.file_name().is_some_and(|n| n == name))
+            .cloned()
+            .collect()
+    };
+    let (cargo_manifests, npm_manifests) = (named("Cargo.toml"), named("package.json"));
+    let mut found = vec![];
     // One `cargo metadata` call returns every member of a workspace, so a
     // manifest an earlier call already returned needs no call of its own.
     let mut seen = BTreeSet::new();
@@ -113,9 +118,8 @@ pub fn discover(repo: &str, root: &Path) -> (Vec<Package>, Vec<Failure>) {
             if pkg.publish.as_ref().is_some_and(Vec::is_empty) {
                 continue;
             }
-            let id = format!("{repo}/cargo:{}", pkg.name);
-            packages.entry(id.clone()).or_insert_with(|| Package {
-                id,
+            found.push(Package {
+                id: format!("{repo}/cargo:{}", pkg.name),
                 kind: Kind::Cargo(Box::new(pkg)),
                 manifest,
             });
@@ -142,12 +146,19 @@ pub fn discover(repo: &str, root: &Path) -> (Vec<Package>, Vec<Failure>) {
         if json["private"].as_bool() == Some(true) {
             continue;
         }
-        let id = format!("{repo}/npm:{name}");
-        packages.entry(id.clone()).or_insert_with(|| Package {
-            id,
-            kind: Kind::Npm(json.clone()),
+        found.push(Package {
+            id: format!("{repo}/npm:{name}"),
+            kind: Kind::Npm(json),
             manifest,
         });
+    }
+    for pkg in found {
+        if let Err(e) = collect(&mut packages, pkg) {
+            failures.push(Failure {
+                subject: repo.to_owned(),
+                error: format!("{e:#}"),
+            });
+        }
     }
     (packages.into_values().collect(), failures)
 }
@@ -180,4 +191,37 @@ pub fn cargo_metadata_surface(pkg: &cargo_metadata::Package) -> Surface {
         );
     }
     s
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn npm(manifest: &str) -> Package {
+        Package {
+            id: "r/npm:x".into(),
+            kind: Kind::Npm(serde_json::json!({"name": "x"})),
+            manifest: manifest.into(),
+        }
+    }
+
+    #[test]
+    fn a_second_package_with_a_taken_id_is_an_error_naming_both_manifests() {
+        let mut packages = BTreeMap::new();
+        collect(&mut packages, npm("a/package.json")).unwrap();
+        let err = collect(&mut packages, npm("b/package.json"))
+            .unwrap_err()
+            .to_string();
+        assert!(
+            err.contains("r/npm:x")
+                && err.contains("a/package.json")
+                && err.contains("b/package.json"),
+            "{err}"
+        );
+        assert_eq!(
+            packages["r/npm:x"].manifest,
+            PathBuf::from("a/package.json"),
+            "the first package keeps the id"
+        );
+    }
 }

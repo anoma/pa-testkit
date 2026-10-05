@@ -6,7 +6,7 @@ use sha2::{Digest, Sha256};
 
 use crate::cmd;
 use crate::compare::Surface;
-use crate::packages::{Kind, Package};
+use crate::packages::Package;
 
 /// Extensions of the files whose content the Rust and TypeScript API
 /// extractions already cover.
@@ -35,20 +35,27 @@ fn flatten_json(prefix: &str, value: &serde_json::Value, s: &mut Surface) {
     walk(prefix, String::new(), value, s);
 }
 
-/// Every file under `dir`, as paths relative to `root` joined with `/`.
-fn files_under(root: &Path, dir: &Path, found: &mut Vec<String>) -> anyhow::Result<()> {
-    for entry in std::fs::read_dir(dir).with_context(|| format!("reading {}", dir.display()))? {
-        let path = entry?.path();
-        if path.is_dir() {
-            files_under(root, &path, found)?;
-        } else {
-            let relative = path.strip_prefix(root)?.components();
-            found.push(
-                relative
-                    .map(|c| c.as_os_str().to_string_lossy())
-                    .collect::<Vec<_>>()
-                    .join("/"),
-            );
+/// Every file under `dir` into `found`, in name order, not descending into a
+/// directory for which `skip_dir` holds. A symlink is never followed, so a
+/// symlinked directory is listed as a file.
+pub(crate) fn walk(
+    dir: &Path,
+    skip_dir: &impl Fn(&Path) -> bool,
+    found: &mut Vec<PathBuf>,
+) -> anyhow::Result<()> {
+    let mut entries = std::fs::read_dir(dir)
+        .and_then(|entries| entries.collect::<Result<Vec<_>, _>>())
+        .with_context(|| format!("reading {}", dir.display()))?;
+    entries.sort_by_key(|e| e.file_name());
+    for entry in entries {
+        let path = entry.path();
+        let file_type = entry
+            .file_type()
+            .with_context(|| format!("reading the type of {}", path.display()))?;
+        if !file_type.is_dir() {
+            found.push(path);
+        } else if !skip_dir(&path) {
+            walk(&path, skip_dir, found)?;
         }
     }
     Ok(())
@@ -58,13 +65,18 @@ fn files_under(root: &Path, dir: &Path, found: &mut Vec<String>) -> anyhow::Resu
 /// other file by its SHA-256.
 fn unpacked_surface(root: &Path, sources: &[&str]) -> anyhow::Result<Surface> {
     let mut paths = vec![];
-    files_under(root, root, &mut paths)?;
+    walk(root, &|_| false, &mut paths)?;
     let mut s = Surface::default();
-    for path in paths
-        .iter()
-        .filter(|p| !sources.iter().any(|ext| p.ends_with(ext)))
-    {
-        let full = root.join(path);
+    for full in paths {
+        let path = full
+            .strip_prefix(root)?
+            .components()
+            .map(|c| c.as_os_str().to_string_lossy())
+            .collect::<Vec<_>>()
+            .join("/");
+        if sources.iter().any(|ext| path.ends_with(ext)) {
+            continue;
+        }
         let bytes = std::fs::read(&full).with_context(|| format!("reading {}", full.display()))?;
         if path.ends_with(".json") {
             let value: serde_json::Value = serde_json::from_slice(&bytes)
@@ -82,10 +94,7 @@ fn unpacked_surface(root: &Path, sources: &[&str]) -> anyhow::Result<Surface> {
 
 /// Unpacks a `.crate` or `.tgz` archive into a fresh `dir`.
 fn unpack(archive: &Path, dir: &Path) -> anyhow::Result<()> {
-    if dir.exists() {
-        std::fs::remove_dir_all(dir).with_context(|| format!("removing {}", dir.display()))?;
-    }
-    std::fs::create_dir_all(dir).with_context(|| format!("creating {}", dir.display()))?;
+    cmd::fresh_dir(dir)?;
     cmd::stdout(
         Command::new("tar")
             .arg("-xzf")
@@ -102,10 +111,11 @@ fn package_dir(work: &Path, pkg: &Package, what: &str) -> PathBuf {
 }
 
 /// The non-source files of the `.crate` archive `cargo package` builds.
-pub fn cargo_files(pkg: &Package, work: &Path) -> anyhow::Result<Surface> {
-    let Kind::Cargo(meta) = &pkg.kind else {
-        anyhow::bail!("{} is not a Cargo package", pkg.id);
-    };
+pub fn cargo_files(
+    pkg: &Package,
+    meta: &cargo_metadata::Package,
+    work: &Path,
+) -> anyhow::Result<Surface> {
     let target = package_dir(work, pkg, "cargo-package");
     cmd::stdout(
         Command::new("cargo")

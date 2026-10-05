@@ -4,33 +4,28 @@ use anyhow::Context;
 
 use crate::cmd;
 use crate::compare::Surface;
-use crate::packages::{Kind, Package};
+use crate::packages::Package;
 
 const SCRIPT: &str = include_str!("ts_exports.mjs");
 
 /// The exported items of a built npm package's types entry, read with the
-/// package's own TypeScript compiler.
-pub fn exports(pkg: &Package) -> anyhow::Result<Surface> {
-    let Kind::Npm(manifest) = &pkg.kind else {
-        anyhow::bail!("{} is not an npm package", pkg.id);
+/// package's own TypeScript compiler. A package with an `exports` map is
+/// resolved through it by its own name, any other package as its directory.
+pub fn exports(pkg: &Package, manifest: &serde_json::Value) -> anyhow::Result<Surface> {
+    let spec = if manifest.get("exports").is_some() {
+        manifest["name"]
+            .as_str()
+            .expect("discover keeps only npm packages with a name")
+    } else {
+        "./"
     };
-    let types = manifest["exports"]["."]["types"]
-        .as_str()
-        .or(manifest["types"].as_str())
-        .or(manifest["typings"].as_str())
-        .with_context(|| {
-            format!(
-                "{} names no types entry (exports[\".\"].types, types or typings)",
-                pkg.manifest.display()
-            )
-        })?;
-    let out = cmd::stdout_with_input(
-        Command::new("node")
-            .current_dir(pkg.dir())
-            .args(["--input-type=module", "-", "."])
-            .arg(types),
-        SCRIPT.as_bytes(),
-    )?;
+    let out = cmd::stdout(Command::new("node").current_dir(pkg.dir()).args([
+        "--input-type=module",
+        "--eval",
+        SCRIPT,
+        ".",
+        spec,
+    ]))?;
     let mut s = Surface::default();
     for line in out.lines() {
         let item: serde_json::Value =
