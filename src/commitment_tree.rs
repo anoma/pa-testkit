@@ -43,7 +43,7 @@ impl FrontierCommitmentTree {
     }
 
     /// The number of leaves: those read and those added since.
-    pub fn count(&self) -> usize {
+    fn count(&self) -> usize {
         self.commitment_count + self.leaves.len()
     }
 
