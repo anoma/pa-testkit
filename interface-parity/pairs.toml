@@ -7,7 +7,7 @@ solana = "solana-protocol-adapter"
 
 [[repository]]
 evm = "anomapay-erc20-forwarder"
-solana = "solana-protocol-adapter"
+solana = "anomapay-spl-token-forwarder"
 
 [[package]]
 evm = "pa-evm/cargo:anoma-pa-evm-bindings"
@@ -15,4 +15,4 @@ solana = "anoma-pa-solana-client/cargo:anoma-pa-solana-client"
 
 [[package]]
 evm = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings"
-solana = "anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+solana = "anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"

@@ -5,13 +5,13 @@
 name = "pa-evm"
 side = "evm"
 url = "https://github.com/anoma/pa-evm"
-commit = "dbac05ae68776199ac904aae4376e886d11f199f"
+commit = "4986aa1f635722b8b0f08aefe841752551fe2053"
 
 [[repository]]
 name = "anomapay-erc20-forwarder"
 side = "evm"
 url = "https://github.com/anoma/anomapay-erc20-forwarder"
-commit = "8e2d30f246d595bf6b91231f76d4c25b5c0d24bf"
+commit = "4b6341360887c598d17eee6a8eb98b58494042ce"
 
 [[repository]]
 name = "forwarder-bases"
@@ -23,10 +23,16 @@ commit = "08f2f2e8b147fc6c9394031063664a6f3cd6a58c"
 name = "anoma-pa-solana-client"
 side = "solana"
 url = "https://github.com/anoma/anoma-pa-solana-client"
-commit = "ba957aa38246cc3906cc1dc1e9c5cacd36ac5f10"
+commit = "70719175534ec073e331301c1ca2755b404c87d7"
 
 [[repository]]
 name = "solana-protocol-adapter"
 side = "solana"
 url = "https://github.com/anoma/solana-protocol-adapter"
-commit = "866d11ed20bfec13d77ac880528206f2eaa5113d"
+commit = "77e0abc629e50e4c5b1df349b91c63e698e9c5dd"
+
+[[repository]]
+name = "anomapay-spl-token-forwarder"
+side = "solana"
+url = "https://github.com/anoma/anomapay-spl-token-forwarder"
+commit = "54eabb1fc80b7b8accc121c91d72d898c55d855d"
