@@ -5,7 +5,7 @@ pub mod environment;
 pub mod fixtures;
 #[cfg(feature = "mocks")]
 pub mod mocks;
-#[cfg(any(feature = "local", feature = "e2e"))]
+#[cfg(any(feature = "local", feature = "e2e", feature = "prove"))]
 pub mod prover;
 #[cfg(feature = "fixtures")]
 pub mod suite;

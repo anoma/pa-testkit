@@ -2,9 +2,10 @@
 
 The backend-agnostic risc0 test core for Anoma protocol-adapter integration
 testing: the `Environment` / `Prover` / `Transaction` traits, the trivial
-action fixtures, the local mock prover, and the remote-queue prover for e2e
-runs. It knows nothing about any target chain — chain-specific harnesses live
-in the protocol-adapter repos and implement the traits from here:
+action fixtures, the local mock prover, and the remote-queue and in-process
+risc0 provers for e2e runs. It knows nothing about any target chain —
+chain-specific harnesses live in the protocol-adapter repos and implement the
+traits from here:
 
 - EVM: [anoma-pa-evm](https://github.com/anoma/pa-evm)
   (`anoma-pa-evm-integration-test`)
@@ -24,6 +25,8 @@ A single flat crate, `anoma-pa-testkit` — no workspace. Feature-gated parts:
 - `local` (default) — `LocalProver`: native `constrain` plus mock Groth16
   seals, no real proving
 - `e2e` — `QueueProver`: submits witnesses to the remote proving queue
+- `prove` — `Risc0Prover`: the queue's real proofs, made in-process with
+  risc0; the Groth16 aggregation needs a container runtime (`docker`)
 - `abi_encoding` — the EVM-ABI aggregation journal encoding (what the EVM
   protocol adapter reconstructs); off by default
 - `mocks` — `mockall` doubles of the core traits

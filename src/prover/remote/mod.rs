@@ -2,17 +2,12 @@
 //! aggregation payload, and returns the aggregated ARM transaction.
 
 use std::collections::HashMap;
-use std::panic::AssertUnwindSafe;
 
-use anoma_rm_risc0::action::Action;
-use anoma_rm_risc0::compliance_unit::{self, ComplianceUnit};
 use anoma_rm_risc0::constants::{
     BATCH_AGGREGATION_EVM_PK, BATCH_AGGREGATION_PK, COMPLIANCE_PK, COMPLIANCE_VK,
 };
-use anoma_rm_risc0::delta_proof;
-use anoma_rm_risc0::logic_proof::LogicVerifierInput;
 use anoma_rm_risc0::proving_system::JournalEncoding;
-use anoma_rm_risc0::transaction::{self, Delta, Transaction as ArmTxn};
+use anoma_rm_risc0::transaction::Transaction as ArmTxn;
 use anyhow::Context;
 use futures::future::try_join_all;
 use heliax_ap_orchestrator_sdk::QueueClient;
@@ -24,7 +19,8 @@ use heliax_ap_orchestrator_sdk::{
 mod queue;
 
 use super::JOURNAL_ENCODING;
-use super::constrain::{self, ConstrainedAction, ConstrainedLogic};
+use super::assemble::{self, BaseProof, BaseProofKey, BaseProofSlot};
+use super::constrain;
 use crate::environment::Prover;
 use crate::transaction::Transaction;
 use crate::witness::{ActionWitnesses, LogicWitness};
@@ -60,21 +56,6 @@ impl Prover for QueueProver {
     }
 }
 
-/// Identifies one base proof within an action: either the logic proof of the
-/// witness at a given index in the action's logic list, or the compliance
-/// proof of the action's single compliance unit.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-enum BaseJobSlot {
-    Logic(usize),
-    Compliance,
-}
-
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-struct BaseJobKey {
-    action_idx: usize,
-    slot: BaseJobSlot,
-}
-
 #[derive(Clone, Debug)]
 enum BaseJobPayload {
     Logic(ProofPayload),
@@ -83,19 +64,19 @@ enum BaseJobPayload {
 
 #[derive(Clone, Debug)]
 struct BaseJobSpec {
-    key: BaseJobKey,
+    key: BaseProofKey,
     payload: BaseJobPayload,
 }
 
 #[derive(Debug)]
 struct SubmittedBaseJob {
-    key: BaseJobKey,
+    key: BaseProofKey,
     job_id: String,
 }
 
 #[derive(Debug)]
 struct FetchedBaseJob {
-    key: BaseJobKey,
+    key: BaseProofKey,
     result: BaseProofResult,
 }
 
@@ -103,19 +84,9 @@ async fn prove_via_queue(
     queue: &QueueClient,
     action_witnesses: &[ActionWitnesses],
 ) -> anyhow::Result<Transaction> {
-    let constrained =
-        std::panic::catch_unwind(AssertUnwindSafe(|| constrain_actions(action_witnesses)))
-            .unwrap_or_else(|cause| {
-                if let Some(panic_msg) = cause.downcast_ref::<String>() {
-                    anyhow::bail!("proving failed: {panic_msg}");
-                }
-                if let Some(panic_msg) = cause.downcast_ref::<&'static str>() {
-                    anyhow::bail!("proving failed: {panic_msg}");
-                }
-                std::panic::resume_unwind(cause)
-            })?;
+    let constrained = constrain::actions(action_witnesses)?;
 
-    let (base_job_specs, rcvs) = build_base_job_specs(action_witnesses)?;
+    let base_job_specs = build_base_job_specs(action_witnesses)?;
 
     let submitted_jobs = try_join_all(
         base_job_specs
@@ -131,10 +102,16 @@ async fn prove_via_queue(
     )
     .await?;
 
-    let mut base_results_by_key: HashMap<BaseJobKey, BaseProofResult> =
+    let mut base_proofs: HashMap<BaseProofKey, BaseProof> =
         HashMap::with_capacity(base_results.len());
     for fetched in base_results {
-        let replaced = base_results_by_key.insert(fetched.key, fetched.result);
+        let replaced = base_proofs.insert(
+            fetched.key,
+            BaseProof {
+                receipt: fetched.result.receipt,
+                instance: fetched.result.instance,
+            },
+        );
         anyhow::ensure!(
             replaced.is_none(),
             "duplicate base proof result for action {} {:?}",
@@ -143,69 +120,10 @@ async fn prove_via_queue(
         );
     }
 
-    let mut actions = Vec::with_capacity(constrained.len());
-    for (action_idx, action) in constrained.into_iter().enumerate() {
-        let compliance_result = take_base_result(
-            &mut base_results_by_key,
-            action_idx,
-            BaseJobSlot::Compliance,
-        )?;
-        let compliance_unit = ComplianceUnit {
-            proof: compliance_result.receipt,
-            instance: compliance_result.instance,
-        };
+    let assembled = assemble::assemble(action_witnesses, constrained, base_proofs)?;
 
-        // The logic verifier inputs must be in the canonical tag order
-        // (consumed nullifiers, then created commitments) — `constrain`
-        // returns them reordered, and `witness_index` correlates each with
-        // its proving job.
-        let logic_count = action.consumed_logics.len() + action.created_logics.len();
-        let mut logic_verifier_inputs = Vec::with_capacity(logic_count);
-        for logic in action
-            .consumed_logics
-            .into_iter()
-            .chain(action.created_logics)
-        {
-            let result = take_base_result(
-                &mut base_results_by_key,
-                action_idx,
-                BaseJobSlot::Logic(logic.witness_index),
-            )?;
-            logic_verifier_inputs.push(logic_verifier_inputs_from(logic, result));
-        }
-
-        actions.push(Action {
-            compliance_unit,
-            logic_verifier_inputs,
-        });
-    }
-
-    anyhow::ensure!(
-        base_results_by_key.is_empty(),
-        "unused base proof results remaining after assembly: {}",
-        base_results_by_key.len()
-    );
-
-    let delta = Delta::Witness(
-        delta_proof::from_bytes_vec(&rcvs)
-            .context("failed to construct delta witness from rcv values")?,
-    );
-    // `verify` takes the commitment the transaction is checked against. No global kind table is installed here,
-    // so it comes from the compliance instances, which makes the check compare the aggregation against them.
-    let kind_table_commitment = compliance_unit::get_instance(
-        &actions
-            .first()
-            .context("the transaction carries no action")?
-            .compliance_unit,
-    )
-    .map_err(|error| anyhow::anyhow!("failed to read the compliance instance: {error:?}"))?
-    .kind_table_commitment;
-
-    let arm_txn = transaction::generate_delta_proof(ArmTxn::create(actions, delta))
-        .context("failed to generate delta proof")?;
-
-    let serialized =
-        bincode::serialize(&arm_txn).context("failed to serialize transaction for aggregation")?;
+    let serialized = bincode::serialize(&assembled.transaction)
+        .context("failed to serialize transaction for aggregation")?;
 
     let batch_aggregation_pk = match JOURNAL_ENCODING {
         JournalEncoding::Abi => BATCH_AGGREGATION_EVM_PK,
@@ -231,76 +149,35 @@ async fn prove_via_queue(
     let aggregated: ArmTxn = bincode::deserialize(&agg_result.transaction)
         .context("failed to decode aggregated transaction")?;
 
-    transaction::verify(&aggregated, kind_table_commitment, JOURNAL_ENCODING)
-        .context("aggregated transaction failed local verification")?;
-
-    Ok(Transaction::from_arm(aggregated))
+    assemble::verify_aggregated(aggregated, assembled.kind_table_commitment)
 }
 
-/// Constrains and validates every action, panicking on invalid witnesses (the
-/// caller catches the panic).
-fn constrain_actions(
-    action_witnesses: &[ActionWitnesses],
-) -> anyhow::Result<Vec<ConstrainedAction>> {
-    action_witnesses
-        .iter()
-        .enumerate()
-        .map(|(action_idx, witnesses)| constrain::action(witnesses, action_idx))
-        .collect()
-}
-
-fn logic_verifier_inputs_from(
-    logic: ConstrainedLogic,
-    result: BaseProofResult,
-) -> LogicVerifierInput {
-    LogicVerifierInput {
-        tag: logic.instance.tag,
-        verifying_key: logic.verifying_key,
-        app_data: logic.instance.app_data,
-        proof: result.receipt,
-    }
-}
-
-fn take_base_result(
-    results: &mut HashMap<BaseJobKey, BaseProofResult>,
-    action_idx: usize,
-    slot: BaseJobSlot,
-) -> anyhow::Result<BaseProofResult> {
-    results
-        .remove(&BaseJobKey { action_idx, slot })
-        .with_context(|| format!("missing base proof result for action {action_idx} {slot:?}"))
-}
-
-fn build_base_job_specs(
-    action_witnesses: &[ActionWitnesses],
-) -> anyhow::Result<(Vec<BaseJobSpec>, Vec<Vec<u8>>)> {
+fn build_base_job_specs(action_witnesses: &[ActionWitnesses]) -> anyhow::Result<Vec<BaseJobSpec>> {
     let mut specs = Vec::new();
-    let mut rcvs = Vec::new();
 
     for (action_idx, witnesses) in action_witnesses.iter().enumerate() {
         for (logic_idx, logic_witness) in witnesses.logic_witnesses.iter().enumerate() {
             specs.push(BaseJobSpec {
-                key: BaseJobKey {
+                key: BaseProofKey {
                     action_idx,
-                    slot: BaseJobSlot::Logic(logic_idx),
+                    slot: BaseProofSlot::Logic(logic_idx),
                 },
                 payload: BaseJobPayload::Logic(build_logic_proof_payload(logic_witness)?),
             });
         }
 
         specs.push(BaseJobSpec {
-            key: BaseJobKey {
+            key: BaseProofKey {
                 action_idx,
-                slot: BaseJobSlot::Compliance,
+                slot: BaseProofSlot::Compliance,
             },
             payload: BaseJobPayload::Compliance(build_compliance_proof_payload(
                 &witnesses.compliance_witness,
             )?),
         });
-        rcvs.push(witnesses.compliance_witness.rcv.clone());
     }
 
-    Ok((specs, rcvs))
+    Ok(specs)
 }
 
 async fn submit_base_job(

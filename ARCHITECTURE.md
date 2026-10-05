@@ -33,11 +33,20 @@ nesting.
   constraint checking, no zkVM).
 - `transaction` — the risc0 `Transaction` newtype over `arm::Transaction`, the
   orphan-rule seam that lets the testkit implement the `Transaction` trait.
-- `prover` — the two chain-agnostic provers:
+- `prover` — the three chain-agnostic provers, which all constrain the actions
+  first (`constrain`):
   - `LocalProver` (`feature = "local"`): runs `constrain` and emits mock Groth16
     seals. No real proving — fast and offline.
   - `QueueProver` (`feature = "e2e"`): submits to the real remote proving queue.
     Built from typed params (`new(base_url, auth_token)`); reads no environment.
+  - `Risc0Prover` (`feature = "prove"`): makes the same real proofs in-process
+    with risc0, one at a time — succinct base proofs, then a Groth16
+    aggregation, which needs a container runtime (`docker`). For an e2e
+    environment without the queue; minutes per transaction.
+
+  The two real provers share `assemble`: the actions built from their base
+  proofs in canonical tag order, the delta proof, and the verification of the
+  aggregated transaction.
 - `assert` — negative-test assertion helpers (`Needle`,
   `expect_integration_panic`), shared by every integration-test crate. The
   proof-tamper counterpart lives on `Transaction` (`tamper_first_logic_seal`).
