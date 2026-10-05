@@ -1,6 +1,6 @@
 use anoma_rm_risc0::action_tree::ActionTree;
 use anoma_rm_risc0::compliance;
-use anoma_rm_risc0::logic_instance::{AppData, LogicInstance};
+use anoma_rm_risc0::logic_instance::{AppData, ExpirableBlob, LogicInstance};
 use anoma_rm_risc0::nullifier_key::NullifierKey;
 use anoma_rm_risc0::resource::{ConsumedResourceWitness, Resource};
 use anyhow::Context;
@@ -17,18 +17,19 @@ pub struct ActionData {
     pub created_ephemeral: Resource,
 }
 
-/// Optional deviations from the default pass-through action.
+/// Optional deviations from the default pass-through action: none yet.
 #[derive(Clone, Debug, Default)]
-pub struct Overrides {
-    /// The created resource's app data; empty by default.
-    pub created_app_data: Option<AppData>,
-}
+pub struct Overrides {}
 
-/// Build a pass-through action whose consumed resource carries `app_data`
-/// (an external call in its `external_payload`, for one). Both resources are
+/// Build a pass-through action whose consumed resource makes `external_calls`,
+/// each a blob in the encoding the chain's adapter reads. Both resources are
 /// ephemeral with zero quantity, so the action balances; `seed` keeps their
 /// nonces apart from every other action's.
-pub fn build(seed: u8, app_data: AppData, overrides: Overrides) -> anyhow::Result<ActionData> {
+pub fn build(
+    seed: u8,
+    external_calls: Vec<Vec<u32>>,
+    Overrides {}: Overrides,
+) -> anyhow::Result<ActionData> {
     let nf_key = NullifierKey::from_bytes([seed; 32]);
     let nk_commitment = nf_key.commit();
 
@@ -48,15 +49,10 @@ pub fn build(seed: u8, app_data: AppData, overrides: Overrides) -> anyhow::Resul
     // The created nonce derives from the consumed nullifier; the compliance
     // circuit rejects any other.
     let created = Resource {
-        logic_ref: PASSTHROUGH_LOGIC_VK,
-        label_ref: Digest::default(),
-        quantity: 0,
-        value_ref: Digest::default(),
-        is_ephemeral: true,
         nonce: Resource::derive_nonce_from_nullifiers(0, &[nullifier])
             .context("failed to derive the created nonce")?,
-        nk_commitment,
         rand_seed: [seed.wrapping_add(33); 32],
+        ..consumed
     };
     let commitment = created.commitment();
 
@@ -75,13 +71,22 @@ pub fn build(seed: u8, app_data: AppData, overrides: Overrides) -> anyhow::Resul
             tag: nullifier,
             is_consumed: true,
             root,
-            app_data,
+            app_data: AppData {
+                external_payload: external_calls
+                    .into_iter()
+                    .map(|blob| ExpirableBlob {
+                        blob,
+                        deletion_criterion: 0,
+                    })
+                    .collect(),
+                ..AppData::default()
+            },
         })),
         Box::new(PassthroughLogicWitness(LogicInstance {
             tag: commitment,
             is_consumed: false,
             root,
-            app_data: overrides.created_app_data.unwrap_or_default(),
+            app_data: AppData::default(),
         })),
     ];
 

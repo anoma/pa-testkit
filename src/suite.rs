@@ -11,7 +11,6 @@ use crate::assert::{Needle, expect_integration_panic};
 use crate::environment::Environment;
 use crate::fixtures::{passthrough, trivial};
 use crate::transaction::Transaction;
-use crate::witness::{AppData, ExpirableBlob};
 use crate::{commitment_root, execute_tx, prove_actions};
 
 /// The nonce of the trivial transaction's consumed resource, outside the
@@ -327,14 +326,7 @@ async fn prove_external_call<Env: Environment>(
     seed: u8,
     call: Vec<u32>,
 ) -> anyhow::Result<Env::Transaction> {
-    let app_data = AppData {
-        external_payload: vec![ExpirableBlob {
-            blob: call,
-            deletion_criterion: 0,
-        }],
-        ..AppData::default()
-    };
-    let action = passthrough::build(seed, app_data, passthrough::Overrides::default())
+    let action = passthrough::build(seed, vec![call], passthrough::Overrides::default())
         .context("failed to build a pass-through action")?
         .witnesses;
     prove_actions(env, &[action]).await
