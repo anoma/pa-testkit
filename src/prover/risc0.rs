@@ -7,7 +7,7 @@ use anoma_rm_risc0::compliance::ComplianceWitness;
 use anoma_rm_risc0::compliance_unit;
 use anoma_rm_risc0::error::ArmError;
 use anoma_rm_risc0::proving_system::{self, ProofType};
-use anoma_rm_risc0::transaction::{self, Transaction as ArmTxn};
+use anoma_rm_risc0::transaction;
 use anyhow::Context;
 use serde::ser::{Serialize, SerializeTuple, Serializer};
 
@@ -71,9 +71,13 @@ impl Prover for Risc0Prover {
         }
 
         let assembled = assemble::assemble(action_witnesses, constrained, base_proofs)?;
-        let aggregated = aggregate(assembled.transaction)
-            .await
-            .context("failed to aggregate the transaction")?;
+        let mut transaction = assembled.transaction;
+        let aggregated = on_blocking_thread(move || {
+            transaction::aggregate(&mut transaction, ProofType::Groth16, JOURNAL_ENCODING)?;
+            Ok(transaction)
+        })
+        .await
+        .context("failed to aggregate the transaction")?;
         assemble::verify_aggregated(aggregated, assembled.kind_table_commitment)
     }
 }
@@ -98,14 +102,6 @@ async fn prove_compliance(witness: &ComplianceWitness) -> anyhow::Result<BasePro
         receipt: unit.proof,
         instance: unit.instance,
     })
-}
-
-async fn aggregate(mut transaction: ArmTxn) -> anyhow::Result<ArmTxn> {
-    on_blocking_thread(move || {
-        transaction::aggregate(&mut transaction, ProofType::Groth16, JOURNAL_ENCODING)?;
-        Ok(transaction)
-    })
-    .await
 }
 
 /// Runs one proving job on tokio's blocking thread pool: risc0 proving is
