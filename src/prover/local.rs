@@ -1,8 +1,6 @@
 //! Local prover: constrains circuits natively and emits a mock Groth16
 //! aggregation seal.
 
-use std::panic::AssertUnwindSafe;
-
 use anoma_rm_risc0::action_tree::ActionTree;
 use anoma_rm_risc0::aggregation_instance::{
     ActionAggregated, AggregationInstance, ConsumedResourceAggregated, CreatedResourceAggregated,
@@ -32,19 +30,7 @@ impl Prover for LocalProver {
     type Transaction = Transaction;
 
     async fn prove(&self, actions: &[ActionWitnesses]) -> anyhow::Result<Self::Transaction> {
-        // NOTE: this may not actually be unwind safe, but we don't care, because
-        // we will hardly ever run into unwind safety issues during these tests.
-        std::panic::catch_unwind(AssertUnwindSafe(|| constrain_txn(actions))).unwrap_or_else(
-            |cause| {
-                if let Some(panic_msg) = cause.downcast_ref::<String>() {
-                    anyhow::bail!("proving failed: {panic_msg}");
-                }
-                if let Some(panic_msg) = cause.downcast_ref::<&'static str>() {
-                    anyhow::bail!("proving failed: {panic_msg}");
-                }
-                std::panic::resume_unwind(cause)
-            },
-        )
+        constrain::catching_panics(|| constrain_txn(actions))
     }
 }
 
@@ -64,6 +50,23 @@ fn encode_seal(verifying_key: Digest, journal: Digest) -> Vec<u8> {
         Digest::new([u32::MAX; 8]),
     )))
     .unwrap()
+}
+
+/// The mock aggregation seal over `instance`: the claim of the batch
+/// aggregation circuit over the instance's journal, in the journal encoding the
+/// provers use.
+pub(crate) fn mock_aggregation_seal(instance: &AggregationInstance) -> Vec<u8> {
+    let (journal, verifying_key) = match JOURNAL_ENCODING {
+        JournalEncoding::Abi => (
+            anoma_rm_risc0::aggregation_instance::abi_encode_instance(instance.clone()),
+            anoma_rm_risc0::constants::BATCH_AGGREGATION_EVM_VK,
+        ),
+        JournalEncoding::Risc0Serde => (
+            instance.to_journal(),
+            anoma_rm_risc0::constants::BATCH_AGGREGATION_VK,
+        ),
+    };
+    encode_seal(verifying_key, journal_digest(&journal))
 }
 
 fn journal_digest(journal: &[u8]) -> Digest {
@@ -137,22 +140,7 @@ fn constrain_txn(action_witnesses: &[ActionWitnesses]) -> anyhow::Result<Transac
         actions,
     };
 
-    let (journal, verifying_key) = match JOURNAL_ENCODING {
-        JournalEncoding::Abi => (
-            anoma_rm_risc0::aggregation_instance::abi_encode_instance(instance.clone()),
-            anoma_rm_risc0::constants::BATCH_AGGREGATION_EVM_VK,
-        ),
-        JournalEncoding::Risc0Serde => {
-            let words = risc0_zkvm::serde::to_vec(&instance)
-                .context("failed to serialize the aggregation instance")?;
-            (
-                anoma_rm_risc0::utils::words_to_bytes(&words).to_vec(),
-                anoma_rm_risc0::constants::BATCH_AGGREGATION_VK,
-            )
-        }
-    };
-
-    let proof = encode_seal(verifying_key, journal_digest(&journal));
+    let proof = mock_aggregation_seal(&instance);
 
     let arm_txn = transaction::generate_delta_proof(ArmTxn {
         actions: None,

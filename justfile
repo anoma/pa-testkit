@@ -17,6 +17,10 @@ fmt-check:
 build *args:
     cargo build --workspace {{ args }}
 
+# Check that each feature builds on its own, without warnings, as a consumer enabling only it
+check-features:
+    for feature in fixtures local e2e prove mocks abi_encoding; do cargo clippy --no-default-features --features "$feature" -- -D warnings; done
+
 # Test
 test *args:
     cargo test --workspace {{ args }}
@@ -29,6 +33,10 @@ publish *args:
 lint:
     cargo clippy --workspace --no-deps -- -Dwarnings
     cargo clippy --workspace --no-deps --tests -- -Dwarnings
+
+# Rebuild the committed guest ELFs reproducibly (Docker)
+elfs:
+    ./scripts/update_elfs.sh
 
 # The toolchain whose rustdoc JSON interface-parity reads (rust_api::NIGHTLY)
 nightly := "nightly-2026-02-08"

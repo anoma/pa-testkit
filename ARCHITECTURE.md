@@ -25,22 +25,44 @@ nesting.
 - `environment` — backend-agnostic traits: `Environment`, `Prover`,
   `ProtocolAdapter`, `Transaction`, `CommitmentTree`, plus the typed `State` /
   `StateBuilder` container.
+- `commitment_tree` — `FrontierCommitmentTree`, a `CommitmentTree` built from
+  what an adapter stores of its tree (its commitment count and, per level, the
+  last left node) plus the leaves the tests add. A chain's harness reads those
+  from its adapter; roots and paths follow without the earlier leaves.
 - `witness` — `ActionWitnesses`, `LogicWitness`, and `constrain_action` (native
   constraint checking, no zkVM).
 - `transaction` — the risc0 `Transaction` newtype over `arm::Transaction`, the
   orphan-rule seam that lets the testkit implement the `Transaction` trait.
-- `prover` — the two chain-agnostic provers:
+- `prover` — the three chain-agnostic provers, which all constrain the actions
+  first (`constrain`):
   - `LocalProver` (`feature = "local"`): runs `constrain` and emits mock Groth16
     seals. No real proving — fast and offline.
   - `QueueProver` (`feature = "e2e"`): submits to the real remote proving queue.
     Built from typed params (`new(base_url, auth_token)`); reads no environment.
+  - `Risc0Prover` (`feature = "prove"`): makes the same real proofs in-process
+    with risc0, one at a time — succinct base proofs, then a Groth16
+    aggregation, which needs a container runtime (`docker`). For an e2e
+    environment without the queue; minutes per transaction.
+
+  The two real provers share `assemble`: the actions built from their base
+  proofs in canonical tag order, the delta proof, and the verification of the
+  aggregated transaction.
 - `assert` — negative-test assertion helpers (`Needle`,
   `expect_integration_panic`), shared by every integration-test crate. The
   proof-tamper counterpart lives on `Transaction` (`tamper_first_logic_seal`).
 - `fixtures` (`feature = "fixtures"`): the trivial action kind — one `build`
   (plus batch `build_many`) returning `ActionData`, with `Overrides` for negative
-  tests (ADR-0003). App- and chain-agnostic, exposed for reuse by every
-  integration-test crate.
+  tests (ADR-0003) — and the pass-through action kind, whose resources carry
+  the app data a test gives them (an external call, in the encoding of the
+  chain under test), under a logic whose guest commits its instance as given
+  (`circuits/passthrough-logic`, committed as `elfs/passthrough-logic-guest.bin`,
+  rebuilt reproducibly by `scripts/update_elfs.sh`). App- and chain-agnostic,
+  exposed for reuse by every integration-test crate.
+- `suite` (`feature = "fixtures"`): the chain-agnostic integration tests, each
+  a function over any `Environment`; `suite_tests!` emits one test per suite
+  function for an environment, so a harness cannot miss one. The testkit runs
+  it against an adapter in memory. An environment encodes the external-call
+  tests' calls for its chain by implementing `BlockTimeForwarder`.
 - `identities` — well-known test signing keys.
 - `mocks` (`feature = "mocks"`): `mockall` doubles of the core traits.
 

@@ -45,6 +45,9 @@ jobs:
       - name: Build
         run: just build
 
+      - name: Check each feature on its own
+        run: just check-features
+
       - name: Lint
         run: just lint
 

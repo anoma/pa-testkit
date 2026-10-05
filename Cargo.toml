@@ -29,6 +29,9 @@ e2e = [
   "dep:serde",
   "dep:tokio",
 ]
+# Proves in-process with risc0: real succinct base proofs and a Groth16
+# aggregation, whose prover runs in a container runtime (`docker`).
+prove = ["anoma-rm-risc0/prove", "dep:serde", "dep:tokio", "tokio/rt"]
 
 [dependencies]
 anoma-rm-risc0 = { version = "2.0.0-rc.6", default-features = false, features = [

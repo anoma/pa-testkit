@@ -1,9 +1,10 @@
 //! Shared front-half of proving: constrain an action's witnesses into validated
-//! instances. Both provers run this first — the local prover mints a mock
-//! aggregation seal over the resulting instances, the queue prover assembles
-//! the transaction while submitting the witnesses for real proving.
+//! instances. Every prover runs this first — the local prover mints a mock
+//! aggregation seal over the resulting instances, the queue and risc0 provers
+//! assemble the transaction from real proofs of the witnesses.
 
 use std::collections::HashMap;
+use std::panic::AssertUnwindSafe;
 
 use anoma_rm_risc0::Digest;
 use anoma_rm_risc0::compliance::{self, ComplianceInstance};
@@ -21,7 +22,7 @@ pub(super) struct ConstrainedLogic {
     /// Position of the originating witness in
     /// [`ActionWitnesses::logic_witnesses`], correlating canonical-order
     /// logics with their per-witness proving jobs.
-    #[cfg_attr(not(feature = "e2e"), allow(dead_code))]
+    #[cfg_attr(not(any(feature = "e2e", feature = "prove")), allow(dead_code))]
     pub witness_index: usize,
 }
 
@@ -29,11 +30,42 @@ pub(super) struct ConstrainedLogic {
 /// tag-correlation rules.
 pub(super) struct ConstrainedAction {
     /// The action's compliance instance.
+    #[cfg_attr(not(feature = "local"), allow(dead_code))]
     pub compliance_instance: ComplianceInstance,
     /// Logic inputs for the consumed resources, in `consumed_publics` order.
     pub consumed_logics: Vec<ConstrainedLogic>,
     /// Logic inputs for the created resources, in `created_publics` order.
     pub created_logics: Vec<ConstrainedLogic>,
+}
+
+/// Runs `f`, turning a panic with a message into an error: the circuits panic
+/// on invalid witnesses.
+pub(super) fn catching_panics<T>(f: impl FnOnce() -> anyhow::Result<T>) -> anyhow::Result<T> {
+    // NOTE: this may not actually be unwind safe, but we don't care, because
+    // we will hardly ever run into unwind safety issues during these tests.
+    std::panic::catch_unwind(AssertUnwindSafe(f)).unwrap_or_else(|cause| {
+        if let Some(panic_msg) = cause.downcast_ref::<String>() {
+            anyhow::bail!("proving failed: {panic_msg}");
+        }
+        if let Some(panic_msg) = cause.downcast_ref::<&'static str>() {
+            anyhow::bail!("proving failed: {panic_msg}");
+        }
+        std::panic::resume_unwind(cause)
+    })
+}
+
+/// Constrains every action of a transaction (see [`action`]).
+#[cfg(any(feature = "e2e", feature = "prove"))]
+pub(super) fn actions(
+    action_witnesses: &[ActionWitnesses],
+) -> anyhow::Result<Vec<ConstrainedAction>> {
+    catching_panics(|| {
+        action_witnesses
+            .iter()
+            .enumerate()
+            .map(|(action_idx, witnesses)| action(witnesses, action_idx))
+            .collect()
+    })
 }
 
 /// Constrains every witness of an action and checks that each of the compliance
