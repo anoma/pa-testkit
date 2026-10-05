@@ -3,4 +3,5 @@
 //! integration-test crate can reuse them.
 
 pub mod identities;
+pub mod passthrough;
 pub mod trivial;

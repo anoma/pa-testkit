@@ -33,3 +33,7 @@ publish *args:
 lint:
     cargo clippy --no-deps -- -Dwarnings
     cargo clippy --no-deps --tests -- -Dwarnings
+
+# Rebuild the committed guest ELFs reproducibly (Docker)
+elfs:
+    ./scripts/update_elfs.sh
