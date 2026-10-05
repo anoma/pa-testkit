@@ -1,0 +1,14 @@
+{
+  "name": "@fixture/solana-client",
+  "version": "1.0.0",
+  "type": "module",
+  "types": "dist/index.d.ts",
+  "files": ["dist", "deployments.json"],
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3"
+  }
+}

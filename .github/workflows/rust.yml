@@ -23,6 +23,18 @@ jobs:
         with:
           components: rustfmt, clippy
 
+      # interface-parity's tests read rustdoc JSON from this nightly and
+      # TypeScript exports through Node.
+      - name: Install the interface-parity nightly
+        run: just install-nightly
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: interface-parity/tests/fixtures/**/package-lock.json
+
       - name: Show Rust version
         run: rustc --version
 
