@@ -1,4 +1,5 @@
 pub mod assert;
+pub mod commitment_tree;
 pub mod environment;
 #[cfg(feature = "fixtures")]
 pub mod fixtures;
@@ -6,6 +7,8 @@ pub mod fixtures;
 pub mod mocks;
 #[cfg(any(feature = "local", feature = "e2e"))]
 pub mod prover;
+#[cfg(feature = "fixtures")]
+pub mod suite;
 pub mod transaction;
 pub mod witness;
 

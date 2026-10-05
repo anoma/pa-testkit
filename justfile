@@ -17,6 +17,10 @@ fmt-check:
 build *args:
     cargo build {{ args }}
 
+# Check that each feature builds on its own, without warnings, as a consumer enabling only it
+check-features:
+    for feature in fixtures local e2e mocks abi_encoding; do cargo clippy --no-default-features --features "$feature" -- -D warnings; done
+
 # Test
 test *args:
     cargo test {{ args }}

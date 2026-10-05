@@ -25,6 +25,10 @@ nesting.
 - `environment` — backend-agnostic traits: `Environment`, `Prover`,
   `ProtocolAdapter`, `Transaction`, `CommitmentTree`, plus the typed `State` /
   `StateBuilder` container.
+- `commitment_tree` — `FrontierCommitmentTree`, a `CommitmentTree` built from
+  what an adapter stores of its tree (its commitment count and, per level, the
+  last left node) plus the leaves the tests add. A chain's harness reads those
+  from its adapter; roots and paths follow without the earlier leaves.
 - `witness` — `ActionWitnesses`, `LogicWitness`, and `constrain_action` (native
   constraint checking, no zkVM).
 - `transaction` — the risc0 `Transaction` newtype over `arm::Transaction`, the
@@ -41,6 +45,10 @@ nesting.
   (plus batch `build_many`) returning `ActionData`, with `Overrides` for negative
   tests (ADR-0003). App- and chain-agnostic, exposed for reuse by every
   integration-test crate.
+- `suite` (`feature = "fixtures"`): the chain-agnostic integration tests, each
+  a function over any `Environment`; `suite_tests!` emits one test per suite
+  function for an environment, so a harness cannot miss one. The testkit runs
+  it against an adapter in memory.
 - `identities` — well-known test signing keys.
 - `mocks` (`feature = "mocks"`): `mockall` doubles of the core traits.
 
