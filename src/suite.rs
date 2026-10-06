@@ -174,6 +174,7 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use anoma_rm_risc0::Digest;
+    use anoma_rm_risc0::proving_system::JournalEncoding;
 
     use super::*;
     use crate::commitment_tree::FrontierCommitmentTree;
@@ -181,11 +182,12 @@ mod tests {
     use crate::prover::{LocalProver, mock_aggregation_seal};
 
     /// A protocol adapter in memory that checks what the suite expects it to
-    /// refuse: the local prover's seal and each external call's output. Its
-    /// one forwarder is a block-time forwarder whose calls are `[time,
-    /// expected output]`.
+    /// refuse: the local prover's seal, over the aggregation journal in
+    /// `encoding`, and each external call's output. Its one forwarder is a
+    /// block-time forwarder whose calls are `[time, expected output]`.
     struct InMemoryAdapter {
         tree: FrontierCommitmentTree,
+        encoding: JournalEncoding,
     }
 
     impl ProtocolAdapter for InMemoryAdapter {
@@ -199,7 +201,7 @@ mod tests {
                 .aggregation
                 .context("the transaction carries no aggregation")?;
             anyhow::ensure!(
-                aggregation.proof == mock_aggregation_seal(&aggregation.instance),
+                aggregation.proof == mock_aggregation_seal(&aggregation.instance, self.encoding),
                 "the aggregation seal does not verify"
             );
             for action in &aggregation.instance.actions {
@@ -242,12 +244,15 @@ mod tests {
     }
 
     impl InMemoryEnvironment {
-        fn new() -> Self {
+        /// An adapter that verifies seals over the aggregation journal in
+        /// `verified`, with a local prover that seals it in `proved`.
+        fn new(proved: JournalEncoding, verified: JournalEncoding) -> Self {
             Self {
                 state: StateBuilder::new().finalize(),
-                prover: LocalProver,
+                prover: LocalProver::new(proved),
                 adapter: InMemoryAdapter {
                     tree: FrontierCommitmentTree::new(0, Vec::new()).unwrap(),
+                    encoding: verified,
                 },
             }
         }
@@ -285,15 +290,42 @@ mod tests {
         }
     }
 
-    /// The whole suite against the adapter in memory.
-    mod in_memory {
-        use super::*;
+    /// The whole suite against the adapter in memory, for each journal
+    /// encoding.
+    macro_rules! in_memory_suite {
+        ($module:ident, $encoding:expr) => {
+            mod $module {
+                use super::*;
 
-        crate::suite_tests!(
-            async { anyhow::Ok(InMemoryEnvironment::new()) },
-            refusal = Needle::Static("the aggregation seal does not verify"),
-            output_mismatch = Needle::Static("the external call returned Before, not 2"),
-        );
+                crate::suite_tests!(
+                    async { anyhow::Ok(InMemoryEnvironment::new($encoding, $encoding)) },
+                    refusal = Needle::Static("the aggregation seal does not verify"),
+                    output_mismatch = Needle::Static("the external call returned Before, not 2"),
+                );
+            }
+        };
+    }
+
+    in_memory_suite!(in_memory_risc0_serde, JournalEncoding::Risc0Serde);
+    in_memory_suite!(in_memory_abi, JournalEncoding::Abi);
+
+    /// A seal over the journal in one encoding claims a different circuit and
+    /// journal than the other's, so an adapter verifying the other refuses it.
+    #[tokio::test]
+    async fn settlement_refuses_a_seal_in_the_other_encoding() -> anyhow::Result<()> {
+        for (proved, verified) in [
+            (JournalEncoding::Abi, JournalEncoding::Risc0Serde),
+            (JournalEncoding::Risc0Serde, JournalEncoding::Abi),
+        ] {
+            let mut env = InMemoryEnvironment::new(proved, verified);
+            let actions = trivial::build_many(1, 71).context("failed to build trivial actions")?;
+            let tx = prove_actions(&env, &actions).await?;
+            expect_integration_panic(Needle::Static("the aggregation seal does not verify"))(
+                execute_tx(&mut env, tx).await,
+            )
+            .with_context(|| format!("proved in {proved:?}, verified in {verified:?}"))?;
+        }
+        Ok(())
     }
 }
 

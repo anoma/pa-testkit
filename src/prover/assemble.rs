@@ -10,10 +10,10 @@ use anoma_rm_risc0::action::Action;
 use anoma_rm_risc0::compliance_unit::{self, ComplianceUnit};
 use anoma_rm_risc0::delta_proof;
 use anoma_rm_risc0::logic_proof::LogicVerifierInput;
+use anoma_rm_risc0::proving_system::JournalEncoding;
 use anoma_rm_risc0::transaction::{self, Delta, Transaction as ArmTxn};
 use anyhow::Context;
 
-use super::JOURNAL_ENCODING;
 use super::constrain::ConstrainedAction;
 use crate::transaction::Transaction;
 use crate::witness::ActionWitnesses;
@@ -130,12 +130,13 @@ pub(super) fn assemble(
 }
 
 /// Verifies the aggregated transaction against the kind table commitment of
-/// its [`Assembled`] form, in the provers' journal encoding.
+/// its [`Assembled`] form, its aggregation journal in `encoding`.
 pub(super) fn verify_aggregated(
     aggregated: ArmTxn,
     kind_table_commitment: Digest,
+    encoding: JournalEncoding,
 ) -> anyhow::Result<Transaction> {
-    transaction::verify(&aggregated, kind_table_commitment, JOURNAL_ENCODING)
+    transaction::verify(&aggregated, kind_table_commitment, encoding)
         .context("aggregated transaction failed local verification")?;
 
     Ok(Transaction::from_arm(aggregated))

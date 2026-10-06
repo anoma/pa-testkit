@@ -13,7 +13,6 @@ use risc0_zkvm::sha::Digestible;
 use risc0_zkvm::{Digest, Groth16Receipt, InnerReceipt, MaybePruned, ReceiptClaim};
 use sha2::{Digest as _, Sha256};
 
-use super::JOURNAL_ENCODING;
 use super::constrain;
 use crate::environment::Prover;
 use crate::transaction::Transaction;
@@ -23,14 +22,22 @@ use crate::witness::ActionWitnesses;
 /// `constrain` and replicates the aggregation guest host-side, emitting one
 /// mock Groth16 seal over the aggregation instance — mirroring real
 /// aggregation, the base proofs are erased. No real proving — fast and offline.
-#[derive(Default)]
-pub struct LocalProver;
+pub struct LocalProver {
+    encoding: JournalEncoding,
+}
+
+impl LocalProver {
+    /// A local prover whose seals claim the aggregation journal in `encoding`.
+    pub fn new(encoding: JournalEncoding) -> Self {
+        Self { encoding }
+    }
+}
 
 impl Prover for LocalProver {
     type Transaction = Transaction;
 
     async fn prove(&self, actions: &[ActionWitnesses]) -> anyhow::Result<Self::Transaction> {
-        constrain::catching_panics(|| constrain_txn(actions))
+        constrain::catching_panics(|| constrain_txn(actions, self.encoding))
     }
 }
 
@@ -53,10 +60,13 @@ fn encode_seal(verifying_key: Digest, journal: Digest) -> Vec<u8> {
 }
 
 /// The mock aggregation seal over `instance`: the claim of the batch
-/// aggregation circuit over the instance's journal, in the journal encoding the
-/// provers use.
-pub(crate) fn mock_aggregation_seal(instance: &AggregationInstance) -> Vec<u8> {
-    let (journal, verifying_key) = match JOURNAL_ENCODING {
+/// aggregation circuit for `encoding` over the instance's journal in that
+/// encoding.
+pub(crate) fn mock_aggregation_seal(
+    instance: &AggregationInstance,
+    encoding: JournalEncoding,
+) -> Vec<u8> {
+    let (journal, verifying_key) = match encoding {
         JournalEncoding::Abi => (
             anoma_rm_risc0::aggregation_instance::abi_encode_instance(instance.clone()),
             anoma_rm_risc0::constants::BATCH_AGGREGATION_EVM_VK,
@@ -79,7 +89,10 @@ fn journal_digest(journal: &[u8]) -> Digest {
 /// batch aggregation guest does: the action tree roots are recomputed from the
 /// compliance tags, the per-resource app data is merged in canonical tag order,
 /// and all actions must share one kind table commitment.
-fn constrain_txn(action_witnesses: &[ActionWitnesses]) -> anyhow::Result<Transaction> {
+fn constrain_txn(
+    action_witnesses: &[ActionWitnesses],
+    encoding: JournalEncoding,
+) -> anyhow::Result<Transaction> {
     let mut actions = Vec::with_capacity(action_witnesses.len());
     let mut rcvs = Vec::new();
     let mut kind_table_commitment: Option<Digest> = None;
@@ -140,7 +153,7 @@ fn constrain_txn(action_witnesses: &[ActionWitnesses]) -> anyhow::Result<Transac
         actions,
     };
 
-    let proof = mock_aggregation_seal(&instance);
+    let proof = mock_aggregation_seal(&instance, encoding);
 
     let arm_txn = transaction::generate_delta_proof(ArmTxn {
         actions: None,

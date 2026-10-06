@@ -1,7 +1,10 @@
 //! Risc0 provers: turn action witnesses into a proven ARM
 //! [`crate::transaction::Transaction`].
 //!
-//! Every prover is agnostic to the target chain. The [`LocalProver`] runs
+//! Every prover is built with the aggregation journal encoding of the chain
+//! that verifies its transactions (`JournalEncoding::Abi` for the EVM,
+//! `Risc0Serde` for Solana), which also selects the batch aggregation circuit;
+//! nothing else about the chain reaches it. The [`LocalProver`] runs
 //! circuits via `constrain` and emits a mock aggregation seal (no real
 //! proving); the [`QueueProver`] submits to the real remote proving queue; the
 //! [`Risc0Prover`] makes the same real proofs in-process. The shared
@@ -27,17 +30,3 @@ pub(crate) use local::mock_aggregation_seal;
 pub use remote::QueueProver;
 #[cfg(feature = "prove")]
 pub use risc0::Risc0Prover;
-
-/// How every prover encodes the aggregation journal, which also selects the
-/// batch aggregation circuit.
-#[cfg(any(feature = "local", feature = "e2e", feature = "prove"))]
-const JOURNAL_ENCODING: anoma_rm_risc0::proving_system::JournalEncoding = {
-    #[cfg(feature = "abi_encoding")]
-    {
-        anoma_rm_risc0::proving_system::JournalEncoding::Abi
-    }
-    #[cfg(not(feature = "abi_encoding"))]
-    {
-        anoma_rm_risc0::proving_system::JournalEncoding::Risc0Serde
-    }
-};

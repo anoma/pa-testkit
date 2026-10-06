@@ -6,6 +6,7 @@
 use anoma_pa_testkit::environment::Prover;
 use anoma_pa_testkit::fixtures::trivial;
 use anoma_pa_testkit::prover::LocalProver;
+use anoma_rm_risc0::proving_system::JournalEncoding;
 
 #[test]
 fn build_trivial_action_defaults_to_one_resource_per_side() {
@@ -65,7 +66,7 @@ fn build_trivial_action_with_overrides_builds_nonzero_quantity() {
 #[tokio::test]
 async fn local_prover_mock_aggregates_trivial_actions() {
     let actions = trivial::build_many(8, 1).expect("must build trivial action witnesses");
-    let txn = LocalProver
+    let txn = LocalProver::new(JournalEncoding::Risc0Serde)
         .prove(&actions)
         .await
         .expect("local prover must constrain trivial actions");
@@ -94,7 +95,7 @@ async fn local_prover_mock_aggregates_an_n_to_m_action() {
     )
     .expect("an n:m trivial action must build");
 
-    let txn = LocalProver
+    let txn = LocalProver::new(JournalEncoding::Risc0Serde)
         .prove(&[built.witnesses])
         .await
         .expect("local prover must constrain an n:m trivial action");
@@ -120,7 +121,7 @@ async fn local_prover_mock_aggregates_a_consume_only_action() {
     )
     .expect("a consume-only trivial action must build");
 
-    let txn = LocalProver
+    let txn = LocalProver::new(JournalEncoding::Risc0Serde)
         .prove(&[built.witnesses])
         .await
         .expect("local prover must constrain a consume-only trivial action");

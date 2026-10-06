@@ -6,12 +6,11 @@ use std::collections::HashMap;
 use anoma_rm_risc0::compliance::ComplianceWitness;
 use anoma_rm_risc0::compliance_unit;
 use anoma_rm_risc0::error::ArmError;
-use anoma_rm_risc0::proving_system::{self, ProofType};
+use anoma_rm_risc0::proving_system::{self, JournalEncoding, ProofType};
 use anoma_rm_risc0::transaction;
 use anyhow::Context;
 use serde::ser::{Serialize, SerializeTuple, Serializer};
 
-use super::JOURNAL_ENCODING;
 use super::assemble::{self, BaseProof, BaseProofKey, BaseProofSlot};
 use super::constrain;
 use crate::environment::Prover;
@@ -29,8 +28,17 @@ use crate::witness::{ActionWitnesses, LogicWitness};
 /// minutes per transaction. The Groth16 step runs risc0's Groth16 prover in a
 /// container, so it needs a container runtime on the `PATH` as `docker`
 /// (Docker, or podman behind a `docker` wrapper).
-#[derive(Default)]
-pub struct Risc0Prover;
+pub struct Risc0Prover {
+    encoding: JournalEncoding,
+}
+
+impl Risc0Prover {
+    /// A risc0 prover that aggregates with the batch aggregation circuit for
+    /// `encoding`.
+    pub fn new(encoding: JournalEncoding) -> Self {
+        Self { encoding }
+    }
+}
 
 impl Prover for Risc0Prover {
     type Transaction = Transaction;
@@ -72,13 +80,14 @@ impl Prover for Risc0Prover {
 
         let assembled = assemble::assemble(action_witnesses, constrained, base_proofs)?;
         let mut transaction = assembled.transaction;
+        let encoding = self.encoding;
         let aggregated = on_blocking_thread(move || {
-            transaction::aggregate(&mut transaction, ProofType::Groth16, JOURNAL_ENCODING)?;
+            transaction::aggregate(&mut transaction, ProofType::Groth16, encoding)?;
             Ok(transaction)
         })
         .await
         .context("failed to aggregate the transaction")?;
-        assemble::verify_aggregated(aggregated, assembled.kind_table_commitment)
+        assemble::verify_aggregated(aggregated, assembled.kind_table_commitment, self.encoding)
     }
 }
 
@@ -153,7 +162,7 @@ mod tests {
             trivial::build(1, trivial::Overrides::default()).expect("a trivial action must build");
 
         let started = std::time::Instant::now();
-        let txn = Risc0Prover
+        let txn = Risc0Prover::new(JournalEncoding::Risc0Serde)
             .prove(&[action.witnesses])
             .await
             .expect("the risc0 prover must prove a trivial transaction");
@@ -182,7 +191,7 @@ mod tests {
         let kind_table_commitment = anoma_rm_risc0::compliance::hash_kind_table_entries(
             anoma_rm_risc0::constants::kind_table(),
         );
-        transaction::verify(arm_txn, kind_table_commitment, JOURNAL_ENCODING)
+        transaction::verify(arm_txn, kind_table_commitment, JournalEncoding::Risc0Serde)
             .expect("the aggregated transaction must verify");
     }
 }
