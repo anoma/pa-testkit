@@ -24,30 +24,28 @@ const TRIVIAL_NONCE: [u8; 32] = *b"anoma pa-testkit suite trivial 1";
 
 /// A transaction of one trivial action settles and adds its commitment.
 pub async fn settles_a_trivial_transaction<Env: Environment>(env: &mut Env) -> anyhow::Result<()> {
-    settles_one_action(
-        env,
+    let action = trivial_action(
         1,
         trivial::Overrides {
             consumed_nonce: Some(TRIVIAL_NONCE),
             ..trivial::Overrides::default()
         },
-    )
-    .await
+    )?;
+    proves_and_settles(env, &[action]).await
 }
 
 /// An action consuming two resources and creating three settles and adds its
 /// commitments.
 pub async fn settles_an_n_to_m_transaction<Env: Environment>(env: &mut Env) -> anyhow::Result<()> {
-    settles_one_action(
-        env,
+    let action = trivial_action(
         21,
         trivial::Overrides {
             consumed_count: Some(2),
             created_count: Some(3),
             ..trivial::Overrides::default()
         },
-    )
-    .await
+    )?;
+    proves_and_settles(env, &[action]).await
 }
 
 /// A transaction of three actions settles and adds their commitments.
@@ -64,17 +62,15 @@ pub async fn settles_consume_only_transactions_without_a_root_change<Env: Enviro
     env: &mut Env,
 ) -> anyhow::Result<()> {
     for seed in [41, 42] {
-        settles_one_action(
-            env,
+        let action = trivial_action(
             seed,
             trivial::Overrides {
                 consumed_count: Some(2),
                 created_count: Some(0),
                 ..trivial::Overrides::default()
             },
-        )
-        .await
-        .with_context(|| format!("consume-only transaction {seed}"))?;
+        )?;
+        proves_and_settles(env, &[action]).await?;
     }
     Ok(())
 }
@@ -93,13 +89,13 @@ pub async fn settlement_refuses_a_tampered_aggregation_seal<Env: Environment>(
     refuses(env, tx, Refusal::InvalidAggregationProof).await
 }
 
-/// The protocol adapter refuses a transaction spending a nullifier an earlier
-/// transaction spent.
+/// The protocol adapter refuses a transaction spending a nullifier it already
+/// settled: the same transaction a second time.
 pub async fn settlement_refuses_a_spent_nullifier<Env: Environment>(
     env: &mut Env,
 ) -> anyhow::Result<()> {
-    proves_and_settles(env, &[trivial_action(51)?]).await?;
-    let tx = prove_actions(env, &[trivial_action(51)?]).await?;
+    let tx = prove_actions(env, &[trivial_action(51, trivial::Overrides::default())?]).await?;
+    settles(env, tx.clone()).await?;
     refuses(env, tx, Refusal::NullifierSpent).await
 }
 
@@ -108,15 +104,13 @@ pub async fn settlement_refuses_a_spent_nullifier<Env: Environment>(
 pub async fn settlement_refuses_an_unknown_root<Env: Environment>(
     env: &mut Env,
 ) -> anyhow::Result<()> {
-    let action = trivial::build(
+    let action = trivial_action(
         52,
         trivial::Overrides {
             ephemeral_root: Some(Digest::from_bytes(*b"anoma pa-testkit suite: no root!")),
             ..trivial::Overrides::default()
         },
-    )
-    .context("failed to build a trivial action under an unknown root")?
-    .witnesses;
+    )?;
     let tx = prove_actions(env, &[action]).await?;
     refuses(env, tx, Refusal::UnknownRoot).await
 }
@@ -127,38 +121,35 @@ pub async fn settlement_refuses_an_unknown_root<Env: Environment>(
 pub async fn settles_only_under_the_kind_table_it_was_proven_against<Env: Environment>(
     env: &mut Env,
 ) -> anyhow::Result<()> {
-    let proven_against = anoma_rm_risc0::compliance::hash_kind_table_entries(
-        anoma_rm_risc0::constants::kind_table(),
-    );
+    let tx = prove_actions(env, &[trivial_action(53, trivial::Overrides::default())?]).await?;
     env.protocol_adapter_mut()
         .set_kind_table_commitment(Digest::from_bytes(*b"anoma pa-testkit suite: kindtabl"))
         .await
         .context("failed to install another kind table")?;
-    let tx = prove_actions(env, &[trivial_action(53)?]).await?;
-    refuses(env, tx, Refusal::InvalidAggregationProof).await?;
+    refuses(env, tx.clone(), Refusal::InvalidAggregationProof).await?;
 
     env.protocol_adapter_mut()
-        .set_kind_table_commitment(proven_against)
+        .set_kind_table_commitment(crate::fixtures::kind_table_commitment())
         .await
         .context("failed to install the kind table the transaction was proven against")?;
-    proves_and_settles(env, &[trivial_action(53)?]).await
+    settles(env, tx).await
 }
 
 /// The protocol adapter refuses every transaction while its owner has paused
-/// it, and settles again once unpaused.
+/// it, and settles it once unpaused.
 pub async fn settles_only_while_unpaused<Env: Environment>(env: &mut Env) -> anyhow::Result<()> {
+    let tx = prove_actions(env, &[trivial_action(54, trivial::Overrides::default())?]).await?;
     env.protocol_adapter_mut()
         .pause()
         .await
         .context("failed to pause the protocol adapter")?;
-    let tx = prove_actions(env, &[trivial_action(54)?]).await?;
-    refuses(env, tx, Refusal::Paused).await?;
+    refuses(env, tx.clone(), Refusal::Paused).await?;
 
     env.protocol_adapter_mut()
         .unpause()
         .await
         .context("failed to unpause the protocol adapter")?;
-    proves_and_settles(env, &[trivial_action(54)?]).await
+    settles(env, tx).await
 }
 
 /// The protocol adapter refuses a transaction with a resource whose logic ref
@@ -235,18 +226,20 @@ mod tests {
                 tree,
                 nullifiers: HashSet::new(),
                 denied_logic_refs: HashSet::new(),
-                kind_table_commitment: anoma_rm_risc0::compliance::hash_kind_table_entries(
-                    anoma_rm_risc0::constants::kind_table(),
-                ),
+                kind_table_commitment: crate::fixtures::kind_table_commitment(),
                 paused: false,
                 encoding,
             }
         }
 
-        /// Why the adapter refuses `transaction`, if it does.
-        fn refusal(&self, transaction: &Transaction) -> anyhow::Result<Option<Refusal>> {
+        /// Why the adapter refuses `transaction`, or the nullifiers it
+        /// spends.
+        fn check(
+            &self,
+            transaction: &Transaction,
+        ) -> anyhow::Result<Result<HashSet<Digest>, Refusal>> {
             if self.paused {
-                return Ok(Some(Refusal::Paused));
+                return Ok(Err(Refusal::Paused));
             }
             let aggregation = transaction
                 .as_arm()
@@ -260,26 +253,26 @@ mod tests {
                         .denied_logic_refs
                         .contains(&consumed.resource_logic_ref)
                     {
-                        return Ok(Some(Refusal::DeniedLogicRef));
+                        return Ok(Err(Refusal::DeniedLogicRef));
                     }
                     if !self.roots.contains(&consumed.commitment_tree_root) {
-                        return Ok(Some(Refusal::UnknownRoot));
+                        return Ok(Err(Refusal::UnknownRoot));
                     }
                     if self.nullifiers.contains(&consumed.resource_nullifier)
                         || !spent.insert(consumed.resource_nullifier)
                     {
-                        return Ok(Some(Refusal::NullifierSpent));
+                        return Ok(Err(Refusal::NullifierSpent));
                     }
                     if !calls_return_what_they_expect(&consumed.app_data)? {
-                        return Ok(Some(Refusal::ExternalCallOutputMismatch));
+                        return Ok(Err(Refusal::ExternalCallOutputMismatch));
                     }
                 }
                 for created in &action.created_publics {
                     if self.denied_logic_refs.contains(&created.resource_logic_ref) {
-                        return Ok(Some(Refusal::DeniedLogicRef));
+                        return Ok(Err(Refusal::DeniedLogicRef));
                     }
                     if !calls_return_what_they_expect(&created.app_data)? {
-                        return Ok(Some(Refusal::ExternalCallOutputMismatch));
+                        return Ok(Err(Refusal::ExternalCallOutputMismatch));
                     }
                 }
             }
@@ -289,32 +282,21 @@ mod tests {
                 ..aggregation.instance.clone()
             };
             if aggregation.proof != mock_aggregation_seal(&verified, self.encoding) {
-                return Ok(Some(Refusal::InvalidAggregationProof));
+                return Ok(Err(Refusal::InvalidAggregationProof));
             }
-            Ok(None)
+            Ok(Ok(spent))
         }
     }
 
     impl ProtocolAdapter for InMemoryAdapter {
         async fn settle(&mut self, transaction: Transaction) -> anyhow::Result<Outcome> {
-            if let Some(refusal) = self.refusal(&transaction)? {
-                return Ok(Outcome::Refused(refusal));
-            }
-            let created: Vec<Digest> = transaction.created_commitments()?.collect();
-            let aggregation = transaction.as_arm().aggregation.as_ref();
-            self.nullifiers
-                .extend(aggregation.into_iter().flat_map(|aggregation| {
-                    aggregation
-                        .instance
-                        .actions
-                        .iter()
-                        .flat_map(|action| action.consumed_publics.iter())
-                        .map(|consumed| consumed.resource_nullifier)
-                }));
-            if !created.is_empty() {
-                self.tree.add(created);
-                self.roots.insert(self.tree.root());
-            }
+            let spent = match self.check(&transaction)? {
+                Ok(spent) => spent,
+                Err(refusal) => return Ok(Outcome::Refused(refusal)),
+            };
+            self.nullifiers.extend(spent);
+            self.tree.add(transaction.created_commitments()?);
+            self.roots.insert(self.tree.root());
             Ok(Outcome::Settled)
         }
 
@@ -442,20 +424,9 @@ mod tests {
     }
 }
 
-async fn settles_one_action<Env: Environment>(
-    env: &mut Env,
-    seed: u8,
-    overrides: trivial::Overrides,
-) -> anyhow::Result<()> {
-    let action = trivial::build(seed, overrides)
-        .with_context(|| format!("failed to build trivial action {seed}"))?
-        .witnesses;
-    proves_and_settles(env, &[action]).await
-}
-
-/// A trivial action of one resource per side, with nonces from `seed`.
-fn trivial_action(seed: u8) -> anyhow::Result<ActionWitnesses> {
-    Ok(trivial::build(seed, trivial::Overrides::default())
+/// A trivial action with nonces from `seed`.
+fn trivial_action(seed: u8, overrides: trivial::Overrides) -> anyhow::Result<ActionWitnesses> {
+    Ok(trivial::build(seed, overrides)
         .with_context(|| format!("failed to build trivial action {seed}"))?
         .witnesses)
 }
@@ -491,15 +462,11 @@ async fn prove_external_call<Env: Environment>(
 /// its tree with the transaction's commitments added, or, if it creates none,
 /// the root it stored before.
 async fn settles<Env: Environment>(env: &mut Env, tx: Transaction) -> anyhow::Result<()> {
-    let before = stored_root(env).await?;
+    stored_root(env).await?;
     let created: Vec<_> = tx.created_commitments()?.collect();
-    let mut expected = env.protocol_adapter().commitment_tree().await?;
-    expected.add(created.iter().copied());
-    let expected = if created.is_empty() {
-        before
-    } else {
-        expected.root()
-    };
+    let mut tree = env.protocol_adapter().commitment_tree().await?;
+    tree.add(created.iter().copied());
+    let expected = tree.root();
     execute_tx(env, tx).await?;
     let after = stored_root(env).await?;
     anyhow::ensure!(

@@ -62,6 +62,7 @@ pub enum TimeComparison {
 }
 
 /// A protocol adapter on one chain, with a prover for it.
+#[allow(async_fn_in_trait)]
 pub trait Environment {
     /// Protocol adapter.
     type ProtocolAdapter: ProtocolAdapter;
@@ -80,53 +81,46 @@ pub trait Environment {
 
     /// The external payload blob of `call`, in this chain's encoding. The
     /// program it calls is ready for the call once this returns.
-    #[allow(async_fn_in_trait)]
     async fn external_call(&mut self, call: ExternalCall) -> anyhow::Result<Vec<u32>>;
 }
 
 /// Protocol adapter abstraction.
+#[allow(async_fn_in_trait)]
 pub trait ProtocolAdapter {
     /// Asks the adapter to settle `transaction`, adding its commitments and
     /// nullifiers to the commitment tree and nullifier set. A refusal is an
     /// [`Outcome`]; an error means the harness could not ask, or could not
     /// decode the adapter's answer.
-    #[allow(async_fn_in_trait)]
     async fn settle(&mut self, transaction: Transaction) -> anyhow::Result<Outcome>;
 
     /// The commitment tree as the adapter stores it now, read from the
     /// chain: its commitment count and sides.
-    #[allow(async_fn_in_trait)]
     async fn commitment_tree(&self) -> anyhow::Result<FrontierCommitmentTree>;
 
     /// The latest commitment tree root the adapter stores, read from the
     /// chain.
-    #[allow(async_fn_in_trait)]
     async fn latest_root(&self) -> anyhow::Result<Digest>;
 
     /// As the adapter's owner, makes `commitment` the kind-table commitment
     /// transactions are verified against.
-    #[allow(async_fn_in_trait)]
     async fn set_kind_table_commitment(&mut self, commitment: Digest) -> anyhow::Result<()>;
 
     /// As the adapter's owner, pauses settlement.
-    #[allow(async_fn_in_trait)]
     async fn pause(&mut self) -> anyhow::Result<()>;
 
     /// As the adapter's owner, resumes settlement.
-    #[allow(async_fn_in_trait)]
     async fn unpause(&mut self) -> anyhow::Result<()>;
 
     /// As the adapter's owner, denies `logic_ref`: the adapter refuses any
     /// transaction with a resource carrying it.
-    #[allow(async_fn_in_trait)]
     async fn deny_logic_ref(&mut self, logic_ref: Digest) -> anyhow::Result<()>;
 }
 
 /// Transaction prover.
+#[allow(async_fn_in_trait)]
 pub trait Prover {
     /// Prove an ARM transaction.
     ///
     /// Invalid witnesses will result in an error.
-    #[allow(async_fn_in_trait)]
     async fn prove(&self, actions: &[ActionWitnesses]) -> anyhow::Result<Transaction>;
 }

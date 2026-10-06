@@ -182,12 +182,7 @@ mod tests {
             "the aggregation proof must be a Groth16 receipt"
         );
 
-        // The fixtures commit to the loaded kind table, the empty one when
-        // none is loaded.
-        let kind_table_commitment = anoma_rm_risc0::compliance::hash_kind_table_entries(
-            anoma_rm_risc0::constants::kind_table(),
-        );
-        transaction::verify(arm_txn, kind_table_commitment, encoding)
+        transaction::verify(arm_txn, crate::fixtures::kind_table_commitment(), encoding)
             .expect("the aggregated transaction must verify");
     }
 }

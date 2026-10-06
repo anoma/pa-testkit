@@ -8,6 +8,7 @@ use anoma_rm_risc0::transaction::Transaction as ArmTxn;
 /// newtype over the proving backend's ARM transaction. Each target chain's
 /// protocol adapter converts the inner transaction into chain-specific
 /// calldata when it settles it.
+#[derive(Clone)]
 pub struct Transaction {
     pub(crate) arm_txn: ArmTxn,
 }
