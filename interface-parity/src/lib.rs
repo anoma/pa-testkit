@@ -7,6 +7,7 @@ pub mod excuses;
 pub mod fetch;
 pub mod files;
 pub mod inputs;
+pub mod interface;
 pub mod packages;
 pub mod report;
 pub mod run;

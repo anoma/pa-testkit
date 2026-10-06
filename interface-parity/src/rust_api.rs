@@ -27,16 +27,25 @@ fn nightly_binary(name: &str) -> anyhow::Result<PathBuf> {
     Ok(PathBuf::from(path.trim()))
 }
 
-/// The public API of the package's library target, built with all features.
-/// A package without a library target exposes no Rust items.
-pub fn surface(meta: &cargo_metadata::Package) -> anyhow::Result<Surface> {
+/// The public API of the package's library target, built with all features
+/// and the repository's build environment `env`. A package without a library
+/// target exposes no Rust items.
+pub fn surface(
+    meta: &cargo_metadata::Package,
+    env: &[(String, String)],
+) -> anyhow::Result<Surface> {
     if !has_lib(meta) {
         return Ok(Surface::default());
     }
     let (mut stdout, mut stderr) = (Vec::new(), Vec::new());
     // rustdoc JSON only loads dependencies compiled by the same rustc, so both
     // binaries come from the pinned toolchain whatever PATH resolves first.
-    let json = rustdoc_json::Builder::default()
+    let builder = env
+        .iter()
+        .fold(rustdoc_json::Builder::default(), |builder, (key, value)| {
+            builder.env(key, value)
+        });
+    let json = builder
         .toolchain(NIGHTLY)
         .env(NO_AUTO_INSTALL.0, NO_AUTO_INSTALL.1)
         .env("RUSTC", nightly_binary("rustc")?)

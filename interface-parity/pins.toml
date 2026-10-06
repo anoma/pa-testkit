@@ -5,13 +5,13 @@
 name = "pa-evm"
 side = "evm"
 url = "https://github.com/anoma/pa-evm"
-commit = "4986aa1f635722b8b0f08aefe841752551fe2053"
+commit = "7deb37d69582fd445c3aa77f000c2be8d322d826"
 
 [[repository]]
 name = "anomapay-erc20-forwarder"
 side = "evm"
 url = "https://github.com/anoma/anomapay-erc20-forwarder"
-commit = "4b6341360887c598d17eee6a8eb98b58494042ce"
+commit = "155bc123078a9975ffba9880b01aa6ed15378d65"
 
 [[repository]]
 name = "forwarder-bases"
@@ -30,9 +30,11 @@ name = "solana-protocol-adapter"
 side = "solana"
 url = "https://github.com/anoma/solana-protocol-adapter"
 commit = "77e0abc629e50e4c5b1df349b91c63e698e9c5dd"
+build_env = "solana-pa-prototype/env/localnet.env"
 
 [[repository]]
 name = "anomapay-spl-token-forwarder"
 side = "solana"
 url = "https://github.com/anoma/anomapay-spl-token-forwarder"
-commit = "54eabb1fc80b7b8accc121c91d72d898c55d855d"
+commit = "16ccb0b69f4f945764026075c35b90d3d39cf350"
+build_env = "env/localnet.env"
