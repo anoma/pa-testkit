@@ -87,7 +87,7 @@ impl Prover for Risc0Prover {
         })
         .await
         .context("failed to aggregate the transaction")?;
-        assemble::verify_aggregated(aggregated, assembled.kind_table_commitment, self.encoding)
+        assemble::verify_aggregated(aggregated, assembled.kind_table_commitment, encoding)
     }
 }
 
@@ -162,7 +162,8 @@ mod tests {
             trivial::build(1, trivial::Overrides::default()).expect("a trivial action must build");
 
         let started = std::time::Instant::now();
-        let txn = Risc0Prover::new(JournalEncoding::Risc0Serde)
+        let encoding = JournalEncoding::Risc0Serde;
+        let txn = Risc0Prover::new(encoding)
             .prove(&[action.witnesses])
             .await
             .expect("the risc0 prover must prove a trivial transaction");
@@ -191,7 +192,7 @@ mod tests {
         let kind_table_commitment = anoma_rm_risc0::compliance::hash_kind_table_entries(
             anoma_rm_risc0::constants::kind_table(),
         );
-        transaction::verify(arm_txn, kind_table_commitment, JournalEncoding::Risc0Serde)
+        transaction::verify(arm_txn, kind_table_commitment, encoding)
             .expect("the aggregated transaction must verify");
     }
 }

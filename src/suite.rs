@@ -244,15 +244,15 @@ mod tests {
     }
 
     impl InMemoryEnvironment {
-        /// An adapter that verifies seals over the aggregation journal in
-        /// `verified`, with a local prover that seals it in `proved`.
-        fn new(proved: JournalEncoding, verified: JournalEncoding) -> Self {
+        /// An adapter verifying seals over the aggregation journal in
+        /// `encoding`, with a local prover that seals it in `encoding`.
+        fn new(encoding: JournalEncoding) -> Self {
             Self {
                 state: StateBuilder::new().finalize(),
-                prover: LocalProver::new(proved),
+                prover: LocalProver::new(encoding),
                 adapter: InMemoryAdapter {
                     tree: FrontierCommitmentTree::new(0, Vec::new()).unwrap(),
-                    encoding: verified,
+                    encoding,
                 },
             }
         }
@@ -298,7 +298,7 @@ mod tests {
                 use super::*;
 
                 crate::suite_tests!(
-                    async { anyhow::Ok(InMemoryEnvironment::new($encoding, $encoding)) },
+                    async { anyhow::Ok(InMemoryEnvironment::new($encoding)) },
                     refusal = Needle::Static("the aggregation seal does not verify"),
                     output_mismatch = Needle::Static("the external call returned Before, not 2"),
                 );
@@ -317,7 +317,8 @@ mod tests {
             (JournalEncoding::Abi, JournalEncoding::Risc0Serde),
             (JournalEncoding::Risc0Serde, JournalEncoding::Abi),
         ] {
-            let mut env = InMemoryEnvironment::new(proved, verified);
+            let mut env = InMemoryEnvironment::new(proved);
+            env.adapter.encoding = verified;
             let actions = trivial::build_many(1, 71).context("failed to build trivial actions")?;
             let tx = prove_actions(&env, &actions).await?;
             expect_integration_panic(Needle::Static("the aggregation seal does not verify"))(

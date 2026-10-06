@@ -36,7 +36,8 @@ implementations, all of which live in the testkit.
 
 **Prover**:
 The component that turns action witnesses into a proven ARM transaction. Three
-risc0 variants live in the testkit and are agnostic to the target chain: a local
+risc0 variants live in the testkit, each built with the aggregation journal
+encoding of the chain that verifies its transactions: a local
 prover (runs circuits via `constrain`, emits mock seals, no real proving), a
 queue prover (submits to the real remote proving queue), and a risc0 prover
 (makes the queue's real proofs in-process, for an e2e run without the queue).
