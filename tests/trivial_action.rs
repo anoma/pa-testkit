@@ -3,9 +3,11 @@
 //! Gated on `local` + `fixtures`; run with `cargo test --features local,fixtures`.
 #![cfg(all(feature = "local", feature = "fixtures"))]
 
+use anoma_pa_testkit::assert::{Needle, expect_integration_panic};
 use anoma_pa_testkit::environment::Prover;
 use anoma_pa_testkit::fixtures::trivial;
 use anoma_pa_testkit::prover::LocalProver;
+use anoma_rm_risc0::proving_system::JournalEncoding;
 
 #[test]
 fn build_trivial_action_defaults_to_one_resource_per_side() {
@@ -65,7 +67,7 @@ fn build_trivial_action_with_overrides_builds_nonzero_quantity() {
 #[tokio::test]
 async fn local_prover_mock_aggregates_trivial_actions() {
     let actions = trivial::build_many(8, 1).expect("must build trivial action witnesses");
-    let txn = LocalProver
+    let txn = LocalProver::new(JournalEncoding::Risc0Serde)
         .prove(&actions)
         .await
         .expect("local prover must constrain trivial actions");
@@ -94,7 +96,7 @@ async fn local_prover_mock_aggregates_an_n_to_m_action() {
     )
     .expect("an n:m trivial action must build");
 
-    let txn = LocalProver
+    let txn = LocalProver::new(JournalEncoding::Risc0Serde)
         .prove(&[built.witnesses])
         .await
         .expect("local prover must constrain an n:m trivial action");
@@ -120,7 +122,7 @@ async fn local_prover_mock_aggregates_a_consume_only_action() {
     )
     .expect("a consume-only trivial action must build");
 
-    let txn = LocalProver
+    let txn = LocalProver::new(JournalEncoding::Risc0Serde)
         .prove(&[built.witnesses])
         .await
         .expect("local prover must constrain a consume-only trivial action");
@@ -132,4 +134,48 @@ async fn local_prover_mock_aggregates_a_consume_only_action() {
         .expect("the transaction must carry an aggregation");
     assert_eq!(aggregation.instance.actions[0].consumed_publics.len(), 2);
     assert!(aggregation.instance.actions[0].created_publics.is_empty());
+}
+
+/// The local prover refuses an action whose padding resource breaks the
+/// trivial logic, as every prover does when it constrains the actions first.
+async fn local_prover_refuses(seed: u8, overrides: trivial::Overrides) -> anyhow::Result<()> {
+    let bad = trivial::build(seed, overrides)?;
+    expect_integration_panic(Needle::Static("Invalid padding resource"))(
+        LocalProver::new(JournalEncoding::Risc0Serde)
+            .prove(&[bad.witnesses])
+            .await,
+    )
+}
+
+#[tokio::test]
+async fn local_prover_refuses_a_nonzero_quantity() -> anyhow::Result<()> {
+    local_prover_refuses(7, trivial::Overrides::invalid_nonzero_quantity()).await
+}
+
+#[tokio::test]
+async fn local_prover_refuses_a_non_ephemeral_consumed_resource() -> anyhow::Result<()> {
+    local_prover_refuses(8, trivial::Overrides::invalid_consumed_non_ephemeral()).await
+}
+
+#[tokio::test]
+async fn the_consumed_resources_name_the_overridden_ephemeral_root() -> anyhow::Result<()> {
+    let root = anoma_rm_risc0::Digest::from_bytes([7; 32]);
+    let built = trivial::build(
+        10,
+        trivial::Overrides {
+            consumed_count: Some(2),
+            ephemeral_root: Some(root),
+            ..trivial::Overrides::default()
+        },
+    )?;
+    let txn = LocalProver::new(JournalEncoding::Risc0Serde)
+        .prove(&[built.witnesses])
+        .await?;
+    for consumed in &txn.aggregation_instance()?.actions[0].consumed_publics {
+        assert_eq!(
+            consumed.commitment_tree_root, root,
+            "a consumed ephemeral resource must name the overridden root"
+        );
+    }
+    Ok(())
 }

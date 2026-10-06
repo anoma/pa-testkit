@@ -1,17 +1,15 @@
 //! The proven ARM transaction produced by a [`crate::prover`].
 
 use anoma_rm_risc0::Digest;
+use anoma_rm_risc0::aggregation_instance::AggregationInstance;
 use anoma_rm_risc0::compliance_unit;
-use anoma_rm_risc0::transaction::Transaction as ArmTxn;
+use anoma_rm_risc0::transaction::{Aggregation, Transaction as ArmTxn};
 
-use crate::environment::Transaction as CoreTransaction;
-
-/// Transaction produced by a prover and consumed by a protocol adapter.
-///
-/// A thin newtype over the proving backend's ARM transaction, existing so the
-/// testkit can implement [`CoreTransaction`] on a type it owns (the inner
-/// `ArmTxn` is foreign). Each target chain's protocol adapter converts the inner
-/// transaction into chain-specific calldata at execution time.
+/// Transaction produced by a prover and consumed by a protocol adapter: a thin
+/// newtype over the proving backend's ARM transaction. Each target chain's
+/// protocol adapter converts the inner transaction into chain-specific
+/// calldata when it settles it.
+#[derive(Clone)]
 pub struct Transaction {
     pub(crate) arm_txn: ArmTxn,
 }
@@ -75,10 +73,24 @@ impl Transaction {
 
         Ok(())
     }
-}
 
-impl CoreTransaction for Transaction {
-    fn created_commitments(&self) -> anyhow::Result<impl Iterator<Item = Digest> + '_> {
+    /// The transaction's aggregation: its instance and the proof of it.
+    pub fn aggregation(&self) -> anyhow::Result<&Aggregation> {
+        use anyhow::Context;
+
+        self.arm_txn
+            .aggregation
+            .as_ref()
+            .context("the transaction carries no aggregation")
+    }
+
+    /// The aggregation instance the transaction's aggregation proof proves.
+    pub fn aggregation_instance(&self) -> anyhow::Result<&AggregationInstance> {
+        Ok(&self.aggregation()?.instance)
+    }
+
+    /// Commitments the transaction creates when it settles.
+    pub fn created_commitments(&self) -> anyhow::Result<impl Iterator<Item = Digest> + '_> {
         // When the transaction is aggregated, the proof-backed aggregation
         // instance is authoritative; before aggregation the commitments come
         // from the compliance instances.

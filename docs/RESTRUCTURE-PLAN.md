@@ -23,7 +23,7 @@ An `Environment` binds one `(backend, chain)` pair and (for e2e) one queue.
 
 ```
 anoma-pa-testkit                       (ONE crate; crates/evm deleted)
-  traits · State · identities · witness+constrain · generic helpers
+  traits · identities · witness+constrain · generic helpers
   LocalProver [local] · QueueProver(typed params) [e2e]
   risc0 Transaction newtype · trivial-action fixtures [fixtures]
   tests/ = chain-free constrain/prover tests
@@ -55,4 +55,4 @@ Deps: git-rev in committed manifests, `[patch]`-to-sibling-path for local dev.
   add `Swatinem/rust-cache`; document `[patch]` workflow; refresh ARCHITECTURE.md.
 
 ## Out of scope (don't touch unless asked)
-`State` `unsafe` transmute; dropping `Prover::Transaction`; arm-risc0/resource repos.
+arm-risc0/resource repos.

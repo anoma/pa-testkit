@@ -3,8 +3,6 @@ pub mod commitment_tree;
 pub mod environment;
 #[cfg(feature = "fixtures")]
 pub mod fixtures;
-#[cfg(feature = "mocks")]
-pub mod mocks;
 #[cfg(any(feature = "local", feature = "e2e", feature = "prove"))]
 pub mod prover;
 #[cfg(feature = "fixtures")]
@@ -15,32 +13,45 @@ pub mod witness;
 use anoma_rm_risc0::Digest;
 use anyhow::Context;
 
-use self::environment::{CommitmentTree, Environment, ProtocolAdapter, Prover};
+use self::environment::{Environment, Outcome, ProtocolAdapter, Prover};
+use self::transaction::Transaction;
 use self::witness::ActionWitnesses;
 
 pub async fn prove_actions<Env: Environment>(
     env: &Env,
     actions: &[ActionWitnesses],
-) -> anyhow::Result<Env::Transaction> {
+) -> anyhow::Result<Transaction> {
     env.prover()
         .prove(actions)
         .await
         .context("failed to prove action witnesses")
 }
 
-pub async fn execute_tx<Env: Environment>(
+/// Asks the protocol adapter to settle `tx`, and returns what it did.
+pub async fn settle_tx<Env: Environment>(
     env: &mut Env,
-    tx: Env::Transaction,
-) -> anyhow::Result<()> {
+    tx: Transaction,
+) -> anyhow::Result<Outcome> {
     env.protocol_adapter_mut()
-        .execute(tx)
+        .settle(tx)
         .await
-        .context("failed to execute transaction on protocol adapter")
+        .context("failed to ask the protocol adapter to settle the transaction")
 }
 
-pub fn commitment_root<Env: Environment>(env: &Env) -> anyhow::Result<Digest> {
+/// Settles `tx`, which the protocol adapter must not refuse.
+pub async fn execute_tx<Env: Environment>(env: &mut Env, tx: Transaction) -> anyhow::Result<()> {
+    match settle_tx(env, tx).await? {
+        Outcome::Settled(_) => Ok(()),
+        Outcome::Refused(refusal) => {
+            anyhow::bail!("the protocol adapter refused the transaction: {refusal:?}")
+        }
+    }
+}
+
+/// The latest commitment tree root the protocol adapter stores.
+pub async fn latest_root<Env: Environment>(env: &Env) -> anyhow::Result<Digest> {
     env.protocol_adapter()
-        .commitment_tree()
-        .root()
-        .context("failed to compute commitment tree root")
+        .latest_root()
+        .await
+        .context("failed to read the protocol adapter's latest root")
 }

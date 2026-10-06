@@ -13,10 +13,8 @@ Purpose: fast orientation for agents in this repo.
 ## Load By Task
 
 - Coding quality rules, naming, control flow, tests: `docs/agents/coding-guidelines.md`
-- Crate responsibilities and data flow: `docs/agents/architecture.md`
-- State keys/getters/setters patterns: `docs/agents/patterns-state.md`
-- Deploy/init and `deploy_and_insert_*` conventions: `docs/agents/patterns-deploy.md`
-- Environment/prover/execute/test flow: `docs/agents/patterns-env-tests.md`
+- Module responsibilities, the harness interface and data flow: `ARCHITECTURE.md`
+- Vocabulary: `CONTEXT.md`
 
 ## Default Workflow
 

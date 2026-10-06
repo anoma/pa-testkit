@@ -7,6 +7,7 @@ use anoma_pa_testkit::environment::Prover;
 use anoma_pa_testkit::fixtures::passthrough::{self, PASSTHROUGH_LOGIC_VK};
 use anoma_pa_testkit::prover::LocalProver;
 use anoma_pa_testkit::witness::{AppData, ExpirableBlob};
+use anoma_rm_risc0::proving_system::JournalEncoding;
 
 #[tokio::test]
 async fn the_proven_action_carries_the_external_calls_under_the_consumed_tag() {
@@ -21,7 +22,7 @@ async fn the_proven_action_carries_the_external_calls_under_the_consumed_tag() {
         .expect("the consumed resource has a nullifier");
     let commitment = built.created_ephemeral.commitment();
 
-    let tx = LocalProver
+    let tx = LocalProver::new(JournalEncoding::Risc0Serde)
         .prove(&[built.witnesses])
         .await
         .expect("the local prover must constrain a pass-through action");

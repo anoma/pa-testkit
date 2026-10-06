@@ -56,12 +56,15 @@ pub fn build(seed: u8, overrides: Overrides) -> anyhow::Result<ActionData> {
         })
         .collect::<anyhow::Result<_>>()?;
 
-    let compliance_witness = compliance::from_resources(
+    let compliance_witness = compliance::from_resources_with_ephemeral_root(
         consumed_ephemerals
             .iter()
             .map(|consumed| ConsumedResourceWitness::from_resource(*consumed, nf_key.clone()))
             .collect::<Vec<_>>(),
         created_ephemerals.clone(),
+        overrides
+            .ephemeral_root
+            .unwrap_or(anoma_rm_risc0::compliance::INITIAL_ROOT),
         // The loaded kind table, or the empty one if none is loaded.
         anoma_rm_risc0::constants::kind_table().to_vec(),
     );

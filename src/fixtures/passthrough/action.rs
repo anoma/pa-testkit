@@ -7,6 +7,7 @@ use anyhow::Context;
 use risc0_zkvm::Digest;
 
 use super::logic::{PASSTHROUGH_LOGIC_VK, PassthroughLogicWitness};
+use crate::environment::DELETION_CRITERION_NEVER;
 use crate::witness::{ActionWitnesses, LogicWitness};
 
 /// The derived data of a built pass-through action: the action witnesses
@@ -17,9 +18,14 @@ pub struct ActionData {
     pub created_ephemeral: Resource,
 }
 
-/// Optional deviations from the default pass-through action: none yet.
+/// Optional deviations from the default pass-through action.
 #[derive(Clone, Debug, Default)]
-pub struct Overrides {}
+pub struct Overrides {
+    /// The adapter keeps the external calls' blobs
+    /// ([`DELETION_CRITERION_NEVER`]) and emits each as a payload event,
+    /// instead of deleting them once the calls are made.
+    pub keep_calls: bool,
+}
 
 /// Build a pass-through action whose consumed resource makes `external_calls`,
 /// each a blob in the encoding the chain's adapter reads. Both resources are
@@ -28,7 +34,7 @@ pub struct Overrides {}
 pub fn build(
     seed: u8,
     external_calls: Vec<Vec<u32>>,
-    Overrides {}: Overrides,
+    overrides: Overrides,
 ) -> anyhow::Result<ActionData> {
     let nf_key = NullifierKey::from_bytes([seed; 32]);
     let nk_commitment = nf_key.commit();
@@ -39,7 +45,7 @@ pub fn build(
         quantity: 0,
         value_ref: Digest::default(),
         is_ephemeral: true,
-        nonce: [seed; 32],
+        nonce: crate::fixtures::consumed_nonce(seed, 0),
         nk_commitment,
         rand_seed: [seed.wrapping_add(11); 32],
     };
@@ -76,7 +82,11 @@ pub fn build(
                     .into_iter()
                     .map(|blob| ExpirableBlob {
                         blob,
-                        deletion_criterion: 0,
+                        deletion_criterion: if overrides.keep_calls {
+                            DELETION_CRITERION_NEVER
+                        } else {
+                            0
+                        },
                     })
                     .collect(),
                 ..AppData::default()

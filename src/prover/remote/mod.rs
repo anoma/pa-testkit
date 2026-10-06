@@ -18,7 +18,6 @@ use heliax_ap_orchestrator_sdk::{
 
 mod queue;
 
-use super::JOURNAL_ENCODING;
 use super::assemble::{self, BaseProof, BaseProofKey, BaseProofSlot};
 use super::constrain;
 use crate::environment::Prover;
@@ -29,30 +28,34 @@ use crate::witness::{ActionWitnesses, LogicWitness};
 /// queue. Built from typed connection params; reads no environment variables.
 pub struct QueueProver {
     queue: QueueClient,
+    encoding: JournalEncoding,
 }
 
 impl QueueProver {
-    /// Build a queue prover from a base URL and auth token.
-    pub fn new(base_url: &str, auth_token: &str) -> anyhow::Result<Self> {
+    /// Build a queue prover from a base URL and auth token, aggregating with
+    /// the batch aggregation circuit for `encoding`.
+    pub fn new(
+        base_url: &str,
+        auth_token: &str,
+        encoding: JournalEncoding,
+    ) -> anyhow::Result<Self> {
         let queue = QueueClient::builder(base_url)
             .auth_token(auth_token)
             .build()
             .context("failed to build queue client")?;
 
-        Ok(Self { queue })
+        Ok(Self::from_client(queue, encoding))
     }
 
     /// Build a queue prover from an already-constructed client.
-    pub fn from_client(queue: QueueClient) -> Self {
-        Self { queue }
+    pub fn from_client(queue: QueueClient, encoding: JournalEncoding) -> Self {
+        Self { queue, encoding }
     }
 }
 
 impl Prover for QueueProver {
-    type Transaction = Transaction;
-
-    async fn prove(&self, actions: &[ActionWitnesses]) -> anyhow::Result<Self::Transaction> {
-        prove_via_queue(&self.queue, actions).await
+    async fn prove(&self, actions: &[ActionWitnesses]) -> anyhow::Result<Transaction> {
+        prove_via_queue(&self.queue, actions, self.encoding).await
     }
 }
 
@@ -83,6 +86,7 @@ struct FetchedBaseJob {
 async fn prove_via_queue(
     queue: &QueueClient,
     action_witnesses: &[ActionWitnesses],
+    encoding: JournalEncoding,
 ) -> anyhow::Result<Transaction> {
     let constrained = constrain::actions(action_witnesses)?;
 
@@ -125,7 +129,7 @@ async fn prove_via_queue(
     let serialized = bincode::serialize(&assembled.transaction)
         .context("failed to serialize transaction for aggregation")?;
 
-    let batch_aggregation_pk = match JOURNAL_ENCODING {
+    let batch_aggregation_pk = match encoding {
         JournalEncoding::Abi => BATCH_AGGREGATION_EVM_PK,
         JournalEncoding::Risc0Serde => BATCH_AGGREGATION_PK,
     };
@@ -149,7 +153,7 @@ async fn prove_via_queue(
     let aggregated: ArmTxn = bincode::deserialize(&agg_result.transaction)
         .context("failed to decode aggregated transaction")?;
 
-    assemble::verify_aggregated(aggregated, assembled.kind_table_commitment)
+    assemble::verify_aggregated(aggregated, assembled.kind_table_commitment, encoding)
 }
 
 fn build_base_job_specs(action_witnesses: &[ActionWitnesses]) -> anyhow::Result<Vec<BaseJobSpec>> {

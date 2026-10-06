@@ -22,23 +22,30 @@ An `Environment` binds one (backend, chain) pair, and for e2e one proving queue.
 A single crate `anoma-pa-testkit` at the repo root — no workspace, no `crates/`
 nesting.
 
-- `environment` — backend-agnostic traits: `Environment`, `Prover`,
-  `ProtocolAdapter`, `Transaction`, `CommitmentTree`, plus the typed `State` /
-  `StateBuilder` container.
-- `commitment_tree` — `FrontierCommitmentTree`, a `CommitmentTree` built from
-  what an adapter stores of its tree (its commitment count and, per level, the
-  last left node) plus the leaves the tests add. A chain's harness reads those
-  from its adapter; roots and paths follow without the earlier leaves.
+- `environment` — the interface a chain's harness implements: `Environment`,
+  `Prover`, `ProtocolAdapter` (which settles a transaction, reads the
+  commitment tree and latest root the adapter stores, and makes the owner's
+  calls: kind table, pause, logic-ref denylist); and the vocabulary the suite
+  speaks through it: `Outcome` and `Refusal` (what an adapter did with a
+  transaction), `ExternalCall` (a call to an example program, which the
+  environment encodes for its chain).
+- `commitment_tree` — `FrontierCommitmentTree`, the tree built from what an
+  adapter stores of it (its commitment count and, per level, the last left
+  node) plus the leaves the tests add. A chain's harness reads those from its
+  adapter; roots and paths follow without the earlier leaves.
 - `witness` — `ActionWitnesses`, `LogicWitness`, and `constrain_action` (native
   constraint checking, no zkVM).
-- `transaction` — the risc0 `Transaction` newtype over `arm::Transaction`, the
-  orphan-rule seam that lets the testkit implement the `Transaction` trait.
-- `prover` — the three chain-agnostic provers, which all constrain the actions
-  first (`constrain`):
+- `transaction` — the risc0 `Transaction` newtype over `arm::Transaction`,
+  which every prover produces and every protocol adapter settles.
+- `prover` — the three provers, which all constrain the actions first
+  (`constrain`). Each is built with the aggregation journal encoding of the
+  chain that verifies its transactions (`JournalEncoding`, which also selects
+  the batch aggregation circuit), so one build proves for every chain:
   - `LocalProver` (`feature = "local"`): runs `constrain` and emits mock Groth16
     seals. No real proving — fast and offline.
   - `QueueProver` (`feature = "e2e"`): submits to the real remote proving queue.
-    Built from typed params (`new(base_url, auth_token)`); reads no environment.
+    Built from typed params (`new(base_url, auth_token, encoding)`); reads no
+    environment.
   - `Risc0Prover` (`feature = "prove"`): makes the same real proofs in-process
     with risc0, one at a time — succinct base proofs, then a Groth16
     aggregation, which needs a container runtime (`docker`). For an e2e
@@ -49,7 +56,7 @@ nesting.
   aggregated transaction.
 - `assert` — negative-test assertion helpers (`Needle`,
   `expect_integration_panic`), shared by every integration-test crate. The
-  proof-tamper counterpart lives on `Transaction` (`tamper_first_logic_seal`).
+  proof-tamper counterpart lives on `Transaction` (`tamper_aggregation_seal`).
 - `fixtures` (`feature = "fixtures"`): the trivial action kind — one `build`
   (plus batch `build_many`) returning `ActionData`, with `Overrides` for negative
   tests (ADR-0003) — and the pass-through action kind, whose resources carry
@@ -60,14 +67,17 @@ nesting.
   exposed for reuse by every integration-test crate.
 - `suite` (`feature = "fixtures"`): the chain-agnostic integration tests, each
   a function over any `Environment`; `suite_tests!` emits one test per suite
-  function for an environment, so a harness cannot miss one. The testkit runs
-  it against an adapter in memory. An environment encodes the external-call
-  tests' calls for its chain by implementing `BlockTimeForwarder`.
+  function for an environment, so a harness cannot miss one. A suite test
+  takes nothing but the environment, so it cannot be run differently on two
+  chains, and checks the roots the adapter stores against the root the testkit
+  computes from the adapter's tree and the transaction's commitments, and
+  every settlement's events against those the testkit computes from the
+  transaction. The
+  testkit runs it against an adapter in memory, under each journal encoding.
 - `identities` — well-known test signing keys.
-- `mocks` (`feature = "mocks"`): `mockall` doubles of the core traits.
 
-Generic helpers `prove_actions`, `execute_tx`, `commitment_root` live at the
-crate root.
+Generic helpers `prove_actions`, `settle_tx` (the `Outcome`), `execute_tx`
+(which must settle) and `latest_root` live at the crate root.
 
 ## Downstream layout
 
@@ -87,15 +97,16 @@ contracts:
 
 ## Data flow
 
-1. A chain harness constructs an `Environment` and populates backend state.
+1. A chain harness constructs an `Environment`.
 2. Tests build action witnesses (trivial fixtures here, or app-specific builders
    downstream).
 3. `prove_actions` delegates to the backend `Prover`, yielding an
    `arm::Transaction`.
-4. `execute_tx` delegates to the chain `ProtocolAdapter`, which converts the ARM
-   transaction to chain calldata and executes it.
-5. Successful execution updates the commitment tree; tests assert roots and
-   error paths.
+4. `settle_tx` delegates to the chain `ProtocolAdapter`, which converts the ARM
+   transaction to chain calldata, settles it, and decodes a refusal into a
+   `Refusal`.
+5. A settlement updates the commitment tree the adapter stores; tests assert
+   its root and the outcome.
 
 ## CI / proving guardrail
 

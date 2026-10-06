@@ -11,9 +11,8 @@ Two orthogonal axes of variation shape the design:
 - **Target chain** (EVM today; Solana later) — varies the `ProtocolAdapter`,
   on-chain execution, and state. Lives in the protocol-adapter repos.
 
-An `Environment` binds one (backend, chain) pair. The `type Transaction`
-associated seam keeps the backend swappable in principle, but the testkit is not
-yet fully backend-agnostic: its witness types and ARM value vocabulary are
+An `Environment` binds one (backend, chain) pair. The testkit is not
+backend-agnostic: its `Transaction`, witness types and ARM value vocabulary are
 risc0-bound. Full openVM/Jolt support is a deliberately deferred future effort.
 
 ## Language
@@ -24,9 +23,10 @@ chain-specific harnesses implement. Knows nothing about EVM or Solana.
 _Avoid_: framework, library (when referring to this repo specifically)
 
 **Environment**:
-The trait a chain-specific harness implements to wire together a prover, a
-protocol adapter, and test state. A concrete environment is one (chain, mode)
-pairing — e.g. EVM-local or EVM-e2e.
+The trait a chain-specific harness implements to wire together a prover and a
+protocol adapter, and to encode the suite's external calls for its chain. A
+concrete environment is one (chain, mode) pairing — e.g. EVM-local or
+Solana-e2e.
 _Avoid_: harness (an environment is assembled by a harness, it is not the harness)
 
 **Proving backend**:
@@ -36,7 +36,8 @@ implementations, all of which live in the testkit.
 
 **Prover**:
 The component that turns action witnesses into a proven ARM transaction. Three
-risc0 variants live in the testkit and are agnostic to the target chain: a local
+risc0 variants live in the testkit, each built with the aggregation journal
+encoding of the chain that verifies its transactions: a local
 prover (runs circuits via `constrain`, emits mock seals, no real proving), a
 queue prover (submits to the real remote proving queue), and a risc0 prover
 (makes the queue's real proofs in-process, for an e2e run without the queue).
@@ -44,10 +45,9 @@ _Avoid_: proof generator
 
 **ARM transaction**:
 The transaction produced by a prover, carrying the proofs. In the testkit it is
-a thin newtype over the proving backend's transaction (e.g. risc0's), existing
-so the testkit can implement the `Transaction` trait on a foreign type. Each
-target chain's `ProtocolAdapter` converts it into chain-specific calldata at
-execution time. The newtype is a proving-backend artifact and lives in the
+a thin newtype over the proving backend's transaction (e.g. risc0's). Each
+target chain's `ProtocolAdapter` converts it into chain-specific calldata when
+it settles it. The newtype is a proving-backend artifact and lives in the
 testkit, never in a protocol-adapter repo.
 _Avoid_: tx (in prose), EVM transaction (that is the post-conversion artifact)
 
@@ -56,6 +56,22 @@ The on-chain contract that verifies and executes ARM transactions on a target
 chain. Each chain has its own (the EVM PA, the future Solana PA). In tests it is
 represented by a chain-specific `ProtocolAdapter` trait implementation.
 _Avoid_: PA contract (use "protocol adapter"), verifier
+
+**Outcome / Refusal**:
+What a protocol adapter did with a transaction it was asked to settle: it
+settled it, emitting its settlement events (`Event`: pa-evm's, which the Solana
+adapter mirrors, in pa-evm's order), or refused it for a `Refusal`, one of the protocol's reasons (such
+as a spent nullifier or an unknown root; the enum lists them). A harness
+decodes its chain's error into a `Refusal`, so a suite test names the reason
+the same way for every chain. A reason is in the list only if every chain's
+adapter can report it apart from the others: pa-evm cannot tell a
+transaction proven against another kind table from one with a bad seal, so
+both are `InvalidAggregationProof`.
+
+**External call**:
+A call a settled transaction makes to an example program every chain's harness
+provides (`ExternalCall`, e.g. the block-time forwarder). The environment
+encodes it for its chain.
 
 **Action kind**:
 A fixture module that builds one kind of action (`trivial` here; `wrap` /

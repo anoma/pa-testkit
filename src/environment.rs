@@ -1,201 +1,174 @@
-use std::any::Any;
-use std::borrow::Cow;
-use std::collections::HashMap;
+//! The interface a chain's harness implements, and the vocabulary the suite
+//! speaks through it. Nothing here names a chain: whatever differs between
+//! chains (how a call is encoded, how an adapter reports a refusal) is the
+//! harness's to translate into these terms.
 
 use anoma_rm_risc0::Digest;
-use anoma_rm_risc0::merkle_path::MerklePath;
-use anyhow::Context;
 
+use crate::commitment_tree::FrontierCommitmentTree;
+use crate::transaction::Transaction;
 use crate::witness::ActionWitnesses;
 
-/// Transaction produced by the harness prover and consumed by the harness
-/// protocol adapter.
-pub trait Transaction {
-    /// Commitments created by successful execution of this transaction.
-    fn created_commitments(&self) -> anyhow::Result<impl Iterator<Item = Digest> + '_>;
+/// What a protocol adapter did with a transaction it was asked to settle.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Outcome {
+    /// It settled it, emitting these events in this order.
+    Settled(Vec<Event>),
+    Refused(Refusal),
 }
 
-/// Environment used to test the protocol adapter.
-pub trait Environment {
-    /// ARM transaction.
-    type Transaction: Transaction;
+/// The deletion criterion of a blob a protocol adapter keeps: it emits the
+/// blob as a payload event when it settles the resource carrying it
+/// (pa-evm's `DeletionCriterion.Never`, the Solana adapter's
+/// `DELETION_CRITERION_NEVER`).
+pub const DELETION_CRITERION_NEVER: u32 = 1;
 
+/// An event a protocol adapter emits when it settles a transaction: pa-evm's
+/// settlement events, which the Solana adapter mirrors, with only what every
+/// chain gives the same way.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Event {
+    /// A forwarder returned the output its call expected. What it was called
+    /// with and returned are in its chain's encoding, so they are not here.
+    ForwarderCallExecuted,
+    /// A blob of a settled resource's app data the adapter keeps
+    /// ([`DELETION_CRITERION_NEVER`]): the resource's tag, the blob's index
+    /// in its payload, and the blob's bytes.
+    Payload {
+        kind: PayloadKind,
+        tag: Digest,
+        index: u32,
+        blob: Vec<u8>,
+    },
+    /// An action settled.
+    ActionExecuted {
+        action_tree_root: Digest,
+        nullifiers: Vec<Digest>,
+        consumed_logic_refs: Vec<Digest>,
+        commitments: Vec<Digest>,
+        created_logic_refs: Vec<Digest>,
+    },
+    /// The transaction's commitments made this the latest root.
+    CommitmentTreeRootAdded { root: Digest },
+    /// The transaction settled; its id is the keccak hash of its action tree
+    /// roots, in order.
+    TransactionExecuted { transaction_id: Digest },
+}
+
+/// Which payload of a resource's app data a [`Event::Payload`] blob is from.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PayloadKind {
+    Resource,
+    Discovery,
+    External,
+    Application,
+}
+
+/// Why a protocol adapter refused to settle a transaction: the protocol's
+/// reasons, which every chain's adapter checks. A harness decodes its
+/// adapter's error into one; an error it cannot decode is not a refusal but a
+/// failure of the harness.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Refusal {
+    /// The adapter is paused.
+    Paused,
+    /// A resource carries a logic ref the adapter denies.
+    DeniedLogicRef,
+    /// A consumed resource names a commitment tree root the adapter never
+    /// stored.
+    UnknownRoot,
+    /// A consumed resource's nullifier is already spent.
+    NullifierSpent,
+    /// The aggregation proof does not prove the transaction's actions under
+    /// the adapter's compliance key and kind-table commitment. pa-evm builds
+    /// the journal it verifies from its stored commitment, so a transaction
+    /// proven against another kind table is refused for this too.
+    InvalidAggregationProof,
+    /// An external call returned other than the output its proof expects.
+    ExternalCallOutputMismatch,
+}
+
+/// An external call the suite makes, to one of the example programs every
+/// chain's harness provides.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ExternalCall {
+    /// Asks the block-time forwarder how `time`, in seconds since the Unix
+    /// epoch, compares with the block's, expecting `expected`.
+    BlockTime { time: u32, expected: TimeComparison },
+}
+
+/// How a block-time forwarder finds the time it is asked about compared with
+/// the block's: the byte both chains' example forwarders return (`LT`, `EQ`
+/// and `GT` in pa-evm's `BlockTimeForwarder.TimeComparison` and the Solana
+/// adapter's `block_time_forwarder`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
+pub enum TimeComparison {
+    Before = 0,
+    At = 1,
+    After = 2,
+}
+
+/// A protocol adapter on one chain, with a prover for it.
+#[allow(async_fn_in_trait)]
+pub trait Environment {
     /// Protocol adapter.
-    type ProtocolAdapter: ProtocolAdapter<Transaction = Self::Transaction>;
+    type ProtocolAdapter: ProtocolAdapter;
 
     /// Transaction prover.
-    type Prover: Prover<Transaction = Self::Transaction>;
+    type Prover: Prover;
 
     /// Get a reference to the tx prover.
     fn prover(&self) -> &Self::Prover;
-
-    /// Get a reference to the state.
-    fn state(&self) -> &State;
-
-    /// Get a mut reference to the state.
-    fn state_mut(&mut self) -> &mut State;
 
     /// Get a reference to the protocol adapter.
     fn protocol_adapter(&self) -> &Self::ProtocolAdapter;
 
     /// Get a mut reference to the protocol adapter.
     fn protocol_adapter_mut(&mut self) -> &mut Self::ProtocolAdapter;
+
+    /// The external payload blob of `call`, in this chain's encoding. The
+    /// program it calls is ready for the call once this returns.
+    async fn external_call(&mut self, call: ExternalCall) -> anyhow::Result<Vec<u32>>;
 }
 
 /// Protocol adapter abstraction.
+#[allow(async_fn_in_trait)]
 pub trait ProtocolAdapter {
-    /// ARM transaction.
-    type Transaction: Transaction;
+    /// Asks the adapter to settle `transaction`, adding its commitments and
+    /// nullifiers to the commitment tree and nullifier set. A refusal is an
+    /// [`Outcome`]; an error means the harness could not ask, or could not
+    /// decode the adapter's answer.
+    async fn settle(&mut self, transaction: Transaction) -> anyhow::Result<Outcome>;
 
-    /// Commitment tree.
-    type CommitmentTree: CommitmentTree;
+    /// The commitment tree as the adapter stores it now, read from the
+    /// chain: its commitment count and sides.
+    async fn commitment_tree(&self) -> anyhow::Result<FrontierCommitmentTree>;
 
-    /// Executes a transaction by adding the commitments and nullifiers
-    /// to the commitment tree and nullifier set, respectively.
-    #[allow(async_fn_in_trait)]
-    async fn execute(&mut self, transaction: Self::Transaction) -> anyhow::Result<()>;
+    /// The latest commitment tree root the adapter stores, read from the
+    /// chain.
+    async fn latest_root(&self) -> anyhow::Result<Digest>;
 
-    /// Get a reference to the commitment tree root.
-    fn commitment_tree(&self) -> &Self::CommitmentTree;
-}
+    /// As the adapter's owner, makes `commitment` the kind-table commitment
+    /// transactions are verified against.
+    async fn set_kind_table_commitment(&mut self, commitment: Digest) -> anyhow::Result<()>;
 
-/// Commitment tree associated with the protocol adapter.
-pub trait CommitmentTree {
-    /// Compute the current root of the tree.
-    fn root(&self) -> anyhow::Result<Digest>;
+    /// As the adapter's owner, pauses settlement.
+    async fn pause(&mut self) -> anyhow::Result<()>;
 
-    /// Compute the path to a leaf in the tree.
-    fn path_to(&self, leaf: Digest) -> anyhow::Result<MerklePath>;
+    /// As the adapter's owner, resumes settlement.
+    async fn unpause(&mut self) -> anyhow::Result<()>;
+
+    /// As the adapter's owner, denies `logic_ref`: the adapter refuses any
+    /// transaction with a resource carrying it.
+    async fn deny_logic_ref(&mut self, logic_ref: Digest) -> anyhow::Result<()>;
 }
 
 /// Transaction prover.
+#[allow(async_fn_in_trait)]
 pub trait Prover {
-    /// ARM transaction.
-    type Transaction: Transaction;
-
     /// Prove an ARM transaction.
     ///
     /// Invalid witnesses will result in an error.
-    #[allow(async_fn_in_trait)]
-    async fn prove(&self, actions: &[ActionWitnesses]) -> anyhow::Result<Self::Transaction>;
-}
-
-/// Builder of a [`State`] instance.
-#[derive(Default, Debug)]
-pub struct StateBuilder {
-    inner: HashMap<Cow<'static, str>, Box<dyn Any>>,
-}
-
-impl StateBuilder {
-    /// Create a new [`State`].
-    #[inline]
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Stores the given data at the specified key.
-    #[inline]
-    pub fn insert<K, V>(&mut self, key: K, data: V)
-    where
-        K: Into<Cow<'static, str>>,
-        V: Any,
-    {
-        self.inner.insert(key.into(), Box::new(data));
-    }
-
-    /// Get a reference to a [`State`].
-    #[inline]
-    pub fn as_state(&self) -> &State {
-        // SAFETY: `State` and `StateBuilder` are essentially the same type
-        // (same layout and elems)
-        unsafe { &*(self as *const _ as *const _) }
-    }
-
-    /// Get a mut reference to a [`State`].
-    #[inline]
-    pub fn as_state_mut(&mut self) -> &mut State {
-        // SAFETY: `State` and `StateBuilder` are essentially the same type
-        // (same layout and elems)
-        unsafe { &mut *(self as *mut _ as *mut _) }
-    }
-
-    /// Finalize the [`State`].
-    #[inline]
-    pub fn finalize(self) -> State {
-        State { inner: self.inner }
-    }
-}
-
-/// Storage of arbitrary state.
-///
-/// The primary use case is to store data during the set-up phase of a
-/// test. Different environments will have different strategies to init
-/// that data, but ultimately, the test logic will expect it to be present.
-///
-/// For instance, USDC is already deployed on Sepolia, but it will not be
-/// deployed on a local Anvil node. In a Sepolia environment, we just store
-/// the canonical USDC address. In a local Anvil environment, we need to
-/// deploy USDC, then store the address we got.
-#[derive(Debug)]
-pub struct State {
-    inner: HashMap<Cow<'static, str>, Box<dyn Any>>,
-}
-
-impl State {
-    /// Get a ref to the data stored at the specified key.
-    #[inline]
-    pub fn get<V>(&self, key: &str) -> anyhow::Result<&V>
-    where
-        V: Any,
-    {
-        let value = self
-            .inner
-            .get(key)
-            .with_context(|| format!("the key {key} is not present in the state"))?;
-
-        value.downcast_ref().with_context(|| {
-            format!(
-                "the key {key} is not of type {}",
-                std::any::type_name::<V>()
-            )
-        })
-    }
-
-    /// Get a mut ref to the data stored at the specified key.
-    #[inline]
-    pub fn get_mut<V>(&mut self, key: &str) -> anyhow::Result<&mut V>
-    where
-        V: Any,
-    {
-        let value = self
-            .inner
-            .get_mut(key)
-            .with_context(|| format!("the key {key} is not present in the state"))?;
-
-        value.downcast_mut().with_context(|| {
-            format!(
-                "the key {key} is not of type {}",
-                std::any::type_name::<V>()
-            )
-        })
-    }
-
-    /// Remove and return the data stored at the specified key.
-    #[inline]
-    pub fn remove<V>(&mut self, key: &str) -> anyhow::Result<Box<V>>
-    where
-        V: Any,
-    {
-        let value = self
-            .inner
-            .remove(key)
-            .with_context(|| format!("the key {key} is not present in the state"))?;
-
-        value.downcast().map_err(|_| {
-            anyhow::anyhow!(
-                "the key {key} is not of type {}",
-                std::any::type_name::<V>()
-            )
-        })
-    }
+    async fn prove(&self, actions: &[ActionWitnesses]) -> anyhow::Result<Transaction>;
 }
