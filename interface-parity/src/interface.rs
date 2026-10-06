@@ -21,9 +21,11 @@
 //! event's name without the `Event` suffix the Solana programs give theirs.
 //! Types compare in one notation: `u<N>` / `i<N>`, `bool`, `string`, `bytes`,
 //! `bytes<N>` (a fixed byte array: Solidity `bytes32`, Anchor `[u8; 32]`),
-//! `vec<T>`, `[T; N]`, `option<T>`, a defined type by name, and `address` for
+//! `vec<T>`, `[T; N]`, `option<T>`, a defined type by name (an Anchor type
+//! alias as the type it stands for), and `address` for
 //! an account's identifier (Solidity `address`, Anchor `pubkey`).
 
+use std::collections::HashMap;
 use std::path::Path;
 
 use anyhow::{Context, bail};
@@ -167,15 +169,28 @@ fn element_param(param: &Value, element: &str, internal: Option<&str>) -> Value 
     inner
 }
 
+/// An IDL's type aliases: each alias's name and the type it stands for.
+type Aliases<'a> = HashMap<&'a str, &'a Value>;
+
 fn idl_surface(idl: &Value) -> anyhow::Result<Surface> {
     let mut s = Surface::default();
     let events: Vec<&str> = idl_names(idl, "events")?;
     let accounts: Vec<&str> = idl_names(idl, "accounts")?;
+    let mut aliases = Aliases::new();
+    for ty in optional_array(idl, "types")? {
+        let body = ty.get("type").context("an IDL type has a body")?;
+        if str_field(body, "kind")? == "type" {
+            let target = body
+                .get("alias")
+                .context("an IDL type alias names its type")?;
+            aliases.insert(str_field(ty, "name")?, target);
+        }
+    }
     for instruction in array_field(idl, "instructions")? {
-        let args = idl_fields(instruction, "args")?;
+        let args = idl_fields(instruction, "args", &aliases)?;
         let returns = match instruction.get("returns") {
             None | Some(Value::Null) => vec![],
-            Some(ty) => vec![idl_type(ty)?],
+            Some(ty) => vec![idl_type(ty, &aliases)?],
         };
         s.insert(
             format!("fn {}", str_field(instruction, "name")?),
@@ -189,7 +204,9 @@ fn idl_surface(idl: &Value) -> anyhow::Result<Surface> {
         let name = str_field(ty, "name")?;
         let body = ty.get("type").context("an IDL type has a body")?;
         let value = match str_field(body, "kind")? {
-            "struct" => fields_value(&idl_fields(body, "fields")?),
+            // An alias is another name for its type, which its uses render.
+            "type" => continue,
+            "struct" => fields_value(&idl_fields(body, "fields", &aliases)?),
             "enum" => format!(
                 "enum {{{}}}",
                 array_field(body, "variants")?
@@ -219,18 +236,27 @@ fn idl_names<'a>(idl: &'a Value, field: &str) -> anyhow::Result<Vec<&'a str>> {
         .collect()
 }
 
-fn idl_fields(entry: &Value, field: &str) -> anyhow::Result<Vec<(String, String)>> {
+fn idl_fields(
+    entry: &Value,
+    field: &str,
+    aliases: &Aliases,
+) -> anyhow::Result<Vec<(String, String)>> {
     match entry.get(field) {
         None => Ok(vec![]),
         Some(fields) => array(fields)?
             .iter()
-            .map(|f| Ok((str_field(f, "name")?.to_owned(), idl_type(&f["type"])?)))
+            .map(|f| {
+                Ok((
+                    str_field(f, "name")?.to_owned(),
+                    idl_type(&f["type"], aliases)?,
+                ))
+            })
             .collect(),
     }
 }
 
-/// An IDL type in the common notation.
-fn idl_type(ty: &Value) -> anyhow::Result<String> {
+/// An IDL type in the common notation; an alias is rendered as its type.
+fn idl_type(ty: &Value, aliases: &Aliases) -> anyhow::Result<String> {
     if let Some(name) = ty.as_str() {
         return Ok(match name {
             "pubkey" => "address".to_owned(),
@@ -238,10 +264,10 @@ fn idl_type(ty: &Value) -> anyhow::Result<String> {
         });
     }
     if let Some(inner) = ty.get("vec") {
-        return Ok(format!("vec<{}>", idl_type(inner)?));
+        return Ok(format!("vec<{}>", idl_type(inner, aliases)?));
     }
     if let Some(inner) = ty.get("option") {
-        return Ok(format!("option<{}>", idl_type(inner)?));
+        return Ok(format!("option<{}>", idl_type(inner, aliases)?));
     }
     if let Some(array) = ty.get("array") {
         let [element, len] = array.as_array().map(Vec::as_slice).unwrap_or_default() else {
@@ -251,15 +277,16 @@ fn idl_type(ty: &Value) -> anyhow::Result<String> {
         return Ok(if element == "u8" {
             format!("bytes{len}")
         } else {
-            format!("[{}; {len}]", idl_type(element)?)
+            format!("[{}; {len}]", idl_type(element, aliases)?)
         });
     }
     if let Some(defined) = ty.get("defined") {
         let name = defined.get("name").unwrap_or(defined);
-        return Ok(name
-            .as_str()
-            .context("an IDL defined type is named")?
-            .to_owned());
+        let name = name.as_str().context("an IDL defined type is named")?;
+        return match aliases.get(name) {
+            Some(target) => idl_type(target, aliases),
+            None => Ok(name.to_owned()),
+        };
     }
     bail!("an IDL type {ty}")
 }
@@ -448,6 +475,39 @@ mod tests {
         );
         assert_eq!(lines[2].evm, vec!["(count: u256)"]);
         assert_eq!(lines[2].solana, vec!["(count: u64)"]);
+    }
+
+    /// An IDL type alias is its target: a field of the alias `U256` (of
+    /// `u256`) matches a `uint256`, and the alias is no entry of its own.
+    #[test]
+    fn an_idl_type_alias_compares_as_its_target() {
+        let abi = json!([
+            {"type": "event", "name": "ResourcePayload", "anonymous": false,
+             "inputs": [{"name": "index", "type": "uint256", "indexed": false, "internalType": "uint256"}]}
+        ]);
+        let idl = json!({
+            "instructions": [],
+            "events": [{"name": "ResourcePayloadEvent", "discriminator": [1]}],
+            "types": [
+                {"name": "ResourcePayloadEvent", "type": {"kind": "struct",
+                 "fields": [{"name": "index", "type": {"defined": {"name": "U256"}}}]}},
+                {"name": "U256", "type": {"kind": "type", "alias": "u256"}}
+            ]
+        });
+        let lines = compare(
+            "E ↔ S",
+            &abi_surface(&abi).unwrap(),
+            &idl_surface(&idl).unwrap(),
+        );
+        let got: Vec<(&str, Outcome)> = lines
+            .iter()
+            .map(|l| (l.key.as_str(), l.outcome()))
+            .collect();
+        assert_eq!(
+            got,
+            vec![("event ResourcePayload", Outcome::Match)],
+            "{lines:#?}"
+        );
     }
 
     #[test]
