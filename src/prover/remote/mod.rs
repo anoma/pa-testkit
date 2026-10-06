@@ -54,9 +54,7 @@ impl QueueProver {
 }
 
 impl Prover for QueueProver {
-    type Transaction = Transaction;
-
-    async fn prove(&self, actions: &[ActionWitnesses]) -> anyhow::Result<Self::Transaction> {
+    async fn prove(&self, actions: &[ActionWitnesses]) -> anyhow::Result<Transaction> {
         prove_via_queue(&self.queue, actions, self.encoding).await
     }
 }

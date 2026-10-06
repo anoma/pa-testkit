@@ -34,9 +34,7 @@ impl LocalProver {
 }
 
 impl Prover for LocalProver {
-    type Transaction = Transaction;
-
-    async fn prove(&self, actions: &[ActionWitnesses]) -> anyhow::Result<Self::Transaction> {
+    async fn prove(&self, actions: &[ActionWitnesses]) -> anyhow::Result<Transaction> {
         constrain::catching_panics(|| constrain_txn(actions, self.encoding))
     }
 }

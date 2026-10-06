@@ -1,7 +1,8 @@
 # Anoma Protocol Adapter Testkit
 
 The backend-agnostic risc0 test core for Anoma protocol-adapter integration
-testing: the `Environment` / `Prover` / `Transaction` traits, the trivial
+testing: the `Environment` / `Prover` / `ProtocolAdapter` traits and the vocabulary
+the shared suite speaks through them, the trivial
 action fixtures, the local mock prover, and the remote-queue and in-process
 risc0 provers for e2e runs. It knows nothing about any target chain —
 chain-specific harnesses live in the protocol-adapter repos and implement the

@@ -4,14 +4,10 @@ use anoma_rm_risc0::Digest;
 use anoma_rm_risc0::compliance_unit;
 use anoma_rm_risc0::transaction::Transaction as ArmTxn;
 
-use crate::environment::Transaction as CoreTransaction;
-
-/// Transaction produced by a prover and consumed by a protocol adapter.
-///
-/// A thin newtype over the proving backend's ARM transaction, existing so the
-/// testkit can implement [`CoreTransaction`] on a type it owns (the inner
-/// `ArmTxn` is foreign). Each target chain's protocol adapter converts the inner
-/// transaction into chain-specific calldata at execution time.
+/// Transaction produced by a prover and consumed by a protocol adapter: a thin
+/// newtype over the proving backend's ARM transaction. Each target chain's
+/// protocol adapter converts the inner transaction into chain-specific
+/// calldata when it settles it.
 pub struct Transaction {
     pub(crate) arm_txn: ArmTxn,
 }
@@ -75,10 +71,9 @@ impl Transaction {
 
         Ok(())
     }
-}
 
-impl CoreTransaction for Transaction {
-    fn created_commitments(&self) -> anyhow::Result<impl Iterator<Item = Digest> + '_> {
+    /// Commitments created by successful execution of this transaction.
+    pub fn created_commitments(&self) -> anyhow::Result<impl Iterator<Item = Digest> + '_> {
         // When the transaction is aggregated, the proof-backed aggregation
         // instance is authoritative; before aggregation the commitments come
         // from the compliance instances.

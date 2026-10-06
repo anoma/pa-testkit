@@ -41,12 +41,7 @@ impl Risc0Prover {
 }
 
 impl Prover for Risc0Prover {
-    type Transaction = Transaction;
-
-    async fn prove(
-        &self,
-        action_witnesses: &[ActionWitnesses],
-    ) -> anyhow::Result<Self::Transaction> {
+    async fn prove(&self, action_witnesses: &[ActionWitnesses]) -> anyhow::Result<Transaction> {
         let constrained = constrain::actions(action_witnesses)?;
 
         let mut base_proofs = HashMap::new();

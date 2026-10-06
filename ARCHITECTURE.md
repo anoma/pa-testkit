@@ -22,17 +22,19 @@ An `Environment` binds one (backend, chain) pair, and for e2e one proving queue.
 A single crate `anoma-pa-testkit` at the repo root — no workspace, no `crates/`
 nesting.
 
-- `environment` — backend-agnostic traits: `Environment`, `Prover`,
-  `ProtocolAdapter`, `Transaction`, `CommitmentTree`, plus the typed `State` /
-  `StateBuilder` container.
+- `environment` — the interface a chain's harness implements: `Environment`,
+  `Prover`, `ProtocolAdapter`, `CommitmentTree`; and the vocabulary the suite
+  speaks through it: `Outcome` and `Refusal` (what an adapter did with a
+  transaction), `ExternalCall` (a call to an example program, which the
+  environment encodes for its chain).
 - `commitment_tree` — `FrontierCommitmentTree`, a `CommitmentTree` built from
   what an adapter stores of its tree (its commitment count and, per level, the
   last left node) plus the leaves the tests add. A chain's harness reads those
   from its adapter; roots and paths follow without the earlier leaves.
 - `witness` — `ActionWitnesses`, `LogicWitness`, and `constrain_action` (native
   constraint checking, no zkVM).
-- `transaction` — the risc0 `Transaction` newtype over `arm::Transaction`, the
-  orphan-rule seam that lets the testkit implement the `Transaction` trait.
+- `transaction` — the risc0 `Transaction` newtype over `arm::Transaction`,
+  which every prover produces and every protocol adapter settles.
 - `prover` — the three provers, which all constrain the actions first
   (`constrain`). Each is built with the aggregation journal encoding of the
   chain that verifies its transactions (`JournalEncoding`, which also selects
@@ -52,7 +54,7 @@ nesting.
   aggregated transaction.
 - `assert` — negative-test assertion helpers (`Needle`,
   `expect_integration_panic`), shared by every integration-test crate. The
-  proof-tamper counterpart lives on `Transaction` (`tamper_first_logic_seal`).
+  proof-tamper counterpart lives on `Transaction` (`tamper_aggregation_seal`).
 - `fixtures` (`feature = "fixtures"`): the trivial action kind — one `build`
   (plus batch `build_many`) returning `ActionData`, with `Overrides` for negative
   tests (ADR-0003) — and the pass-through action kind, whose resources carry
@@ -63,14 +65,15 @@ nesting.
   exposed for reuse by every integration-test crate.
 - `suite` (`feature = "fixtures"`): the chain-agnostic integration tests, each
   a function over any `Environment`; `suite_tests!` emits one test per suite
-  function for an environment, so a harness cannot miss one. The testkit runs
-  it against an adapter in memory. An environment encodes the external-call
-  tests' calls for its chain by implementing `BlockTimeForwarder`.
+  function for an environment, so a harness cannot miss one. A suite test
+  takes nothing but the environment, so it cannot be run differently on two
+  chains. The testkit runs it against an adapter in memory, under each journal
+  encoding.
 - `identities` — well-known test signing keys.
 - `mocks` (`feature = "mocks"`): `mockall` doubles of the core traits.
 
-Generic helpers `prove_actions`, `execute_tx`, `commitment_root` live at the
-crate root.
+Generic helpers `prove_actions`, `settle_tx` (the `Outcome`), `execute_tx`
+(which must settle) and `commitment_root` live at the crate root.
 
 ## Downstream layout
 
@@ -90,15 +93,16 @@ contracts:
 
 ## Data flow
 
-1. A chain harness constructs an `Environment` and populates backend state.
+1. A chain harness constructs an `Environment`.
 2. Tests build action witnesses (trivial fixtures here, or app-specific builders
    downstream).
 3. `prove_actions` delegates to the backend `Prover`, yielding an
    `arm::Transaction`.
-4. `execute_tx` delegates to the chain `ProtocolAdapter`, which converts the ARM
-   transaction to chain calldata and executes it.
-5. Successful execution updates the commitment tree; tests assert roots and
-   error paths.
+4. `settle_tx` delegates to the chain `ProtocolAdapter`, which converts the ARM
+   transaction to chain calldata, settles it, and decodes a refusal into a
+   `Refusal`.
+5. A settlement updates the commitment tree; tests assert roots and
+   outcomes.
 
 ## CI / proving guardrail
 

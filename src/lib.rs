@@ -15,27 +15,39 @@ pub mod witness;
 use anoma_rm_risc0::Digest;
 use anyhow::Context;
 
-use self::environment::{CommitmentTree, Environment, ProtocolAdapter, Prover};
+use self::environment::{CommitmentTree, Environment, Outcome, ProtocolAdapter, Prover};
+use self::transaction::Transaction;
 use self::witness::ActionWitnesses;
 
 pub async fn prove_actions<Env: Environment>(
     env: &Env,
     actions: &[ActionWitnesses],
-) -> anyhow::Result<Env::Transaction> {
+) -> anyhow::Result<Transaction> {
     env.prover()
         .prove(actions)
         .await
         .context("failed to prove action witnesses")
 }
 
-pub async fn execute_tx<Env: Environment>(
+/// Asks the protocol adapter to settle `tx`, and returns what it did.
+pub async fn settle_tx<Env: Environment>(
     env: &mut Env,
-    tx: Env::Transaction,
-) -> anyhow::Result<()> {
+    tx: Transaction,
+) -> anyhow::Result<Outcome> {
     env.protocol_adapter_mut()
-        .execute(tx)
+        .settle(tx)
         .await
-        .context("failed to execute transaction on protocol adapter")
+        .context("failed to ask the protocol adapter to settle the transaction")
+}
+
+/// Settles `tx`, which the protocol adapter must not refuse.
+pub async fn execute_tx<Env: Environment>(env: &mut Env, tx: Transaction) -> anyhow::Result<()> {
+    match settle_tx(env, tx).await? {
+        Outcome::Settled => Ok(()),
+        Outcome::Refused(refusal) => {
+            anyhow::bail!("the protocol adapter refused the transaction: {refusal:?}")
+        }
+    }
 }
 
 pub fn commitment_root<Env: Environment>(env: &Env) -> anyhow::Result<Digest> {

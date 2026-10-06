@@ -3,17 +3,12 @@ use anoma_rm_risc0::merkle_path::MerklePath;
 
 use crate::environment::CommitmentTree;
 use crate::environment::Environment;
+use crate::environment::ExternalCall;
+use crate::environment::Outcome;
 use crate::environment::ProtocolAdapter;
 use crate::environment::Prover;
-use crate::environment::State;
-use crate::environment::Transaction;
+use crate::transaction::Transaction;
 use crate::witness::ActionWitnesses;
-
-impl Transaction for () {
-    fn created_commitments(&self) -> anyhow::Result<impl Iterator<Item = Digest> + '_> {
-        Ok(std::iter::empty())
-    }
-}
 
 mockall::mock! {
     pub CommitmentTree {}
@@ -28,10 +23,9 @@ mockall::mock! {
     pub ProtocolAdapter {}
 
     impl ProtocolAdapter for ProtocolAdapter {
-        type Transaction = ();
         type CommitmentTree = MockCommitmentTree;
 
-        async fn execute(&mut self, transaction: ()) -> anyhow::Result<()>;
+        async fn settle(&mut self, transaction: Transaction) -> anyhow::Result<Outcome>;
         fn commitment_tree(&self) -> &MockCommitmentTree;
     }
 }
@@ -40,9 +34,7 @@ mockall::mock! {
     pub Prover {}
 
     impl Prover for Prover {
-        type Transaction = ();
-
-        async fn prove(&self, actions: &[ActionWitnesses]) -> anyhow::Result<()>;
+        async fn prove(&self, actions: &[ActionWitnesses]) -> anyhow::Result<Transaction>;
     }
 }
 
@@ -50,14 +42,12 @@ mockall::mock! {
     pub Environment {}
 
     impl Environment for Environment {
-        type Transaction = ();
         type ProtocolAdapter = MockProtocolAdapter;
         type Prover = MockProver;
 
         fn prover(&self) -> &MockProver;
-        fn state(&self) -> &State;
-        fn state_mut(&mut self) -> &mut State;
         fn protocol_adapter(&self) -> &MockProtocolAdapter;
         fn protocol_adapter_mut(&mut self) -> &mut MockProtocolAdapter;
+        async fn external_call(&mut self, call: ExternalCall) -> anyhow::Result<Vec<u32>>;
     }
 }
