@@ -371,59 +371,29 @@ async fn settles_and_moves_the_root<Env: Environment>(
 #[macro_export]
 macro_rules! suite_tests {
     ($setup:expr, settling_only $(,)?) => {
-        #[tokio::test(flavor = "multi_thread")]
-        async fn settles_a_trivial_transaction() -> ::anyhow::Result<()> {
-            $crate::suite::settles_a_trivial_transaction(&mut $setup.await?).await
-        }
-
-        #[tokio::test(flavor = "multi_thread")]
-        async fn settles_an_n_to_m_transaction() -> ::anyhow::Result<()> {
-            $crate::suite::settles_an_n_to_m_transaction(&mut $setup.await?).await
-        }
-
-        #[tokio::test(flavor = "multi_thread")]
-        async fn settles_a_multi_action_transaction() -> ::anyhow::Result<()> {
-            $crate::suite::settles_a_multi_action_transaction(&mut $setup.await?).await
-        }
+        $crate::suite_tests!(@tests $setup;
+            settles_a_trivial_transaction,
+            settles_an_n_to_m_transaction,
+            settles_a_multi_action_transaction,
+        );
     };
     ($setup:expr $(,)?) => {
         $crate::suite_tests!($setup, settling_only);
-
-        #[tokio::test(flavor = "multi_thread")]
-        async fn settles_consume_only_transactions_without_a_root_change() -> ::anyhow::Result<()> {
-            $crate::suite::settles_consume_only_transactions_without_a_root_change(
-                &mut $setup.await?,
-            )
-            .await
-        }
-
-        #[tokio::test(flavor = "multi_thread")]
-        async fn proving_refuses_a_nonzero_quantity() -> ::anyhow::Result<()> {
-            $crate::suite::proving_refuses_a_nonzero_quantity(&$setup.await?).await
-        }
-
-        #[tokio::test(flavor = "multi_thread")]
-        async fn proving_refuses_a_non_ephemeral_consumed_resource() -> ::anyhow::Result<()> {
-            $crate::suite::proving_refuses_a_non_ephemeral_consumed_resource(&$setup.await?).await
-        }
-
-        #[tokio::test(flavor = "multi_thread")]
-        async fn settlement_refuses_a_tampered_aggregation_seal() -> ::anyhow::Result<()> {
-            $crate::suite::settlement_refuses_a_tampered_aggregation_seal(&mut $setup.await?).await
-        }
-
-        #[tokio::test(flavor = "multi_thread")]
-        async fn settles_an_external_call_whose_output_matches() -> ::anyhow::Result<()> {
-            $crate::suite::settles_an_external_call_whose_output_matches(&mut $setup.await?).await
-        }
-
-        #[tokio::test(flavor = "multi_thread")]
-        async fn settlement_refuses_an_external_call_whose_output_differs() -> ::anyhow::Result<()>
-        {
-            $crate::suite::settlement_refuses_an_external_call_whose_output_differs(
-                &mut $setup.await?,
-            )
-            .await
-        }
+        $crate::suite_tests!(@tests $setup;
+            settles_consume_only_transactions_without_a_root_change,
+            proving_refuses_a_nonzero_quantity,
+            proving_refuses_a_non_ephemeral_consumed_resource,
+            settlement_refuses_a_tampered_aggregation_seal,
+            settles_an_external_call_whose_output_matches,
+            settlement_refuses_an_external_call_whose_output_differs,
+        );
+    };
+    (@tests $setup:expr; $($test:ident),* $(,)?) => {
+        $(
+            #[tokio::test(flavor = "multi_thread")]
+            async fn $test() -> ::anyhow::Result<()> {
+                $crate::suite::$test(&mut $setup.await?).await
+            }
+        )*
     };
 }

@@ -72,7 +72,7 @@ impl Transaction {
         Ok(())
     }
 
-    /// Commitments created by successful execution of this transaction.
+    /// Commitments the transaction creates when it settles.
     pub fn created_commitments(&self) -> anyhow::Result<impl Iterator<Item = Digest> + '_> {
         // When the transaction is aggregated, the proof-backed aggregation
         // instance is authoritative; before aggregation the commitments come

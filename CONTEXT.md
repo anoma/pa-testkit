@@ -46,8 +46,8 @@ _Avoid_: proof generator
 **ARM transaction**:
 The transaction produced by a prover, carrying the proofs. In the testkit it is
 a thin newtype over the proving backend's transaction (e.g. risc0's). Each
-target chain's `ProtocolAdapter` converts it into chain-specific calldata at
-execution time. The newtype is a proving-backend artifact and lives in the
+target chain's `ProtocolAdapter` converts it into chain-specific calldata when
+it settles it. The newtype is a proving-backend artifact and lives in the
 testkit, never in a protocol-adapter repo.
 _Avoid_: tx (in prose), EVM transaction (that is the post-conversion artifact)
 
