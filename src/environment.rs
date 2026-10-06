@@ -22,9 +22,20 @@ pub enum Outcome {
 /// failure of the harness.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Refusal {
-    /// The aggregation seal does not prove the transaction's aggregation
-    /// instance.
-    InvalidAggregationSeal,
+    /// The adapter is paused.
+    Paused,
+    /// A resource carries a logic ref the adapter denies.
+    DeniedLogicRef,
+    /// A consumed resource names a commitment tree root the adapter never
+    /// stored.
+    UnknownRoot,
+    /// A consumed resource's nullifier is already spent.
+    NullifierSpent,
+    /// The aggregation proof does not prove the transaction's actions under
+    /// the adapter's compliance key and kind-table commitment. pa-evm builds
+    /// the journal it verifies from its stored commitment, so a transaction
+    /// proven against another kind table is refused for this too.
+    InvalidAggregationProof,
     /// An external call returned other than the output its proof expects.
     ExternalCallOutputMismatch,
 }
@@ -91,6 +102,24 @@ pub trait ProtocolAdapter {
     /// chain.
     #[allow(async_fn_in_trait)]
     async fn latest_root(&self) -> anyhow::Result<Digest>;
+
+    /// As the adapter's owner, makes `commitment` the kind-table commitment
+    /// transactions are verified against.
+    #[allow(async_fn_in_trait)]
+    async fn set_kind_table_commitment(&mut self, commitment: Digest) -> anyhow::Result<()>;
+
+    /// As the adapter's owner, pauses settlement.
+    #[allow(async_fn_in_trait)]
+    async fn pause(&mut self) -> anyhow::Result<()>;
+
+    /// As the adapter's owner, resumes settlement.
+    #[allow(async_fn_in_trait)]
+    async fn unpause(&mut self) -> anyhow::Result<()>;
+
+    /// As the adapter's owner, denies `logic_ref`: the adapter refuses any
+    /// transaction with a resource carrying it.
+    #[allow(async_fn_in_trait)]
+    async fn deny_logic_ref(&mut self, logic_ref: Digest) -> anyhow::Result<()>;
 }
 
 /// Transaction prover.

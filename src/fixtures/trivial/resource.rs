@@ -19,6 +19,9 @@ pub struct Overrides {
     pub created_is_ephemeral: Option<bool>,
     pub consumed_nonce: Option<[u8; 32]>,
     pub created_nonce: Option<[u8; 32]>,
+    /// The commitment tree root the consumed ephemeral resources name, by
+    /// default the empty tree's (`INITIAL_ROOT`), which every adapter holds.
+    pub ephemeral_root: Option<Digest>,
 }
 
 impl Overrides {

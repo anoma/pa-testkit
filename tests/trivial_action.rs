@@ -156,3 +156,31 @@ async fn local_prover_refuses_a_nonzero_quantity() -> anyhow::Result<()> {
 async fn local_prover_refuses_a_non_ephemeral_consumed_resource() -> anyhow::Result<()> {
     local_prover_refuses(8, trivial::Overrides::invalid_consumed_non_ephemeral()).await
 }
+
+#[tokio::test]
+async fn the_consumed_resources_name_the_overridden_ephemeral_root() -> anyhow::Result<()> {
+    let root = anoma_rm_risc0::Digest::from_bytes([7; 32]);
+    let built = trivial::build(
+        10,
+        trivial::Overrides {
+            consumed_count: Some(2),
+            ephemeral_root: Some(root),
+            ..trivial::Overrides::default()
+        },
+    )?;
+    let txn = LocalProver::new(JournalEncoding::Risc0Serde)
+        .prove(&[built.witnesses])
+        .await?;
+    let aggregation = txn
+        .as_arm()
+        .aggregation
+        .as_ref()
+        .expect("the transaction must carry an aggregation");
+    for consumed in &aggregation.instance.actions[0].consumed_publics {
+        assert_eq!(
+            consumed.commitment_tree_root, root,
+            "a consumed ephemeral resource must name the overridden root"
+        );
+    }
+    Ok(())
+}

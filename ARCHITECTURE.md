@@ -23,8 +23,9 @@ A single crate `anoma-pa-testkit` at the repo root — no workspace, no `crates/
 nesting.
 
 - `environment` — the interface a chain's harness implements: `Environment`,
-  `Prover`, `ProtocolAdapter` (which settles a transaction and reads the
-  commitment tree and latest root the adapter stores); and the vocabulary the suite
+  `Prover`, `ProtocolAdapter` (which settles a transaction, reads the
+  commitment tree and latest root the adapter stores, and makes the owner's
+  calls: kind table, pause, logic-ref denylist); and the vocabulary the suite
   speaks through it: `Outcome` and `Refusal` (what an adapter did with a
   transaction), `ExternalCall` (a call to an example program, which the
   environment encodes for its chain).
