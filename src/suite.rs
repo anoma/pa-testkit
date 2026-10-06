@@ -8,14 +8,15 @@
 
 use anoma_rm_risc0::Digest;
 use anyhow::Context;
+use sha3::{Digest as _, Keccak256};
 
 use crate::environment::{
-    Environment, ExternalCall, Outcome, ProtocolAdapter, Refusal, TimeComparison,
+    Environment, Event, ExternalCall, Outcome, ProtocolAdapter, Refusal, TimeComparison,
 };
 use crate::fixtures::{passthrough, trivial};
 use crate::transaction::Transaction;
 use crate::witness::ActionWitnesses;
-use crate::{execute_tx, latest_root, prove_actions, settle_tx};
+use crate::{latest_root, prove_actions, settle_tx};
 
 /// The nonce of the trivial transaction's consumed resource, outside the
 /// `[seed; 32]` default that arm-risc0's transaction generator also produces,
@@ -297,7 +298,10 @@ mod tests {
             self.nullifiers.extend(spent);
             self.tree.add(transaction.created_commitments()?);
             self.roots.insert(self.tree.root());
-            Ok(Outcome::Settled)
+            Ok(Outcome::Settled(expected_events(
+                &transaction,
+                self.tree.root(),
+            )?))
         }
 
         async fn commitment_tree(&self) -> anyhow::Result<FrontierCommitmentTree> {
@@ -458,24 +462,75 @@ async fn prove_external_call<Env: Environment>(
     prove_actions(env, &[action]).await
 }
 
-/// Checks that the protocol adapter settles `tx` and then stores the root of
-/// its tree with the transaction's commitments added, or, if it creates none,
-/// the root it stored before.
+/// Checks that the protocol adapter settles `tx`, emitting pa-evm's events
+/// for it in pa-evm's order, and then stores the root of its tree with the
+/// transaction's commitments added (the root it stored before, if it creates
+/// none).
 async fn settles<Env: Environment>(env: &mut Env, tx: Transaction) -> anyhow::Result<()> {
     stored_root(env).await?;
-    let created: Vec<_> = tx.created_commitments()?.collect();
     let mut tree = env.protocol_adapter().commitment_tree().await?;
-    tree.add(created.iter().copied());
-    let expected = tree.root();
-    execute_tx(env, tx).await?;
+    tree.add(tx.created_commitments()?);
+    let root = tree.root();
+    let expected = expected_events(&tx, root)?;
+    let outcome = settle_tx(env, tx).await?;
+    anyhow::ensure!(
+        outcome == Outcome::Settled(expected.clone()),
+        "the protocol adapter must settle the transaction emitting {expected:#?}, but returned \
+         {outcome:#?}"
+    );
     let after = stored_root(env).await?;
     anyhow::ensure!(
-        after == expected,
-        "after a settlement creating {} commitments, the adapter stores the root {after}, not \
-         {expected}",
-        created.len()
+        after == root,
+        "after the settlement, the adapter stores the root {after}, not {root}"
     );
     Ok(())
+}
+
+/// The events settling `tx` emits, `root` being the tree's root after it:
+/// per action, one per external call its resources make (consumed resources
+/// first) and then the action's; then, if it creates a commitment, the new
+/// root; then the transaction's.
+fn expected_events(tx: &Transaction, root: Digest) -> anyhow::Result<Vec<Event>> {
+    let actions = &tx
+        .as_arm()
+        .aggregation
+        .as_ref()
+        .context("the transaction carries no aggregation")?
+        .instance
+        .actions;
+    let mut events = Vec::new();
+    for action in actions {
+        let consumed = &action.consumed_publics;
+        let created = &action.created_publics;
+        let calls = consumed
+            .iter()
+            .map(|c| &c.app_data)
+            .chain(created.iter().map(|c| &c.app_data))
+            .map(|app_data| app_data.external_payload.len())
+            .sum();
+        events.extend(std::iter::repeat_n(Event::ForwarderCallExecuted, calls));
+        events.push(Event::ActionExecuted {
+            action_tree_root: action.action_tree_root,
+            nullifiers: consumed.iter().map(|c| c.resource_nullifier).collect(),
+            consumed_logic_refs: consumed.iter().map(|c| c.resource_logic_ref).collect(),
+            commitments: created.iter().map(|c| c.resource_commitment).collect(),
+            created_logic_refs: created.iter().map(|c| c.resource_logic_ref).collect(),
+        });
+    }
+    if actions
+        .iter()
+        .any(|action| !action.created_publics.is_empty())
+    {
+        events.push(Event::CommitmentTreeRootAdded { root });
+    }
+    let mut transaction_id = Keccak256::new();
+    for action in actions {
+        transaction_id.update(action.action_tree_root.as_bytes());
+    }
+    events.push(Event::TransactionExecuted {
+        transaction_id: transaction_id.finalize().into(),
+    });
+    Ok(events)
 }
 
 /// Checks that the protocol adapter refuses `tx` for `refusal`, leaving the

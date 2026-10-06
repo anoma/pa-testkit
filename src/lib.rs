@@ -41,7 +41,7 @@ pub async fn settle_tx<Env: Environment>(
 /// Settles `tx`, which the protocol adapter must not refuse.
 pub async fn execute_tx<Env: Environment>(env: &mut Env, tx: Transaction) -> anyhow::Result<()> {
     match settle_tx(env, tx).await? {
-        Outcome::Settled => Ok(()),
+        Outcome::Settled(_) => Ok(()),
         Outcome::Refused(refusal) => {
             anyhow::bail!("the protocol adapter refused the transaction: {refusal:?}")
         }

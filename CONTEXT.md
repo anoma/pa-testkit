@@ -59,7 +59,8 @@ _Avoid_: PA contract (use "protocol adapter"), verifier
 
 **Outcome / Refusal**:
 What a protocol adapter did with a transaction it was asked to settle: it
-settled it, or refused it for a `Refusal`, one of the protocol's reasons (such
+settled it, emitting its settlement events (`Event`: pa-evm's, which the Solana
+adapter mirrors, in pa-evm's order), or refused it for a `Refusal`, one of the protocol's reasons (such
 as a spent nullifier or an unknown root; the enum lists them). A harness
 decodes its chain's error into a `Refusal`, so a suite test names the reason
 the same way for every chain. A reason is in the list only if every chain's

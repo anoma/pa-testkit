@@ -70,7 +70,9 @@ nesting.
   function for an environment, so a harness cannot miss one. A suite test
   takes nothing but the environment, so it cannot be run differently on two
   chains, and checks the roots the adapter stores against the root the testkit
-  computes from the adapter's tree and the transaction's commitments. The
+  computes from the adapter's tree and the transaction's commitments, and
+  every settlement's events against those the testkit computes from the
+  transaction. The
   testkit runs it against an adapter in memory, under each journal encoding.
 - `identities` — well-known test signing keys.
 

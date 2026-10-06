@@ -10,10 +10,34 @@ use crate::transaction::Transaction;
 use crate::witness::ActionWitnesses;
 
 /// What a protocol adapter did with a transaction it was asked to settle.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Outcome {
-    Settled,
+    /// It settled it, emitting these events in this order.
+    Settled(Vec<Event>),
     Refused(Refusal),
+}
+
+/// An event a protocol adapter emits when it settles a transaction: pa-evm's
+/// settlement events, which the Solana adapter mirrors, with only what every
+/// chain gives the same way.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Event {
+    /// A forwarder returned the output its call expected. What it was called
+    /// with and returned are in its chain's encoding, so they are not here.
+    ForwarderCallExecuted,
+    /// An action settled.
+    ActionExecuted {
+        action_tree_root: Digest,
+        nullifiers: Vec<Digest>,
+        consumed_logic_refs: Vec<Digest>,
+        commitments: Vec<Digest>,
+        created_logic_refs: Vec<Digest>,
+    },
+    /// The transaction's commitments made this the latest root.
+    CommitmentTreeRootAdded { root: Digest },
+    /// The transaction settled; its id is the keccak hash of its action tree
+    /// roots, in order.
+    TransactionExecuted { transaction_id: [u8; 32] },
 }
 
 /// Why a protocol adapter refused to settle a transaction: the protocol's
