@@ -171,12 +171,7 @@ async fn the_consumed_resources_name_the_overridden_ephemeral_root() -> anyhow::
     let txn = LocalProver::new(JournalEncoding::Risc0Serde)
         .prove(&[built.witnesses])
         .await?;
-    let aggregation = txn
-        .as_arm()
-        .aggregation
-        .as_ref()
-        .expect("the transaction must carry an aggregation");
-    for consumed in &aggregation.instance.actions[0].consumed_publics {
+    for consumed in &txn.aggregation_instance()?.actions[0].consumed_publics {
         assert_eq!(
             consumed.commitment_tree_root, root,
             "a consumed ephemeral resource must name the overridden root"

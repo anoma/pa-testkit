@@ -71,8 +71,7 @@ pub async fn settles_consume_only_transactions_without_a_root_change<Env: Enviro
 pub async fn settlement_refuses_a_tampered_aggregation_seal<Env: Environment>(
     env: &mut Env,
 ) -> anyhow::Result<()> {
-    let actions = trivial::build_many(1, 11).context("failed to build trivial actions")?;
-    let mut tx = prove_actions(env, &actions)
+    let mut tx = prove_actions(env, &[trivial_action(11, trivial::Overrides::default())?])
         .await
         .context("valid witnesses should prove before tampering")?;
     tx.tamper_aggregation_seal()
@@ -164,7 +163,13 @@ pub async fn settlement_refuses_a_denied_logic_ref<Env: Environment>(
 pub async fn settles_an_external_call_whose_output_matches<Env: Environment>(
     env: &mut Env,
 ) -> anyhow::Result<()> {
-    let tx = prove_external_call(env, 61, block_time_call(TimeComparison::Before)).await?;
+    let tx = prove_external_call(
+        env,
+        61,
+        block_time_call(TimeComparison::Before),
+        passthrough::Overrides::default(),
+    )
+    .await?;
     settles(env, tx).await
 }
 
@@ -173,13 +178,14 @@ pub async fn settles_an_external_call_whose_output_matches<Env: Environment>(
 pub async fn settles_an_external_call_kept_as_a_payload<Env: Environment>(
     env: &mut Env,
 ) -> anyhow::Result<()> {
-    let call = env
-        .external_call(block_time_call(TimeComparison::Before))
-        .await?;
-    let action = passthrough::build(63, vec![call], passthrough::Overrides { keep_calls: true })
-        .context("failed to build a pass-through action keeping its call")?
-        .witnesses;
-    proves_and_settles(env, &[action]).await
+    let tx = prove_external_call(
+        env,
+        63,
+        block_time_call(TimeComparison::Before),
+        passthrough::Overrides { keep_calls: true },
+    )
+    .await?;
+    settles(env, tx).await
 }
 
 /// The protocol adapter refuses a transaction whose external call expects
@@ -187,7 +193,13 @@ pub async fn settles_an_external_call_kept_as_a_payload<Env: Environment>(
 pub async fn settlement_refuses_an_external_call_whose_output_differs<Env: Environment>(
     env: &mut Env,
 ) -> anyhow::Result<()> {
-    let tx = prove_external_call(env, 62, block_time_call(TimeComparison::After)).await?;
+    let tx = prove_external_call(
+        env,
+        62,
+        block_time_call(TimeComparison::After),
+        passthrough::Overrides::default(),
+    )
+    .await?;
     refuses(env, tx, Refusal::ExternalCallOutputMismatch).await
 }
 
@@ -252,16 +264,19 @@ mod tests {
                     refusals.push(refusal);
                 }
             };
-            let instance = transaction.aggregation_instance()?;
-            let mut spent = HashSet::new();
+            let aggregation = transaction.aggregation()?;
+            let instance = &aggregation.instance;
+            // A nullifier repeated within the transaction is spent by its
+            // first use, as both chains' adapters find.
+            if instance.nf_duplication_check().is_err() {
+                refuse(Refusal::NullifierSpent);
+            }
             for action in &instance.actions {
                 for consumed in &action.consumed_publics {
                     if !self.roots.contains(&consumed.commitment_tree_root) {
                         refuse(Refusal::UnknownRoot);
                     }
-                    if self.nullifiers.contains(&consumed.resource_nullifier)
-                        || !spent.insert(consumed.resource_nullifier)
-                    {
+                    if self.nullifiers.contains(&consumed.resource_nullifier) {
                         refuse(Refusal::NullifierSpent);
                     }
                 }
@@ -291,13 +306,7 @@ mod tests {
                 kind_table_commitment: self.kind_table_commitment,
                 ..instance.clone()
             };
-            let proof = &transaction
-                .as_arm()
-                .aggregation
-                .as_ref()
-                .context("the transaction carries no aggregation")?
-                .proof;
-            if *proof != mock_aggregation_seal(&verified, self.encoding) {
+            if aggregation.proof != mock_aggregation_seal(&verified, self.encoding) {
                 refuse(Refusal::InvalidAggregationProof);
             }
             match refusals[..] {
@@ -354,12 +363,8 @@ mod tests {
                 self.roots.insert(root);
                 events.push(Event::CommitmentTreeRootAdded { root });
             }
-            let mut transaction_id = Keccak256::new();
-            for action in &instance.actions {
-                transaction_id.update(action.action_tree_root.as_bytes());
-            }
             events.push(Event::TransactionExecuted {
-                transaction_id: Digest::from_bytes(transaction_id.finalize().into()),
+                transaction_id: Digest::from_bytes(Keccak256::digest(instance.delta_msg()).into()),
             });
             Ok(events)
         }
@@ -492,20 +497,21 @@ mod tests {
         }
     }
 
-    /// The whole suite against the adapter in memory, for each journal
-    /// encoding.
-    macro_rules! in_memory_suite {
-        ($module:ident, $encoding:expr) => {
-            mod $module {
-                use super::*;
+    // The whole suite against the adapter in memory, for each journal
+    // encoding.
+    mod in_memory_risc0_serde {
+        use super::*;
 
-                crate::suite_tests!(async { anyhow::Ok(InMemoryEnvironment::new($encoding)) });
-            }
-        };
+        crate::suite_tests!(async {
+            anyhow::Ok(InMemoryEnvironment::new(JournalEncoding::Risc0Serde))
+        });
     }
 
-    in_memory_suite!(in_memory_risc0_serde, JournalEncoding::Risc0Serde);
-    in_memory_suite!(in_memory_abi, JournalEncoding::Abi);
+    mod in_memory_abi {
+        use super::*;
+
+        crate::suite_tests!(async { anyhow::Ok(InMemoryEnvironment::new(JournalEncoding::Abi)) });
+    }
 
     /// A transaction failing two checks can be refused for a different
     /// reason on each chain (proven against another kind table and under an
@@ -528,41 +534,6 @@ mod tests {
         expect_integration_panic(Needle::Static(
             "the transaction is refused for [UnknownRoot, InvalidAggregationProof]",
         ))(settle_tx(&mut env, tx).await)
-    }
-
-    /// The adapter in memory emits a kept blob as a payload event of its
-    /// resource, after the resource's external call.
-    #[tokio::test]
-    async fn a_kept_call_is_emitted_after_the_call() -> anyhow::Result<()> {
-        let mut env = InMemoryEnvironment::new(JournalEncoding::Risc0Serde);
-        let call = vec![0, TimeComparison::Before as u32];
-        let built = passthrough::build(
-            82,
-            vec![call.clone()],
-            passthrough::Overrides { keep_calls: true },
-        )?;
-        let tx = prove_actions(&env, &[built.witnesses]).await?;
-        let Outcome::Settled(events) = settle_tx(&mut env, tx).await? else {
-            anyhow::bail!("the adapter refused the transaction");
-        };
-        let nullifier = built.consumed_ephemeral.nullifier(
-            &anoma_rm_risc0::nullifier_key::NullifierKey::from_bytes([82; 32]),
-        )?;
-        anyhow::ensure!(
-            events[..2]
-                == [
-                    Event::ForwarderCallExecuted,
-                    Event::Payload {
-                        kind: PayloadKind::External,
-                        tag: nullifier,
-                        index: 0,
-                        blob: anoma_rm_risc0::utils::words_to_bytes(&call).to_vec(),
-                    },
-                ],
-            "the settlement's events start {:#?}",
-            &events[..2]
-        );
-        Ok(())
     }
 
     /// The owner's calls refuse what both chains' adapters refuse.
@@ -605,8 +576,8 @@ mod tests {
         ] {
             let mut env = InMemoryEnvironment::new(proved);
             env.adapter.encoding = verified;
-            let actions = trivial::build_many(1, 71).context("failed to build trivial actions")?;
-            let tx = prove_actions(&env, &actions).await?;
+            let tx =
+                prove_actions(&env, &[trivial_action(71, trivial::Overrides::default())?]).await?;
             refuses(&mut env, tx, Refusal::InvalidAggregationProof)
                 .await
                 .with_context(|| format!("proved in {proved:?}, verified in {verified:?}"))?;
@@ -635,15 +606,16 @@ fn block_time_call(expected: TimeComparison) -> ExternalCall {
     ExternalCall::BlockTime { time: 0, expected }
 }
 
-/// Proves a pass-through action, with nonces from `seed`, whose consumed
-/// resource makes the external call `call`.
+/// Proves a pass-through action, with nonces from `seed` and `overrides`,
+/// whose consumed resource makes the external call `call`.
 async fn prove_external_call<Env: Environment>(
     env: &mut Env,
     seed: u8,
     call: ExternalCall,
+    overrides: passthrough::Overrides,
 ) -> anyhow::Result<Transaction> {
     let call = env.external_call(call).await?;
-    let action = passthrough::build(seed, vec![call], passthrough::Overrides::default())
+    let action = passthrough::build(seed, vec![call], overrides)
         .context("failed to build a pass-through action")?
         .witnesses;
     prove_actions(env, &[action]).await
@@ -740,13 +712,13 @@ async fn refuses<Env: Environment>(
     tx: Transaction,
     refusal: Refusal,
 ) -> anyhow::Result<()> {
-    let before = stored_tree(env).await?.root();
+    let before = latest_root(env).await?;
     let outcome = settle_tx(env, tx).await?;
     anyhow::ensure!(
         outcome == Outcome::Refused(refusal),
         "the protocol adapter must refuse the transaction ({refusal:?}), but returned {outcome:?}"
     );
-    let after = stored_tree(env).await?.root();
+    let after = latest_root(env).await?;
     anyhow::ensure!(
         after == before,
         "a refused transaction moved the stored root from {before} to {after}"

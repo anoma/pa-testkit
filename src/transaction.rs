@@ -3,7 +3,7 @@
 use anoma_rm_risc0::Digest;
 use anoma_rm_risc0::aggregation_instance::AggregationInstance;
 use anoma_rm_risc0::compliance_unit;
-use anoma_rm_risc0::transaction::Transaction as ArmTxn;
+use anoma_rm_risc0::transaction::{Aggregation, Transaction as ArmTxn};
 
 /// Transaction produced by a prover and consumed by a protocol adapter: a thin
 /// newtype over the proving backend's ARM transaction. Each target chain's
@@ -74,16 +74,19 @@ impl Transaction {
         Ok(())
     }
 
-    /// The aggregation instance the transaction's aggregation proof proves.
-    pub fn aggregation_instance(&self) -> anyhow::Result<&AggregationInstance> {
+    /// The transaction's aggregation: its instance and the proof of it.
+    pub fn aggregation(&self) -> anyhow::Result<&Aggregation> {
         use anyhow::Context;
 
-        Ok(&self
-            .arm_txn
+        self.arm_txn
             .aggregation
             .as_ref()
-            .context("the transaction carries no aggregation")?
-            .instance)
+            .context("the transaction carries no aggregation")
+    }
+
+    /// The aggregation instance the transaction's aggregation proof proves.
+    pub fn aggregation_instance(&self) -> anyhow::Result<&AggregationInstance> {
+        Ok(&self.aggregation()?.instance)
     }
 
     /// Commitments the transaction creates when it settles.
