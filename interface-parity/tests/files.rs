@@ -54,3 +54,30 @@ fn cargo_shipped_files_are_read_from_the_package_archive() {
     );
     assert!(lines.iter().all(|l| !l.key.ends_with(".rs")), "{lines:#?}");
 }
+
+/// A crate with a dependency that names no version is one a registry cannot
+/// take, so it is consumed from git: it ships no archive, and so no files,
+/// and the rest of what it publishes (its metadata and API) is still read.
+#[test]
+fn a_crate_a_registry_cannot_take_ships_no_files_but_still_has_its_api() {
+    let (packages, _) = discover("unversioned", &checkout("unversioned-repo"));
+    let [pkg] = &packages[..] else {
+        panic!("the publish = false core is not published: {packages:#?}");
+    };
+    let Kind::Cargo(meta) = &pkg.kind else {
+        panic!("{:?} is not a Cargo package", pkg.id);
+    };
+    let work = common::scratch("files-unversioned");
+    let files = cargo_files(pkg, meta, &work).expect("a git-consumed crate has no archive");
+    let lines = compare("p", &files, &Default::default());
+    assert!(lines.is_empty(), "{lines:#?}");
+
+    let surface = interface_parity::run::package_surface(pkg, &work, &[]).unwrap();
+    let lines = compare("p", &surface, &Default::default());
+    assert!(
+        lines
+            .iter()
+            .any(|l| l.key.starts_with("rust crate::answer")),
+        "{lines:#?}"
+    );
+}
