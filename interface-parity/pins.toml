@@ -23,18 +23,18 @@ commit = "08f2f2e8b147fc6c9394031063664a6f3cd6a58c"
 name = "anoma-pa-solana-client"
 side = "solana"
 url = "https://github.com/anoma/anoma-pa-solana-client"
-commit = "70719175534ec073e331301c1ca2755b404c87d7"
+commit = "43fc5f622d047de5c00a1073864192dad51f8c32"
 
 [[repository]]
 name = "solana-protocol-adapter"
 side = "solana"
 url = "https://github.com/anoma/solana-protocol-adapter"
-commit = "77e0abc629e50e4c5b1df349b91c63e698e9c5dd"
+commit = "c26604e6de9e714f89fba1379420ec09fa648c60"
 build_env = "solana-pa-prototype/env/localnet.env"
 
 [[repository]]
 name = "anomapay-spl-token-forwarder"
 side = "solana"
 url = "https://github.com/anoma/anomapay-spl-token-forwarder"
-commit = "16ccb0b69f4f945764026075c35b90d3d39cf350"
+commit = "2de7123813e76090ad56c6dfb9c305ce1da4c360"
 build_env = "env/localnet.env"
