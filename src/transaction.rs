@@ -1,6 +1,7 @@
 //! The proven ARM transaction produced by a [`crate::prover`].
 
 use anoma_rm_risc0::Digest;
+use anoma_rm_risc0::aggregation_instance::AggregationInstance;
 use anoma_rm_risc0::compliance_unit;
 use anoma_rm_risc0::transaction::Transaction as ArmTxn;
 
@@ -71,6 +72,18 @@ impl Transaction {
             .context("tamper must re-serialize modified inner receipt")?;
 
         Ok(())
+    }
+
+    /// The aggregation instance the transaction's aggregation proof proves.
+    pub fn aggregation_instance(&self) -> anyhow::Result<&AggregationInstance> {
+        use anyhow::Context;
+
+        Ok(&self
+            .arm_txn
+            .aggregation
+            .as_ref()
+            .context("the transaction carries no aggregation")?
+            .instance)
     }
 
     /// Commitments the transaction creates when it settles.

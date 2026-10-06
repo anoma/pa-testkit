@@ -10,12 +10,14 @@ use anoma_rm_risc0::Digest;
 use anyhow::Context;
 use sha3::{Digest as _, Keccak256};
 
+use crate::commitment_tree::FrontierCommitmentTree;
 use crate::environment::{
-    Environment, Event, ExternalCall, Outcome, ProtocolAdapter, Refusal, TimeComparison,
+    DELETION_CRITERION_NEVER, Environment, Event, ExternalCall, Outcome, PayloadKind,
+    ProtocolAdapter, Refusal, TimeComparison,
 };
 use crate::fixtures::{passthrough, trivial};
 use crate::transaction::Transaction;
-use crate::witness::ActionWitnesses;
+use crate::witness::{ActionWitnesses, AppData};
 use crate::{latest_root, prove_actions, settle_tx};
 
 /// A transaction of one trivial action settles and adds its commitment.
@@ -166,6 +168,20 @@ pub async fn settles_an_external_call_whose_output_matches<Env: Environment>(
     settles(env, tx).await
 }
 
+/// A transaction whose external call's blob the adapter keeps settles, and
+/// the adapter emits the blob after the call.
+pub async fn settles_an_external_call_kept_as_a_payload<Env: Environment>(
+    env: &mut Env,
+) -> anyhow::Result<()> {
+    let call = env
+        .external_call(block_time_call(TimeComparison::Before))
+        .await?;
+    let action = passthrough::build(63, vec![call], passthrough::Overrides { keep_calls: true })
+        .context("failed to build a pass-through action keeping its call")?
+        .witnesses;
+    proves_and_settles(env, &[action]).await
+}
+
 /// The protocol adapter refuses a transaction whose external call expects
 /// other than what the forwarder returns.
 pub async fn settlement_refuses_an_external_call_whose_output_differs<Env: Environment>(
@@ -177,7 +193,7 @@ pub async fn settlement_refuses_an_external_call_whose_output_differs<Env: Envir
 
 #[cfg(all(test, feature = "local"))]
 mod tests {
-    use std::collections::{BTreeSet, HashSet};
+    use std::collections::HashSet;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use anoma_rm_risc0::aggregation_instance::AggregationInstance;
@@ -185,19 +201,20 @@ mod tests {
 
     use super::*;
     use crate::assert::{Needle, expect_integration_panic};
-    use crate::commitment_tree::FrontierCommitmentTree;
     use crate::prover::{LocalProver, mock_aggregation_seal};
-    use crate::witness::AppData;
 
     /// A protocol adapter in memory that makes the checks the suite expects an
-    /// adapter to make: the pause; each resource's logic ref, and each
-    /// consumed resource's root and nullifier; the external calls (whose one
-    /// forwarder is a block-time forwarder taking `[time, expected output]`);
-    /// and the local prover's seal over the aggregation journal in `encoding`,
-    /// with the compliance key and the kind-table commitment the adapter
-    /// holds. The chains' adapters make these checks in different orders, so
-    /// a transaction failing more than one would be refused for a different
-    /// reason on each: it fails the test instead.
+    /// adapter to make: the pause, first, as on every chain; each resource's
+    /// logic ref, and each consumed resource's root and nullifier; the
+    /// external calls (whose one forwarder is a block-time forwarder taking
+    /// `[time, expected output]`); and the local prover's seal over the
+    /// aggregation journal in `encoding`, with the compliance key and the
+    /// kind-table commitment the adapter holds. The chains' adapters make
+    /// the checks after the pause in different orders, so a transaction
+    /// failing more than one of them would be refused for a different reason
+    /// on each: it fails the test instead. It emits its events as it settles,
+    /// apart from the suite's `expected_events`, so the suite's check of
+    /// them is a check here too.
     struct InMemoryAdapter {
         tree: FrontierCommitmentTree,
         roots: HashSet<Digest>,
@@ -224,31 +241,28 @@ mod tests {
             }
         }
 
-        /// Why the adapter refuses `transaction`, or the nullifiers it
-        /// spends.
-        fn check(
-            &self,
-            transaction: &Transaction,
-        ) -> anyhow::Result<Result<HashSet<Digest>, Refusal>> {
-            let aggregation = transaction
-                .as_arm()
-                .aggregation
-                .as_ref()
-                .context("the transaction carries no aggregation")?;
-            let mut refusals = BTreeSet::new();
+        /// Why the adapter refuses `transaction`.
+        fn refusal(&self, transaction: &Transaction) -> anyhow::Result<Option<Refusal>> {
             if self.paused {
-                refusals.insert(Refusal::Paused);
+                return Ok(Some(Refusal::Paused));
             }
+            let mut refusals = Vec::new();
+            let mut refuse = |refusal| {
+                if !refusals.contains(&refusal) {
+                    refusals.push(refusal);
+                }
+            };
+            let instance = transaction.aggregation_instance()?;
             let mut spent = HashSet::new();
-            for action in &aggregation.instance.actions {
+            for action in &instance.actions {
                 for consumed in &action.consumed_publics {
                     if !self.roots.contains(&consumed.commitment_tree_root) {
-                        refusals.insert(Refusal::UnknownRoot);
+                        refuse(Refusal::UnknownRoot);
                     }
                     if self.nullifiers.contains(&consumed.resource_nullifier)
                         || !spent.insert(consumed.resource_nullifier)
                     {
-                        refusals.insert(Refusal::NullifierSpent);
+                        refuse(Refusal::NullifierSpent);
                     }
                 }
                 let resources = action
@@ -263,48 +277,126 @@ mod tests {
                     );
                 for (logic_ref, app_data) in resources {
                     if self.denied_logic_refs.contains(&logic_ref) {
-                        refusals.insert(Refusal::DeniedLogicRef);
+                        refuse(Refusal::DeniedLogicRef);
                     }
-                    if !calls_return_what_they_expect(app_data)? {
-                        refusals.insert(Refusal::ExternalCallOutputMismatch);
+                    for call in &app_data.external_payload {
+                        if !call_block_time_forwarder(&call.blob)? {
+                            refuse(Refusal::ExternalCallOutputMismatch);
+                        }
                     }
                 }
             }
             let verified = AggregationInstance {
                 compliance_key: anoma_rm_risc0::constants::COMPLIANCE_VK,
                 kind_table_commitment: self.kind_table_commitment,
-                ..aggregation.instance.clone()
+                ..instance.clone()
             };
-            if aggregation.proof != mock_aggregation_seal(&verified, self.encoding) {
-                refusals.insert(Refusal::InvalidAggregationProof);
+            let proof = &transaction
+                .as_arm()
+                .aggregation
+                .as_ref()
+                .context("the transaction carries no aggregation")?
+                .proof;
+            if *proof != mock_aggregation_seal(&verified, self.encoding) {
+                refuse(Refusal::InvalidAggregationProof);
             }
-            let mut refusals = refusals.into_iter();
-            match (refusals.next(), refusals.next()) {
-                (None, _) => Ok(Ok(spent)),
-                (Some(refusal), None) => Ok(Err(refusal)),
-                (Some(first), Some(second)) => anyhow::bail!(
-                    "the transaction is refused for {first:?}, {second:?} and {:?}: the chains' \
-                     adapters check these in different orders, so a suite transaction must fail \
-                     one check",
-                    refusals.collect::<Vec<_>>()
+            match refusals[..] {
+                [] => Ok(None),
+                [refusal] => Ok(Some(refusal)),
+                _ => anyhow::bail!(
+                    "the transaction is refused for {refusals:?}: the chains' adapters check \
+                     these in different orders, so a suite transaction must fail one check"
                 ),
+            }
+        }
+
+        /// Settles `transaction`, which it does not refuse, and returns the
+        /// events it emits.
+        fn apply(&mut self, transaction: &Transaction) -> anyhow::Result<Vec<Event>> {
+            let instance = transaction.aggregation_instance()?;
+            let before = self.tree.root();
+            let mut events = Vec::new();
+            for action in &instance.actions {
+                for consumed in &action.consumed_publics {
+                    self.nullifiers.insert(consumed.resource_nullifier);
+                    emit_resource(&mut events, consumed.resource_nullifier, &consumed.app_data);
+                }
+                for created in &action.created_publics {
+                    self.tree.add([created.resource_commitment]);
+                    emit_resource(&mut events, created.resource_commitment, &created.app_data);
+                }
+                events.push(Event::ActionExecuted {
+                    action_tree_root: action.action_tree_root,
+                    nullifiers: action
+                        .consumed_publics
+                        .iter()
+                        .map(|c| c.resource_nullifier)
+                        .collect(),
+                    consumed_logic_refs: action
+                        .consumed_publics
+                        .iter()
+                        .map(|c| c.resource_logic_ref)
+                        .collect(),
+                    commitments: action
+                        .created_publics
+                        .iter()
+                        .map(|c| c.resource_commitment)
+                        .collect(),
+                    created_logic_refs: action
+                        .created_publics
+                        .iter()
+                        .map(|c| c.resource_logic_ref)
+                        .collect(),
+                });
+            }
+            let root = self.tree.root();
+            if root != before {
+                self.roots.insert(root);
+                events.push(Event::CommitmentTreeRootAdded { root });
+            }
+            let mut transaction_id = Keccak256::new();
+            for action in &instance.actions {
+                transaction_id.update(action.action_tree_root.as_bytes());
+            }
+            events.push(Event::TransactionExecuted {
+                transaction_id: Digest::from_bytes(transaction_id.finalize().into()),
+            });
+            Ok(events)
+        }
+    }
+
+    /// Emits a settled resource's events: one per external call it makes,
+    /// then one per blob it keeps.
+    fn emit_resource(events: &mut Vec<Event>, tag: Digest, app_data: &AppData) {
+        for _ in &app_data.external_payload {
+            events.push(Event::ForwarderCallExecuted);
+        }
+        let payloads = [
+            (PayloadKind::Resource, &app_data.resource_payload),
+            (PayloadKind::Discovery, &app_data.discovery_payload),
+            (PayloadKind::External, &app_data.external_payload),
+            (PayloadKind::Application, &app_data.application_payload),
+        ];
+        for (kind, payload) in payloads {
+            for (index, blob) in payload.iter().enumerate() {
+                if blob.deletion_criterion == DELETION_CRITERION_NEVER {
+                    events.push(Event::Payload {
+                        kind,
+                        tag,
+                        index: index as u32,
+                        blob: anoma_rm_risc0::utils::words_to_bytes(&blob.blob).to_vec(),
+                    });
+                }
             }
         }
     }
 
     impl ProtocolAdapter for InMemoryAdapter {
         async fn settle(&mut self, transaction: Transaction) -> anyhow::Result<Outcome> {
-            let spent = match self.check(&transaction)? {
-                Ok(spent) => spent,
-                Err(refusal) => return Ok(Outcome::Refused(refusal)),
-            };
-            self.nullifiers.extend(spent);
-            self.tree.add(transaction.created_commitments()?);
-            self.roots.insert(self.tree.root());
-            Ok(Outcome::Settled(expected_events(
-                &transaction,
-                self.tree.root(),
-            )?))
+            Ok(match self.refusal(&transaction)? {
+                Some(refusal) => Outcome::Refused(refusal),
+                None => Outcome::Settled(self.apply(&transaction)?),
+            })
         }
 
         async fn commitment_tree(&self) -> anyhow::Result<FrontierCommitmentTree> {
@@ -349,17 +441,6 @@ mod tests {
             );
             Ok(())
         }
-    }
-
-    /// Whether every external call in `app_data` returns the output it
-    /// expects.
-    fn calls_return_what_they_expect(app_data: &AppData) -> anyhow::Result<bool> {
-        for call in &app_data.external_payload {
-            if !call_block_time_forwarder(&call.blob)? {
-                return Ok(false);
-            }
-        }
-        Ok(true)
     }
 
     /// Whether the block-time forwarder returns the output `call` expects.
@@ -426,18 +507,62 @@ mod tests {
     in_memory_suite!(in_memory_risc0_serde, JournalEncoding::Risc0Serde);
     in_memory_suite!(in_memory_abi, JournalEncoding::Abi);
 
-    /// A transaction failing two checks is refused for a different reason on
-    /// each chain, so the adapter in memory fails the test instead.
+    /// A transaction failing two checks can be refused for a different
+    /// reason on each chain (proven against another kind table and under an
+    /// unknown root: the Solana adapter checks the kind table first, pa-evm
+    /// the root), so the adapter in memory fails the test instead.
     #[tokio::test]
     async fn a_transaction_failing_two_checks_fails_the_test() -> anyhow::Result<()> {
         let mut env = InMemoryEnvironment::new(JournalEncoding::Risc0Serde);
-        let actions = trivial::build_many(1, 81).context("failed to build trivial actions")?;
-        let mut tx = prove_actions(&env, &actions).await?;
-        tx.tamper_aggregation_seal()?;
-        env.adapter.pause().await?;
+        let action = trivial_action(
+            81,
+            trivial::Overrides {
+                ephemeral_root: Some(Digest::from_bytes([7; 32])),
+                ..trivial::Overrides::default()
+            },
+        )?;
+        let tx = prove_actions(&env, &[action]).await?;
+        env.adapter
+            .set_kind_table_commitment(Digest::from_bytes([8; 32]))
+            .await?;
         expect_integration_panic(Needle::Static(
-            "the transaction is refused for Paused, InvalidAggregationProof and []",
+            "the transaction is refused for [UnknownRoot, InvalidAggregationProof]",
         ))(settle_tx(&mut env, tx).await)
+    }
+
+    /// The adapter in memory emits a kept blob as a payload event of its
+    /// resource, after the resource's external call.
+    #[tokio::test]
+    async fn a_kept_call_is_emitted_after_the_call() -> anyhow::Result<()> {
+        let mut env = InMemoryEnvironment::new(JournalEncoding::Risc0Serde);
+        let call = vec![0, TimeComparison::Before as u32];
+        let built = passthrough::build(
+            82,
+            vec![call.clone()],
+            passthrough::Overrides { keep_calls: true },
+        )?;
+        let tx = prove_actions(&env, &[built.witnesses]).await?;
+        let Outcome::Settled(events) = settle_tx(&mut env, tx).await? else {
+            anyhow::bail!("the adapter refused the transaction");
+        };
+        let nullifier = built.consumed_ephemeral.nullifier(
+            &anoma_rm_risc0::nullifier_key::NullifierKey::from_bytes([82; 32]),
+        )?;
+        anyhow::ensure!(
+            events[..2]
+                == [
+                    Event::ForwarderCallExecuted,
+                    Event::Payload {
+                        kind: PayloadKind::External,
+                        tag: nullifier,
+                        index: 0,
+                        blob: anoma_rm_risc0::utils::words_to_bytes(&call).to_vec(),
+                    },
+                ],
+            "the settlement's events start {:#?}",
+            &events[..2]
+        );
+        Ok(())
     }
 
     /// The owner's calls refuse what both chains' adapters refuse.
@@ -524,23 +649,22 @@ async fn prove_external_call<Env: Environment>(
     prove_actions(env, &[action]).await
 }
 
-/// Checks that the protocol adapter settles `tx`, emitting pa-evm's events
-/// for it in pa-evm's order, and then stores the root of its tree with the
-/// transaction's commitments added (the root it stored before, if it creates
-/// none).
+/// Checks that the protocol adapter settles `tx`, emitting the events
+/// `expected_events` gives in that order, and then stores the root of its
+/// tree with the transaction's commitments added (the root it stored before,
+/// if it creates none).
 async fn settles<Env: Environment>(env: &mut Env, tx: Transaction) -> anyhow::Result<()> {
-    stored_root(env).await?;
-    let mut tree = env.protocol_adapter().commitment_tree().await?;
+    let mut tree = stored_tree(env).await?;
     tree.add(tx.created_commitments()?);
     let root = tree.root();
     let expected = expected_events(&tx, root)?;
     let outcome = settle_tx(env, tx).await?;
     anyhow::ensure!(
-        outcome == Outcome::Settled(expected.clone()),
+        matches!(&outcome, Outcome::Settled(events) if *events == expected),
         "the protocol adapter must settle the transaction emitting {expected:#?}, but returned \
          {outcome:#?}"
     );
-    let after = stored_root(env).await?;
+    let after = stored_tree(env).await?.root();
     anyhow::ensure!(
         after == root,
         "after the settlement, the adapter stores the root {after}, not {root}"
@@ -548,29 +672,26 @@ async fn settles<Env: Environment>(env: &mut Env, tx: Transaction) -> anyhow::Re
     Ok(())
 }
 
-/// The events settling `tx` emits, `root` being the tree's root after it:
-/// per action, one per external call its resources make (consumed resources
-/// first) and then the action's; then, if it creates a commitment, the new
-/// root; then the transaction's.
+/// The events settling `tx` emits, `root` being the tree's root after it, in
+/// pa-evm's order, which the Solana adapter mirrors: per action, for each
+/// resource (consumed ones first) one per external call it makes and then one
+/// per blob it keeps, then the action's; then, if the transaction creates a
+/// commitment, the new root; then the transaction's.
 fn expected_events(tx: &Transaction, root: Digest) -> anyhow::Result<Vec<Event>> {
-    let actions = &tx
-        .as_arm()
-        .aggregation
-        .as_ref()
-        .context("the transaction carries no aggregation")?
-        .instance
-        .actions;
+    let instance = tx.aggregation_instance()?;
     let mut events = Vec::new();
-    for action in actions {
+    for action in &instance.actions {
         let consumed = &action.consumed_publics;
         let created = &action.created_publics;
-        let calls = consumed
+        let resources = consumed
             .iter()
-            .map(|c| &c.app_data)
-            .chain(created.iter().map(|c| &c.app_data))
-            .map(|app_data| app_data.external_payload.len())
-            .sum();
-        events.extend(std::iter::repeat_n(Event::ForwarderCallExecuted, calls));
+            .map(|c| (c.resource_nullifier, &c.app_data))
+            .chain(created.iter().map(|c| (c.resource_commitment, &c.app_data)));
+        for (tag, app_data) in resources {
+            let calls = app_data.external_payload.len();
+            events.extend(std::iter::repeat_n(Event::ForwarderCallExecuted, calls));
+            events.extend(kept_blobs(tag, app_data));
+        }
         events.push(Event::ActionExecuted {
             action_tree_root: action.action_tree_root,
             nullifiers: consumed.iter().map(|c| c.resource_nullifier).collect(),
@@ -579,20 +700,37 @@ fn expected_events(tx: &Transaction, root: Digest) -> anyhow::Result<Vec<Event>>
             created_logic_refs: created.iter().map(|c| c.resource_logic_ref).collect(),
         });
     }
-    if actions
-        .iter()
-        .any(|action| !action.created_publics.is_empty())
-    {
+    if tx.created_commitments()?.next().is_some() {
         events.push(Event::CommitmentTreeRootAdded { root });
     }
-    let mut transaction_id = Keccak256::new();
-    for action in actions {
-        transaction_id.update(action.action_tree_root.as_bytes());
-    }
     events.push(Event::TransactionExecuted {
-        transaction_id: transaction_id.finalize().into(),
+        transaction_id: Digest::from_bytes(Keccak256::digest(instance.delta_msg()).into()),
     });
     Ok(events)
+}
+
+/// The payload events of the blobs in `app_data` the adapter keeps, for the
+/// resource `tag`: its resource, discovery, external and application
+/// payloads, in that order.
+fn kept_blobs(tag: Digest, app_data: &AppData) -> impl Iterator<Item = Event> + '_ {
+    [
+        (PayloadKind::Resource, &app_data.resource_payload),
+        (PayloadKind::Discovery, &app_data.discovery_payload),
+        (PayloadKind::External, &app_data.external_payload),
+        (PayloadKind::Application, &app_data.application_payload),
+    ]
+    .into_iter()
+    .flat_map(move |(kind, payload)| {
+        (0u32..)
+            .zip(payload)
+            .filter(|(_, blob)| blob.deletion_criterion == DELETION_CRITERION_NEVER)
+            .map(move |(index, blob)| Event::Payload {
+                kind,
+                tag,
+                index,
+                blob: anoma_rm_risc0::utils::words_to_bytes(&blob.blob).to_vec(),
+            })
+    })
 }
 
 /// Checks that the protocol adapter refuses `tx` for `refusal`, leaving the
@@ -602,13 +740,13 @@ async fn refuses<Env: Environment>(
     tx: Transaction,
     refusal: Refusal,
 ) -> anyhow::Result<()> {
-    let before = stored_root(env).await?;
+    let before = stored_tree(env).await?.root();
     let outcome = settle_tx(env, tx).await?;
     anyhow::ensure!(
         outcome == Outcome::Refused(refusal),
         "the protocol adapter must refuse the transaction ({refusal:?}), but returned {outcome:?}"
     );
-    let after = stored_root(env).await?;
+    let after = stored_tree(env).await?.root();
     anyhow::ensure!(
         after == before,
         "a refused transaction moved the stored root from {before} to {after}"
@@ -616,17 +754,18 @@ async fn refuses<Env: Environment>(
     Ok(())
 }
 
-/// The latest root the protocol adapter stores, after checking that it is the
-/// root of the commitment tree it stores.
-async fn stored_root<Env: Environment>(env: &Env) -> anyhow::Result<Digest> {
-    let root = latest_root(env).await?;
-    let tree = env.protocol_adapter().commitment_tree().await?.root();
+/// The commitment tree the protocol adapter stores, after checking that its
+/// root is the latest root the adapter stores.
+async fn stored_tree<Env: Environment>(env: &Env) -> anyhow::Result<FrontierCommitmentTree> {
+    let latest = latest_root(env).await?;
+    let tree = env.protocol_adapter().commitment_tree().await?;
     anyhow::ensure!(
-        root == tree,
-        "the protocol adapter stores the latest root {root}, but its commitment tree's root is \
-         {tree}"
+        tree.root() == latest,
+        "the protocol adapter stores the latest root {latest}, but its commitment tree's root is \
+         {}",
+        tree.root()
     );
-    Ok(root)
+    Ok(tree)
 }
 
 /// Emits one test per suite function against the environment `$setup`
@@ -657,6 +796,7 @@ macro_rules! suite_tests {
             settles_only_while_unpaused,
             settlement_refuses_a_denied_logic_ref,
             settles_an_external_call_whose_output_matches,
+            settles_an_external_call_kept_as_a_payload,
             settlement_refuses_an_external_call_whose_output_differs,
         );
     };

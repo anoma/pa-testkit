@@ -17,6 +17,12 @@ pub enum Outcome {
     Refused(Refusal),
 }
 
+/// The deletion criterion of a blob a protocol adapter keeps: it emits the
+/// blob as a payload event when it settles the resource carrying it
+/// (pa-evm's `DeletionCriterion.Never`, the Solana adapter's
+/// `DELETION_CRITERION_NEVER`).
+pub const DELETION_CRITERION_NEVER: u32 = 1;
+
 /// An event a protocol adapter emits when it settles a transaction: pa-evm's
 /// settlement events, which the Solana adapter mirrors, with only what every
 /// chain gives the same way.
@@ -25,6 +31,15 @@ pub enum Event {
     /// A forwarder returned the output its call expected. What it was called
     /// with and returned are in its chain's encoding, so they are not here.
     ForwarderCallExecuted,
+    /// A blob of a settled resource's app data the adapter keeps
+    /// ([`DELETION_CRITERION_NEVER`]): the resource's tag, the blob's index
+    /// in its payload, and the blob's bytes.
+    Payload {
+        kind: PayloadKind,
+        tag: Digest,
+        index: u32,
+        blob: Vec<u8>,
+    },
     /// An action settled.
     ActionExecuted {
         action_tree_root: Digest,
@@ -37,14 +52,23 @@ pub enum Event {
     CommitmentTreeRootAdded { root: Digest },
     /// The transaction settled; its id is the keccak hash of its action tree
     /// roots, in order.
-    TransactionExecuted { transaction_id: [u8; 32] },
+    TransactionExecuted { transaction_id: Digest },
+}
+
+/// Which payload of a resource's app data a [`Event::Payload`] blob is from.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PayloadKind {
+    Resource,
+    Discovery,
+    External,
+    Application,
 }
 
 /// Why a protocol adapter refused to settle a transaction: the protocol's
 /// reasons, which every chain's adapter checks. A harness decodes its
 /// adapter's error into one; an error it cannot decode is not a refusal but a
 /// failure of the harness.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Refusal {
     /// The adapter is paused.
     Paused,
