@@ -53,18 +53,15 @@ pub(super) fn consumed(
     nk_commitment: NullifierKeyCommitment,
     overrides: &Overrides,
 ) -> Resource {
-    // The default nonce is unique per (seed, index): actions use distinct
-    // seeds, and the last byte separates the resources within an action.
-    let mut default_nonce = [seed; 32];
-    default_nonce[31] = index as u8;
-
     Resource {
         logic_ref: anoma_rm_risc0::constants::PADDING_LOGIC_VK,
         label_ref: Digest::default(),
         quantity: overrides.consumed_quantity.unwrap_or(0),
         value_ref: Digest::default(),
         is_ephemeral: overrides.consumed_is_ephemeral.unwrap_or(true),
-        nonce: overrides.consumed_nonce.unwrap_or(default_nonce),
+        nonce: overrides
+            .consumed_nonce
+            .unwrap_or(crate::fixtures::consumed_nonce(seed, index as u8)),
         nk_commitment,
         rand_seed: [seed.wrapping_add(11); 32],
     }

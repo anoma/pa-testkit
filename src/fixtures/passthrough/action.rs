@@ -39,7 +39,7 @@ pub fn build(
         quantity: 0,
         value_ref: Digest::default(),
         is_ephemeral: true,
-        nonce: [seed; 32],
+        nonce: crate::fixtures::consumed_nonce(seed, 0),
         nk_commitment,
         rand_seed: [seed.wrapping_add(11); 32],
     };

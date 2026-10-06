@@ -18,21 +18,9 @@ use crate::transaction::Transaction;
 use crate::witness::ActionWitnesses;
 use crate::{latest_root, prove_actions, settle_tx};
 
-/// The nonce of the trivial transaction's consumed resource, outside the
-/// `[seed; 32]` default that arm-risc0's transaction generator also produces,
-/// so a fork of a live chain does not start with its nullifier spent.
-const TRIVIAL_NONCE: [u8; 32] = *b"anoma pa-testkit suite trivial 1";
-
 /// A transaction of one trivial action settles and adds its commitment.
 pub async fn settles_a_trivial_transaction<Env: Environment>(env: &mut Env) -> anyhow::Result<()> {
-    let action = trivial_action(
-        1,
-        trivial::Overrides {
-            consumed_nonce: Some(TRIVIAL_NONCE),
-            ..trivial::Overrides::default()
-        },
-    )?;
-    proves_and_settles(env, &[action]).await
+    proves_and_settles(env, &[trivial_action(1, trivial::Overrides::default())?]).await
 }
 
 /// An action consuming two resources and creating three settles and adds its
@@ -189,24 +177,27 @@ pub async fn settlement_refuses_an_external_call_whose_output_differs<Env: Envir
 
 #[cfg(all(test, feature = "local"))]
 mod tests {
-    use std::collections::HashSet;
+    use std::collections::{BTreeSet, HashSet};
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use anoma_rm_risc0::aggregation_instance::AggregationInstance;
     use anoma_rm_risc0::proving_system::JournalEncoding;
 
     use super::*;
+    use crate::assert::{Needle, expect_integration_panic};
     use crate::commitment_tree::FrontierCommitmentTree;
     use crate::prover::{LocalProver, mock_aggregation_seal};
     use crate::witness::AppData;
 
     /// A protocol adapter in memory that makes the checks the suite expects an
-    /// adapter to make, in pa-evm's order: the pause, then per resource its
-    /// logic ref, root and nullifier, and its external calls (whose one
-    /// forwarder is a block-time forwarder taking `[time, expected output]`),
-    /// then the local prover's seal over the aggregation journal in
-    /// `encoding`, with the compliance key and the kind-table commitment the
-    /// adapter holds.
+    /// adapter to make: the pause; each resource's logic ref, and each
+    /// consumed resource's root and nullifier; the external calls (whose one
+    /// forwarder is a block-time forwarder taking `[time, expected output]`);
+    /// and the local prover's seal over the aggregation journal in `encoding`,
+    /// with the compliance key and the kind-table commitment the adapter
+    /// holds. The chains' adapters make these checks in different orders, so
+    /// a transaction failing more than one would be refused for a different
+    /// reason on each: it fails the test instead.
     struct InMemoryAdapter {
         tree: FrontierCommitmentTree,
         roots: HashSet<Digest>,
@@ -239,41 +230,43 @@ mod tests {
             &self,
             transaction: &Transaction,
         ) -> anyhow::Result<Result<HashSet<Digest>, Refusal>> {
-            if self.paused {
-                return Ok(Err(Refusal::Paused));
-            }
             let aggregation = transaction
                 .as_arm()
                 .aggregation
                 .as_ref()
                 .context("the transaction carries no aggregation")?;
+            let mut refusals = BTreeSet::new();
+            if self.paused {
+                refusals.insert(Refusal::Paused);
+            }
             let mut spent = HashSet::new();
             for action in &aggregation.instance.actions {
                 for consumed in &action.consumed_publics {
-                    if self
-                        .denied_logic_refs
-                        .contains(&consumed.resource_logic_ref)
-                    {
-                        return Ok(Err(Refusal::DeniedLogicRef));
-                    }
                     if !self.roots.contains(&consumed.commitment_tree_root) {
-                        return Ok(Err(Refusal::UnknownRoot));
+                        refusals.insert(Refusal::UnknownRoot);
                     }
                     if self.nullifiers.contains(&consumed.resource_nullifier)
                         || !spent.insert(consumed.resource_nullifier)
                     {
-                        return Ok(Err(Refusal::NullifierSpent));
-                    }
-                    if !calls_return_what_they_expect(&consumed.app_data)? {
-                        return Ok(Err(Refusal::ExternalCallOutputMismatch));
+                        refusals.insert(Refusal::NullifierSpent);
                     }
                 }
-                for created in &action.created_publics {
-                    if self.denied_logic_refs.contains(&created.resource_logic_ref) {
-                        return Ok(Err(Refusal::DeniedLogicRef));
+                let resources = action
+                    .consumed_publics
+                    .iter()
+                    .map(|c| (c.resource_logic_ref, &c.app_data))
+                    .chain(
+                        action
+                            .created_publics
+                            .iter()
+                            .map(|c| (c.resource_logic_ref, &c.app_data)),
+                    );
+                for (logic_ref, app_data) in resources {
+                    if self.denied_logic_refs.contains(&logic_ref) {
+                        refusals.insert(Refusal::DeniedLogicRef);
                     }
-                    if !calls_return_what_they_expect(&created.app_data)? {
-                        return Ok(Err(Refusal::ExternalCallOutputMismatch));
+                    if !calls_return_what_they_expect(app_data)? {
+                        refusals.insert(Refusal::ExternalCallOutputMismatch);
                     }
                 }
             }
@@ -283,9 +276,19 @@ mod tests {
                 ..aggregation.instance.clone()
             };
             if aggregation.proof != mock_aggregation_seal(&verified, self.encoding) {
-                return Ok(Err(Refusal::InvalidAggregationProof));
+                refusals.insert(Refusal::InvalidAggregationProof);
             }
-            Ok(Ok(spent))
+            let mut refusals = refusals.into_iter();
+            match (refusals.next(), refusals.next()) {
+                (None, _) => Ok(Ok(spent)),
+                (Some(refusal), None) => Ok(Err(refusal)),
+                (Some(first), Some(second)) => anyhow::bail!(
+                    "the transaction is refused for {first:?}, {second:?} and {:?}: the chains' \
+                     adapters check these in different orders, so a suite transaction must fail \
+                     one check",
+                    refusals.collect::<Vec<_>>()
+                ),
+            }
         }
     }
 
@@ -312,23 +315,38 @@ mod tests {
             Ok(self.tree.root())
         }
 
+        // The owner's calls refuse what both chains' adapters refuse.
+
         async fn set_kind_table_commitment(&mut self, commitment: Digest) -> anyhow::Result<()> {
+            anyhow::ensure!(
+                commitment != Digest::ZERO,
+                "the zero kind-table commitment is not allowed"
+            );
             self.kind_table_commitment = commitment;
             Ok(())
         }
 
         async fn pause(&mut self) -> anyhow::Result<()> {
+            anyhow::ensure!(!self.paused, "the adapter is already paused");
             self.paused = true;
             Ok(())
         }
 
         async fn unpause(&mut self) -> anyhow::Result<()> {
+            anyhow::ensure!(self.paused, "the adapter is not paused");
             self.paused = false;
             Ok(())
         }
 
         async fn deny_logic_ref(&mut self, logic_ref: Digest) -> anyhow::Result<()> {
-            self.denied_logic_refs.insert(logic_ref);
+            anyhow::ensure!(
+                logic_ref != Digest::ZERO,
+                "the zero logic ref is not allowed"
+            );
+            anyhow::ensure!(
+                self.denied_logic_refs.insert(logic_ref),
+                "the logic ref {logic_ref} is already denied"
+            );
             Ok(())
         }
     }
@@ -407,6 +425,50 @@ mod tests {
 
     in_memory_suite!(in_memory_risc0_serde, JournalEncoding::Risc0Serde);
     in_memory_suite!(in_memory_abi, JournalEncoding::Abi);
+
+    /// A transaction failing two checks is refused for a different reason on
+    /// each chain, so the adapter in memory fails the test instead.
+    #[tokio::test]
+    async fn a_transaction_failing_two_checks_fails_the_test() -> anyhow::Result<()> {
+        let mut env = InMemoryEnvironment::new(JournalEncoding::Risc0Serde);
+        let actions = trivial::build_many(1, 81).context("failed to build trivial actions")?;
+        let mut tx = prove_actions(&env, &actions).await?;
+        tx.tamper_aggregation_seal()?;
+        env.adapter.pause().await?;
+        expect_integration_panic(Needle::Static(
+            "the transaction is refused for Paused, InvalidAggregationProof and []",
+        ))(settle_tx(&mut env, tx).await)
+    }
+
+    /// The owner's calls refuse what both chains' adapters refuse.
+    #[tokio::test]
+    async fn the_owners_calls_refuse_what_both_chains_refuse() -> anyhow::Result<()> {
+        let mut adapter = InMemoryAdapter::new(JournalEncoding::Risc0Serde);
+        anyhow::ensure!(
+            adapter.unpause().await.is_err(),
+            "unpaused while not paused"
+        );
+        adapter.pause().await?;
+        anyhow::ensure!(adapter.pause().await.is_err(), "paused while paused");
+        anyhow::ensure!(
+            adapter
+                .set_kind_table_commitment(Digest::ZERO)
+                .await
+                .is_err(),
+            "installed the zero kind-table commitment"
+        );
+        anyhow::ensure!(
+            adapter.deny_logic_ref(Digest::ZERO).await.is_err(),
+            "denied the zero logic ref"
+        );
+        let logic_ref = passthrough::PASSTHROUGH_LOGIC_VK;
+        adapter.deny_logic_ref(logic_ref).await?;
+        anyhow::ensure!(
+            adapter.deny_logic_ref(logic_ref).await.is_err(),
+            "denied a logic ref twice"
+        );
+        Ok(())
+    }
 
     /// A seal over the journal in one encoding claims a different circuit and
     /// journal than the other's, so an adapter verifying the other refuses it.

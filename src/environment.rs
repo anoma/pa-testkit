@@ -44,7 +44,7 @@ pub enum Event {
 /// reasons, which every chain's adapter checks. A harness decodes its
 /// adapter's error into one; an error it cannot decode is not a refusal but a
 /// failure of the harness.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Refusal {
     /// The adapter is paused.
     Paused,
