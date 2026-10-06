@@ -8,8 +8,7 @@ use anoma_rm_risc0::merkle_path::{MerklePath, PADDING_LEAF};
 use anoma_rm_risc0::utils::hash_two;
 use anyhow::Context;
 
-use crate::environment::CommitmentTree;
-
+#[derive(Clone, Debug)]
 pub struct FrontierCommitmentTree {
     /// The adapter's commitment count when the tree was read.
     commitment_count: usize,
@@ -66,14 +65,14 @@ impl FrontierCommitmentTree {
             &self.node(level - 1, 2 * index + 1),
         )
     }
-}
 
-impl CommitmentTree for FrontierCommitmentTree {
-    fn root(&self) -> anyhow::Result<Digest> {
-        Ok(self.node(depth_at(self.count()), 0))
+    /// The root of the tree.
+    pub fn root(&self) -> Digest {
+        self.node(depth_at(self.count()), 0)
     }
 
-    fn path_to(&self, leaf: Digest) -> anyhow::Result<MerklePath> {
+    /// The path to `leaf`, one of the added leaves.
+    pub fn path_to(&self, leaf: Digest) -> anyhow::Result<MerklePath> {
         let position = self
             .leaves
             .iter()
@@ -149,7 +148,7 @@ mod tests {
             let expected = reference(&all).root().unwrap();
             for commitment_count in 0..=count {
                 assert_eq!(
-                    read_after(&all, commitment_count).root().unwrap(),
+                    read_after(&all, commitment_count).root(),
                     expected,
                     "{count} leaves, {commitment_count} read"
                 );
@@ -178,8 +177,7 @@ mod tests {
     #[test]
     fn sides_must_match_the_depth_at_the_count() {
         let error = FrontierCommitmentTree::new(5, vec![Digest::default(); 2])
-            .err()
-            .expect("5 leaves need 3 sides");
+            .expect_err("5 leaves need 3 sides");
         assert_eq!(error.to_string(), "a tree of 5 leaves has 3 sides, not 2");
     }
 }

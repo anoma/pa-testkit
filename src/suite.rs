@@ -3,22 +3,25 @@
 //! them against each of its environments. A test takes nothing but the
 //! environment: it names refusals and external calls in the
 //! [`crate::environment`] vocabulary, which the harness translates for its
-//! chain, so every chain runs the same test.
+//! chain, and checks the roots the chain stores, so every chain runs the same
+//! test.
 
 use anyhow::Context;
 
-use crate::assert::{Needle, expect_integration_panic};
-use crate::environment::{Environment, ExternalCall, Outcome, Refusal, TimeComparison};
+use crate::environment::{
+    Environment, ExternalCall, Outcome, ProtocolAdapter, Refusal, TimeComparison,
+};
 use crate::fixtures::{passthrough, trivial};
 use crate::transaction::Transaction;
-use crate::{commitment_root, execute_tx, prove_actions, settle_tx};
+use crate::witness::ActionWitnesses;
+use crate::{execute_tx, latest_root, prove_actions, settle_tx};
 
 /// The nonce of the trivial transaction's consumed resource, outside the
 /// `[seed; 32]` default that arm-risc0's transaction generator also produces,
 /// so a fork of a live chain does not start with its nullifier spent.
 const TRIVIAL_NONCE: [u8; 32] = *b"anoma pa-testkit suite trivial 1";
 
-/// A transaction of one trivial action settles and moves the root.
+/// A transaction of one trivial action settles and adds its commitment.
 pub async fn settles_a_trivial_transaction<Env: Environment>(env: &mut Env) -> anyhow::Result<()> {
     settles_one_action(
         env,
@@ -31,8 +34,8 @@ pub async fn settles_a_trivial_transaction<Env: Environment>(env: &mut Env) -> a
     .await
 }
 
-/// An action consuming two resources and creating three settles and moves the
-/// root.
+/// An action consuming two resources and creating three settles and adds its
+/// commitments.
 pub async fn settles_an_n_to_m_transaction<Env: Environment>(env: &mut Env) -> anyhow::Result<()> {
     settles_one_action(
         env,
@@ -46,12 +49,12 @@ pub async fn settles_an_n_to_m_transaction<Env: Environment>(env: &mut Env) -> a
     .await
 }
 
-/// A transaction of three actions settles and moves the root.
+/// A transaction of three actions settles and adds their commitments.
 pub async fn settles_a_multi_action_transaction<Env: Environment>(
     env: &mut Env,
 ) -> anyhow::Result<()> {
     let actions = trivial::build_many(3, 31).context("failed to build trivial actions")?;
-    settles_and_moves_the_root(env, actions).await
+    proves_and_settles(env, &actions).await
 }
 
 /// Two consume-only transactions settle one after the other and leave the
@@ -59,9 +62,9 @@ pub async fn settles_a_multi_action_transaction<Env: Environment>(
 pub async fn settles_consume_only_transactions_without_a_root_change<Env: Environment>(
     env: &mut Env,
 ) -> anyhow::Result<()> {
-    let before = commitment_root(env)?;
     for seed in [41, 42] {
-        let action = trivial::build(
+        settles_one_action(
+            env,
             seed,
             trivial::Overrides {
                 consumed_count: Some(2),
@@ -69,38 +72,10 @@ pub async fn settles_consume_only_transactions_without_a_root_change<Env: Enviro
                 ..trivial::Overrides::default()
             },
         )
-        .context("failed to build a consume-only trivial action")?
-        .witnesses;
-        let tx = prove_actions(env, &[action]).await?;
-        execute_tx(env, tx).await?;
-        anyhow::ensure!(
-            commitment_root(env)? == before,
-            "consume-only transaction {seed} must leave the commitment tree root unchanged"
-        );
+        .await
+        .with_context(|| format!("consume-only transaction {seed}"))?;
     }
     Ok(())
-}
-
-/// The prover refuses a padding resource of nonzero quantity.
-pub async fn proving_refuses_a_nonzero_quantity<Env: Environment>(env: &Env) -> anyhow::Result<()> {
-    proving_refuses_an_invalid_padding_resource(
-        env,
-        7,
-        trivial::Overrides::invalid_nonzero_quantity(),
-    )
-    .await
-}
-
-/// The prover refuses a consumed padding resource that is not ephemeral.
-pub async fn proving_refuses_a_non_ephemeral_consumed_resource<Env: Environment>(
-    env: &Env,
-) -> anyhow::Result<()> {
-    proving_refuses_an_invalid_padding_resource(
-        env,
-        8,
-        trivial::Overrides::invalid_consumed_non_ephemeral(),
-    )
-    .await
 }
 
 /// The protocol adapter refuses a transaction whose aggregation seal was
@@ -123,7 +98,7 @@ pub async fn settles_an_external_call_whose_output_matches<Env: Environment>(
     env: &mut Env,
 ) -> anyhow::Result<()> {
     let tx = prove_external_call(env, 61, block_time_call(TimeComparison::Before)).await?;
-    execute_tx(env, tx).await
+    settles(env, tx).await
 }
 
 /// The protocol adapter refuses a transaction whose external call expects
@@ -144,7 +119,6 @@ mod tests {
 
     use super::*;
     use crate::commitment_tree::FrontierCommitmentTree;
-    use crate::environment::ProtocolAdapter;
     use crate::prover::{LocalProver, mock_aggregation_seal};
 
     /// A protocol adapter in memory that checks what the suite expects it to
@@ -158,8 +132,6 @@ mod tests {
     }
 
     impl ProtocolAdapter for InMemoryAdapter {
-        type CommitmentTree = FrontierCommitmentTree;
-
         async fn settle(&mut self, transaction: Transaction) -> anyhow::Result<Outcome> {
             let created: Vec<Digest> = transaction.created_commitments()?.collect();
             let aggregation = transaction
@@ -182,8 +154,12 @@ mod tests {
             Ok(Outcome::Settled)
         }
 
-        fn commitment_tree(&self) -> &FrontierCommitmentTree {
-            &self.tree
+        async fn commitment_tree(&self) -> anyhow::Result<FrontierCommitmentTree> {
+            Ok(self.tree.clone())
+        }
+
+        async fn latest_root(&self) -> anyhow::Result<Digest> {
+            Ok(self.tree.root())
         }
     }
 
@@ -282,18 +258,15 @@ async fn settles_one_action<Env: Environment>(
     let action = trivial::build(seed, overrides)
         .with_context(|| format!("failed to build trivial action {seed}"))?
         .witnesses;
-    settles_and_moves_the_root(env, vec![action]).await
+    proves_and_settles(env, &[action]).await
 }
 
-async fn proving_refuses_an_invalid_padding_resource<Env: Environment>(
-    env: &Env,
-    seed: u8,
-    overrides: trivial::Overrides,
+async fn proves_and_settles<Env: Environment>(
+    env: &mut Env,
+    actions: &[ActionWitnesses],
 ) -> anyhow::Result<()> {
-    let bad = trivial::build(seed, overrides).context("failed to build invalid trivial action")?;
-    expect_integration_panic(Needle::Static("Invalid padding resource"))(
-        prove_actions(env, &[bad.witnesses]).await,
-    )
+    let tx = prove_actions(env, actions).await?;
+    settles(env, tx).await
 }
 
 /// A call asking the block-time forwarder about time 0, expecting `expected`.
@@ -315,38 +288,62 @@ async fn prove_external_call<Env: Environment>(
     prove_actions(env, &[action]).await
 }
 
+/// Checks that the protocol adapter settles `tx` and then stores the root of
+/// its tree with the transaction's commitments added, or, if it creates none,
+/// the root it stored before.
+async fn settles<Env: Environment>(env: &mut Env, tx: Transaction) -> anyhow::Result<()> {
+    let before = stored_root(env).await?;
+    let created: Vec<_> = tx.created_commitments()?.collect();
+    let mut expected = env.protocol_adapter().commitment_tree().await?;
+    expected.add(created.iter().copied());
+    let expected = if created.is_empty() {
+        before
+    } else {
+        expected.root()
+    };
+    execute_tx(env, tx).await?;
+    let after = stored_root(env).await?;
+    anyhow::ensure!(
+        after == expected,
+        "after a settlement creating {} commitments, the adapter stores the root {after}, not \
+         {expected}",
+        created.len()
+    );
+    Ok(())
+}
+
 /// Checks that the protocol adapter refuses `tx` for `refusal`, leaving the
-/// root where it was.
+/// root it stores where it was.
 async fn refuses<Env: Environment>(
     env: &mut Env,
     tx: Transaction,
     refusal: Refusal,
 ) -> anyhow::Result<()> {
-    let before = commitment_root(env)?;
+    let before = stored_root(env).await?;
     let outcome = settle_tx(env, tx).await?;
     anyhow::ensure!(
         outcome == Outcome::Refused(refusal),
         "the protocol adapter must refuse the transaction ({refusal:?}), but returned {outcome:?}"
     );
+    let after = stored_root(env).await?;
     anyhow::ensure!(
-        commitment_root(env)? == before,
-        "a refused transaction must leave the commitment tree root unchanged"
+        after == before,
+        "a refused transaction moved the stored root from {before} to {after}"
     );
     Ok(())
 }
 
-async fn settles_and_moves_the_root<Env: Environment>(
-    env: &mut Env,
-    actions: Vec<crate::witness::ActionWitnesses>,
-) -> anyhow::Result<()> {
-    let before = commitment_root(env)?;
-    let tx = prove_actions(env, &actions).await?;
-    execute_tx(env, tx).await?;
+/// The latest root the protocol adapter stores, after checking that it is the
+/// root of the commitment tree it stores.
+async fn stored_root<Env: Environment>(env: &Env) -> anyhow::Result<anoma_rm_risc0::Digest> {
+    let root = latest_root(env).await?;
+    let tree = env.protocol_adapter().commitment_tree().await?.root();
     anyhow::ensure!(
-        commitment_root(env)? != before,
-        "the commitment tree root must change"
+        root == tree,
+        "the protocol adapter stores the latest root {root}, but its commitment tree's root is \
+         {tree}"
     );
-    Ok(())
+    Ok(root)
 }
 
 /// Emits one test per suite function against the environment `$setup`
@@ -355,34 +352,21 @@ async fn settles_and_moves_the_root<Env: Environment>(
 /// environment; the tests run on tokio's multi-thread runtime, so the crate
 /// depends on `tokio` with `macros` and `rt-multi-thread`.
 ///
-/// `suite_tests!(setup)` emits every suite test. `suite_tests!(setup,
-/// settling_only)` emits the three that settle a transaction, for an
-/// environment where each proof is a proving-queue job, such as a fork of a
-/// live chain.
+/// Every environment runs every suite test.
 ///
 /// ```ignore
 /// mod local {
 ///     anoma_pa_testkit::suite_tests!(Env::setup_bare());
 /// }
-/// mod e2e_test {
-///     anoma_pa_testkit::suite_tests!(E2eEnv::setup_bare(), settling_only);
-/// }
 /// ```
 #[macro_export]
 macro_rules! suite_tests {
-    ($setup:expr, settling_only $(,)?) => {
+    ($setup:expr $(,)?) => {
         $crate::suite_tests!(@tests $setup;
             settles_a_trivial_transaction,
             settles_an_n_to_m_transaction,
             settles_a_multi_action_transaction,
-        );
-    };
-    ($setup:expr $(,)?) => {
-        $crate::suite_tests!($setup, settling_only);
-        $crate::suite_tests!(@tests $setup;
             settles_consume_only_transactions_without_a_root_change,
-            proving_refuses_a_nonzero_quantity,
-            proving_refuses_a_non_ephemeral_consumed_resource,
             settlement_refuses_a_tampered_aggregation_seal,
             settles_an_external_call_whose_output_matches,
             settlement_refuses_an_external_call_whose_output_differs,

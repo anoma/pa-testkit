@@ -3,8 +3,6 @@ pub mod commitment_tree;
 pub mod environment;
 #[cfg(feature = "fixtures")]
 pub mod fixtures;
-#[cfg(feature = "mocks")]
-pub mod mocks;
 #[cfg(any(feature = "local", feature = "e2e", feature = "prove"))]
 pub mod prover;
 #[cfg(feature = "fixtures")]
@@ -15,7 +13,7 @@ pub mod witness;
 use anoma_rm_risc0::Digest;
 use anyhow::Context;
 
-use self::environment::{CommitmentTree, Environment, Outcome, ProtocolAdapter, Prover};
+use self::environment::{Environment, Outcome, ProtocolAdapter, Prover};
 use self::transaction::Transaction;
 use self::witness::ActionWitnesses;
 
@@ -50,9 +48,10 @@ pub async fn execute_tx<Env: Environment>(env: &mut Env, tx: Transaction) -> any
     }
 }
 
-pub fn commitment_root<Env: Environment>(env: &Env) -> anyhow::Result<Digest> {
+/// The latest commitment tree root the protocol adapter stores.
+pub async fn latest_root<Env: Environment>(env: &Env) -> anyhow::Result<Digest> {
     env.protocol_adapter()
-        .commitment_tree()
-        .root()
-        .context("failed to compute commitment tree root")
+        .latest_root()
+        .await
+        .context("failed to read the protocol adapter's latest root")
 }

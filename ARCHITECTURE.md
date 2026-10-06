@@ -23,14 +23,15 @@ A single crate `anoma-pa-testkit` at the repo root — no workspace, no `crates/
 nesting.
 
 - `environment` — the interface a chain's harness implements: `Environment`,
-  `Prover`, `ProtocolAdapter`, `CommitmentTree`; and the vocabulary the suite
+  `Prover`, `ProtocolAdapter` (which settles a transaction and reads the
+  commitment tree and latest root the adapter stores); and the vocabulary the suite
   speaks through it: `Outcome` and `Refusal` (what an adapter did with a
   transaction), `ExternalCall` (a call to an example program, which the
   environment encodes for its chain).
-- `commitment_tree` — `FrontierCommitmentTree`, a `CommitmentTree` built from
-  what an adapter stores of its tree (its commitment count and, per level, the
-  last left node) plus the leaves the tests add. A chain's harness reads those
-  from its adapter; roots and paths follow without the earlier leaves.
+- `commitment_tree` — `FrontierCommitmentTree`, the tree built from what an
+  adapter stores of it (its commitment count and, per level, the last left
+  node) plus the leaves the tests add. A chain's harness reads those from its
+  adapter; roots and paths follow without the earlier leaves.
 - `witness` — `ActionWitnesses`, `LogicWitness`, and `constrain_action` (native
   constraint checking, no zkVM).
 - `transaction` — the risc0 `Transaction` newtype over `arm::Transaction`,
@@ -67,13 +68,13 @@ nesting.
   a function over any `Environment`; `suite_tests!` emits one test per suite
   function for an environment, so a harness cannot miss one. A suite test
   takes nothing but the environment, so it cannot be run differently on two
-  chains. The testkit runs it against an adapter in memory, under each journal
-  encoding.
+  chains, and checks the roots the adapter stores against the root the testkit
+  computes from the adapter's tree and the transaction's commitments. The
+  testkit runs it against an adapter in memory, under each journal encoding.
 - `identities` — well-known test signing keys.
-- `mocks` (`feature = "mocks"`): `mockall` doubles of the core traits.
 
 Generic helpers `prove_actions`, `settle_tx` (the `Outcome`), `execute_tx`
-(which must settle) and `commitment_root` live at the crate root.
+(which must settle) and `latest_root` live at the crate root.
 
 ## Downstream layout
 
@@ -101,8 +102,8 @@ contracts:
 4. `settle_tx` delegates to the chain `ProtocolAdapter`, which converts the ARM
    transaction to chain calldata, settles it, and decodes a refusal into a
    `Refusal`.
-5. A settlement updates the commitment tree; tests assert roots and
-   outcomes.
+5. A settlement updates the commitment tree the adapter stores; tests assert
+   its root and the outcome.
 
 ## CI / proving guardrail
 

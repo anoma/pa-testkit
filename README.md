@@ -28,7 +28,6 @@ A single flat crate, `anoma-pa-testkit` — no workspace. Feature-gated parts:
 - `e2e` — `QueueProver`: submits witnesses to the remote proving queue
 - `prove` — `Risc0Prover`: the queue's real proofs, made in-process with
   risc0; the Groth16 aggregation needs a container runtime (`docker`)
-- `mocks` — `mockall` doubles of the core traits
 
 ## Quick start
 

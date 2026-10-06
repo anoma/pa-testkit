@@ -4,8 +4,8 @@
 //! harness's to translate into these terms.
 
 use anoma_rm_risc0::Digest;
-use anoma_rm_risc0::merkle_path::MerklePath;
 
+use crate::commitment_tree::FrontierCommitmentTree;
 use crate::transaction::Transaction;
 use crate::witness::ActionWitnesses;
 
@@ -75,9 +75,6 @@ pub trait Environment {
 
 /// Protocol adapter abstraction.
 pub trait ProtocolAdapter {
-    /// Commitment tree.
-    type CommitmentTree: CommitmentTree;
-
     /// Asks the adapter to settle `transaction`, adding its commitments and
     /// nullifiers to the commitment tree and nullifier set. A refusal is an
     /// [`Outcome`]; an error means the harness could not ask, or could not
@@ -85,17 +82,15 @@ pub trait ProtocolAdapter {
     #[allow(async_fn_in_trait)]
     async fn settle(&mut self, transaction: Transaction) -> anyhow::Result<Outcome>;
 
-    /// Get a reference to the commitment tree root.
-    fn commitment_tree(&self) -> &Self::CommitmentTree;
-}
+    /// The commitment tree as the adapter stores it now, read from the
+    /// chain: its commitment count and sides.
+    #[allow(async_fn_in_trait)]
+    async fn commitment_tree(&self) -> anyhow::Result<FrontierCommitmentTree>;
 
-/// Commitment tree associated with the protocol adapter.
-pub trait CommitmentTree {
-    /// Compute the current root of the tree.
-    fn root(&self) -> anyhow::Result<Digest>;
-
-    /// Compute the path to a leaf in the tree.
-    fn path_to(&self, leaf: Digest) -> anyhow::Result<MerklePath>;
+    /// The latest commitment tree root the adapter stores, read from the
+    /// chain.
+    #[allow(async_fn_in_trait)]
+    async fn latest_root(&self) -> anyhow::Result<Digest>;
 }
 
 /// Transaction prover.
