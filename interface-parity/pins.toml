@@ -1,23 +1,28 @@
 # Each repository is compared at exactly this commit. Comparing newer code
 # means changing a commit here, and the report then shows what changed.
+# An EVM repository's `forge` is the Foundry release whose `forge bind` wrote
+# its generated bindings: a module it reproduces compares as its ABI.
 
 [[repository]]
 name = "pa-evm"
 side = "evm"
 url = "https://github.com/anoma/pa-evm"
 commit = "7deb37d69582fd445c3aa77f000c2be8d322d826"
+forge = { version = "1.8.5", sha256 = { linux_amd64 = "6c66ffcc55fa4249197721baa3098bc208014ea1d8aa04b2ed50ac6bccffb226", darwin_arm64 = "56049728e25e44a61c7f2e49438023b0890cb45850ffcb7c882f90cd998baf83" } }
 
 [[repository]]
 name = "anomapay-erc20-forwarder"
 side = "evm"
 url = "https://github.com/anoma/anomapay-erc20-forwarder"
 commit = "155bc123078a9975ffba9880b01aa6ed15378d65"
+forge = { version = "1.8.5", sha256 = { linux_amd64 = "6c66ffcc55fa4249197721baa3098bc208014ea1d8aa04b2ed50ac6bccffb226", darwin_arm64 = "56049728e25e44a61c7f2e49438023b0890cb45850ffcb7c882f90cd998baf83" } }
 
 [[repository]]
 name = "forwarder-bases"
 side = "evm"
 url = "https://github.com/anoma/forwarder-bases"
 commit = "08f2f2e8b147fc6c9394031063664a6f3cd6a58c"
+forge = { version = "1.8.5", sha256 = { linux_amd64 = "6c66ffcc55fa4249197721baa3098bc208014ea1d8aa04b2ed50ac6bccffb226", darwin_arm64 = "56049728e25e44a61c7f2e49438023b0890cb45850ffcb7c882f90cd998baf83" } }
 
 [[repository]]
 name = "anoma-pa-solana-client"

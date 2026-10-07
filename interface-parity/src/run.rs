@@ -8,7 +8,7 @@ use crate::compare::{Line, Surface, compare};
 use crate::inputs::{InterfaceEntry, PairEntry, Pairs, RepoFile, Side, load_env, load_pins, read};
 use crate::packages::{Kind, Package, cargo_metadata_surface, discover};
 use crate::report::{Failure, Report};
-use crate::{cmd, excuses, fetch, files, interface, rust_api, tags, ts_api};
+use crate::{cmd, excuses, fetch, files, generated, interface, rust_api, tags, ts_api};
 
 /// Each repository or package with its side and, unless extraction failed, its surface.
 type Surfaces = BTreeMap<String, (Side, Option<Surface>)>;
@@ -70,10 +70,21 @@ pub fn run(inputs: &Path, work: &Path) -> anyhow::Result<Report> {
                 .with_context(|| format!("reading the build environment of {}", pin.name))?,
             None => vec![],
         };
+        let forge = match &pin.forge {
+            Some(foundry) => Some(
+                fetch::foundry(foundry, &work.join("tools"))
+                    .with_context(|| format!("fetching the Foundry release {} pins", pin.name))?,
+            ),
+            None => None,
+        };
         let (found, discovery_failures) = discover(&pin.name, &dir);
         failures.extend(discovery_failures);
         for pkg in found {
             let surface = package_surface(&pkg, work, &env)
+                .and_then(|mut surface| {
+                    failures.extend(collapse_generated(&pkg, &mut surface, forge.as_deref())?);
+                    Ok(surface)
+                })
                 .map_err(|e| {
                     failures.push(Failure {
                         subject: pkg.id.clone(),
@@ -93,6 +104,35 @@ pub fn run(inputs: &Path, work: &Path) -> anyhow::Result<Report> {
         compare_interface(entry, &pins, work, &mut labels, &mut lines, &mut failures)?;
     }
     Ok(Report::build(labels, failures, lines, excuses))
+}
+
+/// Collapses the `forge bind` modules of `pkg`'s library into the ABIs they
+/// were generated from (`generated`), returning each module left item by
+/// item as a failure: the report must show why its items are all listed.
+fn collapse_generated(
+    pkg: &Package,
+    surface: &mut Surface,
+    forge: Option<&Path>,
+) -> anyhow::Result<Vec<Failure>> {
+    let Kind::Cargo(meta) = &pkg.kind else {
+        return Ok(vec![]);
+    };
+    let Some(lib) = meta.targets.iter().find(|t| t.is_lib()) else {
+        return Ok(vec![]);
+    };
+    let src = lib
+        .src_path
+        .parent()
+        .with_context(|| format!("{} is a library root with no directory", lib.src_path))?;
+    Ok(
+        generated::collapse_crate(surface, src.as_std_path(), forge)?
+            .into_iter()
+            .map(|note| Failure {
+                subject: pkg.id.clone(),
+                error: note,
+            })
+            .collect(),
+    )
 }
 
 /// Compares an EVM contract's ABI with a Solana program's IDL, each read from
@@ -174,7 +214,7 @@ fn compare_all(
         if paired.contains(name) {
             continue;
         }
-        let label = format!("{name} (unpaired)");
+        let label = format!("{name}{}", crate::report::UNPAIRED);
         if let Some(s) = surface {
             lines.extend(match side {
                 Side::Evm => compare(&label, s, &empty),

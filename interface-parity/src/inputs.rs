@@ -23,6 +23,21 @@ pub struct Pin {
     /// address, which it takes with `env!`).
     #[serde(default)]
     pub build_env: Option<String>,
+    /// The Foundry release whose `forge bind` wrote the repository's
+    /// generated bindings. A generated module it reproduces compares as the
+    /// ABI it was generated from instead of item by item (`generated`).
+    #[serde(default)]
+    pub forge: Option<Foundry>,
+}
+
+/// A Foundry release: its version and the sha256 of its release tarball for
+/// each platform it is run on, by the tarball's platform name
+/// (`linux_amd64`, `darwin_arm64`, …).
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Foundry {
+    pub version: String,
+    pub sha256: std::collections::BTreeMap<String, String>,
 }
 
 #[derive(Deserialize)]

@@ -13,6 +13,22 @@ impl Surface {
         values.sort();
     }
 
+    /// Removes the Rust items of `module` and of everything inside it: the
+    /// module, items under its path, and impls whose type is under it.
+    /// Returns how many keys it removed.
+    pub fn remove_rust_module(&mut self, module: &str) -> usize {
+        let (exact, inside) = (format!("rust {module} "), format!("rust {module}::"));
+        let before = self.0.len();
+        self.0
+            .retain(|key, _| !key.starts_with(&exact) && !key.starts_with(&inside));
+        before - self.0.len()
+    }
+
+    /// Each key with its values, in key order.
+    pub fn entries(&self) -> impl Iterator<Item = (&String, &Vec<String>)> {
+        self.0.iter()
+    }
+
     pub fn extend(&mut self, other: Surface) {
         for (key, mut values) in other.0 {
             let existing = self.0.entry(key).or_default();

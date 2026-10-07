@@ -6,6 +6,7 @@ pub mod compare;
 pub mod excuses;
 pub mod fetch;
 pub mod files;
+pub mod generated;
 pub mod inputs;
 pub mod interface;
 pub mod packages;

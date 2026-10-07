@@ -5,6 +5,9 @@ use std::fmt::Write;
 use crate::compare::{Line, Outcome};
 use crate::excuses::Excuse;
 
+/// The end of the label of a repository or package in no pair.
+pub const UNPAIRED: &str = " (unpaired)";
+
 /// A package or repository whose surface could not be extracted.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Failure {
@@ -16,7 +19,12 @@ pub struct Failure {
 pub struct Report {
     pub pairs: Vec<String>,
     pub failures: Vec<Failure>,
+    /// Unexcused differences of paired repositories, packages and interfaces.
     pub unexcused: Vec<Line>,
+    /// Unexcused differences of a repository or package in no pair: every
+    /// item it publishes, compared with nothing. They fail the report like
+    /// any difference and are listed after the paired ones.
+    pub unpaired: Vec<Line>,
     pub stale: Vec<Excuse>,
     pub excused: Vec<(Line, Excuse)>,
     pub matches: Vec<Line>,
@@ -36,7 +44,8 @@ impl Report {
             .into_iter()
             .map(|e| ((e.pair.clone(), e.key.clone()), e))
             .collect();
-        let (mut unexcused, mut excused, mut matches) = (vec![], vec![], vec![]);
+        let (mut unexcused, mut unpaired, mut excused, mut matches) =
+            (vec![], vec![], vec![], vec![]);
         for line in lines {
             if line.outcome() == Outcome::Match {
                 matches.push(line);
@@ -45,6 +54,8 @@ impl Report {
                 && excuse.get().covers(&line)
             {
                 excused.push((line, excuse.remove()));
+            } else if line.pair.ends_with(UNPAIRED) {
+                unpaired.push(line);
             } else {
                 unexcused.push(line);
             }
@@ -54,6 +65,7 @@ impl Report {
             pairs,
             failures,
             unexcused,
+            unpaired,
             stale,
             excused,
             matches,
@@ -61,7 +73,10 @@ impl Report {
     }
 
     pub fn passes(&self) -> bool {
-        self.failures.is_empty() && self.unexcused.is_empty() && self.stale.is_empty()
+        self.failures.is_empty()
+            && self.unexcused.is_empty()
+            && self.unpaired.is_empty()
+            && self.stale.is_empty()
     }
 
     /// The sections that make the test fail.
@@ -72,6 +87,11 @@ impl Report {
             &mut out,
             "Unexcused differences",
             self.unexcused.iter().map(|l| (l, None)),
+        );
+        write_lines(
+            &mut out,
+            "Unexcused differences of unpaired packages",
+            self.unpaired.iter().map(|l| (l, None)),
         );
         write_stale(&mut out, &self.stale);
         out
@@ -229,6 +249,34 @@ mod tests {
             failed.failing_text().contains("boom"),
             "{}",
             failed.failing_text()
+        );
+    }
+
+    #[test]
+    fn unpaired_lines_fail_like_any_difference_but_are_listed_after_the_paired_ones() {
+        let mut unpaired = line("u", &["1"], &[]);
+        unpaired.pair = "E (unpaired)".into();
+        let r = Report::build(
+            vec!["E ↔ S".into(), "E (unpaired)".into()],
+            vec![],
+            vec![line("c", &["1"], &[]), unpaired.clone()],
+            vec![],
+        );
+        let keys = |lines: &[Line]| lines.iter().map(|l| l.key.clone()).collect::<Vec<_>>();
+        assert_eq!(keys(&r.unexcused), vec!["c"]);
+        assert_eq!(keys(&r.unpaired), vec!["u"]);
+        let md = r.to_markdown();
+        let paired = md.find("## Unexcused differences (1)").expect(&md);
+        let apart = md
+            .find("## Unexcused differences of unpaired packages (1)")
+            .expect(&md);
+        let excused = md.find("## Excused").expect(&md);
+        assert!(paired < apart && apart < excused, "{md}");
+        assert!(md[apart..excused].contains("== E (unpaired)"), "{md}");
+        assert!(!md[paired..apart].contains("E (unpaired)"), "{md}");
+        assert!(
+            !Report::build(vec![], vec![], vec![unpaired], vec![]).passes(),
+            "an unpaired difference fails the report"
         );
     }
 
