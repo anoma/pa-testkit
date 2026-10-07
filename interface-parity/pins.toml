@@ -28,7 +28,7 @@ forge = { version = "1.8.5", sha256 = { linux_amd64 = "6c66ffcc55fa4249197721baa
 name = "anoma-pa-solana-client"
 side = "solana"
 url = "https://github.com/anoma/anoma-pa-solana-client"
-commit = "a9c8def062442385b4d86bdc7841de280d52e682"
+commit = "ea2f70583b414035562affe7e1f92303b102f71f"
 
 [[repository]]
 name = "solana-protocol-adapter"
@@ -41,5 +41,5 @@ build_env = "solana-pa-prototype/env/localnet.env"
 name = "anomapay-spl-token-forwarder"
 side = "solana"
 url = "https://github.com/anoma/anomapay-spl-token-forwarder"
-commit = "ff868b3847b2660821605f0724a596a0418036e9"
+commit = "ee3aa45d6c50de87b02dfe16f99233ca8a65f592"
 build_env = "env/localnet.env"
