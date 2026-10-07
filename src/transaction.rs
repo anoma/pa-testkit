@@ -47,12 +47,7 @@ impl Transaction {
     pub fn tamper_aggregation_seal(&mut self) -> anyhow::Result<()> {
         use anyhow::Context;
 
-        let proof = &mut self
-            .arm_txn
-            .aggregation
-            .as_mut()
-            .context("tamper requires an aggregation proof")?
-            .proof;
+        let proof = &mut self.aggregation_mut()?.proof;
 
         let mut inner: risc0_zkvm::InnerReceipt = bincode::deserialize(proof)
             .context("tamper requires bincode-encoded inner receipt proof")?;
@@ -78,14 +73,7 @@ impl Transaction {
     /// `commitment`, which its aggregation proof does not prove: used by
     /// negative tests of an adapter's kind-table check.
     pub fn claim_kind_table_commitment(&mut self, commitment: Digest) -> anyhow::Result<()> {
-        use anyhow::Context;
-
-        self.arm_txn
-            .aggregation
-            .as_mut()
-            .context("the transaction carries no aggregation")?
-            .instance
-            .kind_table_commitment = commitment;
+        self.aggregation_mut()?.instance.kind_table_commitment = commitment;
         Ok(())
     }
 
@@ -96,6 +84,15 @@ impl Transaction {
         self.arm_txn
             .aggregation
             .as_ref()
+            .context("the transaction carries no aggregation")
+    }
+
+    fn aggregation_mut(&mut self) -> anyhow::Result<&mut Aggregation> {
+        use anyhow::Context;
+
+        self.arm_txn
+            .aggregation
+            .as_mut()
             .context("the transaction carries no aggregation")
     }
 

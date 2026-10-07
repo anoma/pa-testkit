@@ -116,7 +116,7 @@ pub async fn settles_a_transaction_proven_against_the_empty_kind_table<Env: Envi
     env: &mut Env,
 ) -> anyhow::Result<()> {
     anyhow::ensure!(
-        crate::fixtures::kind_table_commitment() == crate::fixtures::empty_kind_table_commitment(),
+        anoma_rm_risc0::constants::kind_table().is_empty(),
         "the fixtures must prove against the empty kind table for this test, but a kind table is \
          loaded"
     );
@@ -287,8 +287,7 @@ mod tests {
         tree: FrontierCommitmentTree,
         roots: HashSet<Digest>,
         nullifiers: HashSet<Digest>,
-        denied_consumed_logic_refs: HashSet<Digest>,
-        denied_created_logic_refs: HashSet<Digest>,
+        denied_logic_refs: HashSet<DeniedLogicRef>,
         kind_table_commitment: Digest,
         paused: bool,
         encoding: JournalEncoding,
@@ -303,8 +302,7 @@ mod tests {
                 roots: HashSet::from([tree.root()]),
                 tree,
                 nullifiers: HashSet::new(),
-                denied_consumed_logic_refs: HashSet::new(),
-                denied_created_logic_refs: HashSet::new(),
+                denied_logic_refs: HashSet::new(),
                 kind_table_commitment: crate::fixtures::empty_kind_table_commitment(),
                 paused: false,
                 encoding,
@@ -349,22 +347,18 @@ mod tests {
                 let resources = action
                     .consumed_publics
                     .iter()
-                    .map(|c| {
-                        (
-                            c.resource_logic_ref,
-                            &c.app_data,
-                            &self.denied_consumed_logic_refs,
-                        )
-                    })
-                    .chain(action.created_publics.iter().map(|c| {
-                        (
-                            c.resource_logic_ref,
-                            &c.app_data,
-                            &self.denied_created_logic_refs,
-                        )
-                    }));
-                for (logic_ref, app_data, denylist) in resources {
-                    if denylist.contains(&logic_ref) {
+                    .map(|c| (c.resource_logic_ref, true, &c.app_data))
+                    .chain(
+                        action
+                            .created_publics
+                            .iter()
+                            .map(|c| (c.resource_logic_ref, false, &c.app_data)),
+                    );
+                for (logic_ref, consumed, app_data) in resources {
+                    if self.denied_logic_refs.contains(&DeniedLogicRef {
+                        logic_ref,
+                        consumed,
+                    }) {
                         refuse(Refusal::DeniedLogicRef);
                     }
                     for call in &app_data.external_payload {
@@ -508,25 +502,18 @@ mod tests {
         }
 
         async fn deny_logic_refs(&mut self, logic_refs: &[DeniedLogicRef]) -> anyhow::Result<()> {
-            let mut consumed = self.denied_consumed_logic_refs.clone();
-            let mut created = self.denied_created_logic_refs.clone();
+            let mut denied = self.denied_logic_refs.clone();
             for entry in logic_refs {
                 anyhow::ensure!(
                     entry.logic_ref != Digest::ZERO,
                     "the zero logic ref is not allowed"
                 );
-                let denylist = if entry.consumed {
-                    &mut consumed
-                } else {
-                    &mut created
-                };
                 anyhow::ensure!(
-                    denylist.insert(entry.logic_ref),
+                    denied.insert(*entry),
                     "{entry:?} is already on its denylist"
                 );
             }
-            self.denied_consumed_logic_refs = consumed;
-            self.denied_created_logic_refs = created;
+            self.denied_logic_refs = denied;
             Ok(())
         }
     }
@@ -658,7 +645,7 @@ mod tests {
             "added a logic ref to a denylist it is on"
         );
         anyhow::ensure!(
-            !adapter.denied_created_logic_refs.contains(&other),
+            !adapter.denied_logic_refs.contains(&deny(other, false)),
             "a refused call added its other entry"
         );
         adapter.deny_logic_refs(&[deny(logic_ref, true)]).await?;

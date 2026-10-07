@@ -115,7 +115,7 @@ pub enum TimeComparison {
 /// A logic ref to add to one of a protocol adapter's denylists: the one for
 /// consumed resources when `consumed`, else the one for created resources,
 /// as both chains' adapters take it.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct DeniedLogicRef {
     pub logic_ref: Digest,
     pub consumed: bool,
