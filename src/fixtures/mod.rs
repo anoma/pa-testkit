@@ -24,3 +24,9 @@ pub(crate) fn consumed_nonce(seed: u8, index: u8) -> [u8; 32] {
 pub fn kind_table_commitment() -> Digest {
     anoma_rm_risc0::compliance::hash_kind_table_entries(anoma_rm_risc0::constants::kind_table())
 }
+
+/// The commitment to the empty kind table, which every protocol adapter
+/// accepts whatever table it stores.
+pub fn empty_kind_table_commitment() -> Digest {
+    anoma_rm_risc0::compliance::hash_kind_table_entries(&[])
+}
