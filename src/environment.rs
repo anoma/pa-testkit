@@ -72,17 +72,20 @@ pub enum PayloadKind {
 pub enum Refusal {
     /// The adapter is paused.
     Paused,
-    /// A resource carries a logic ref the adapter denies.
+    /// A resource's logic ref is on the adapter's denylist for its side:
+    /// the one for consumed resources or the one for created resources.
     DeniedLogicRef,
     /// A consumed resource names a commitment tree root the adapter never
     /// stored.
     UnknownRoot,
     /// A consumed resource's nullifier is already spent.
     NullifierSpent,
+    /// The transaction's kind-table commitment is neither the one the adapter
+    /// stores nor the empty table's.
+    UnacceptedKindTableCommitment,
     /// The aggregation proof does not prove the transaction's actions under
-    /// the adapter's compliance key and kind-table commitment. pa-evm builds
-    /// the journal it verifies from its stored commitment, so a transaction
-    /// proven against another kind table is refused for this too.
+    /// the adapter's compliance key and the transaction's kind-table
+    /// commitment.
     InvalidAggregationProof,
     /// An external call returned other than the output its proof expects.
     ExternalCallOutputMismatch,
@@ -107,6 +110,15 @@ pub enum TimeComparison {
     Before = 0,
     At = 1,
     After = 2,
+}
+
+/// A logic ref to add to one of a protocol adapter's denylists: the one for
+/// consumed resources when `consumed`, else the one for created resources,
+/// as both chains' adapters take it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct DeniedLogicRef {
+    pub logic_ref: Digest,
+    pub consumed: bool,
 }
 
 /// A protocol adapter on one chain, with a prover for it.
@@ -150,7 +162,8 @@ pub trait ProtocolAdapter {
     async fn latest_root(&self) -> anyhow::Result<Digest>;
 
     /// As the adapter's owner, makes `commitment` the kind-table commitment
-    /// transactions are verified against.
+    /// it stores: from then on a transaction settles when proven against that
+    /// table or against the empty one.
     async fn set_kind_table_commitment(&mut self, commitment: Digest) -> anyhow::Result<()>;
 
     /// As the adapter's owner, pauses settlement.
@@ -159,9 +172,12 @@ pub trait ProtocolAdapter {
     /// As the adapter's owner, resumes settlement.
     async fn unpause(&mut self) -> anyhow::Result<()>;
 
-    /// As the adapter's owner, denies `logic_ref`: the adapter refuses any
-    /// transaction with a resource carrying it.
-    async fn deny_logic_ref(&mut self, logic_ref: Digest) -> anyhow::Result<()>;
+    /// As the adapter's owner, adds each of `logic_refs` to its denylist:
+    /// the adapter refuses any transaction consuming a resource whose logic
+    /// ref is on the one for consumed resources, or creating one whose logic
+    /// ref is on the one for created resources. The adapter refuses the zero
+    /// logic ref and one already on its denylist.
+    async fn deny_logic_refs(&mut self, logic_refs: &[DeniedLogicRef]) -> anyhow::Result<()>;
 }
 
 /// Transaction prover.

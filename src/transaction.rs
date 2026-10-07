@@ -74,6 +74,21 @@ impl Transaction {
         Ok(())
     }
 
+    /// Make the transaction claim it was proven against the kind table
+    /// `commitment`, which its aggregation proof does not prove: used by
+    /// negative tests of an adapter's kind-table check.
+    pub fn claim_kind_table_commitment(&mut self, commitment: Digest) -> anyhow::Result<()> {
+        use anyhow::Context;
+
+        self.arm_txn
+            .aggregation
+            .as_mut()
+            .context("the transaction carries no aggregation")?
+            .instance
+            .kind_table_commitment = commitment;
+        Ok(())
+    }
+
     /// The transaction's aggregation: its instance and the proof of it.
     pub fn aggregation(&self) -> anyhow::Result<&Aggregation> {
         use anyhow::Context;

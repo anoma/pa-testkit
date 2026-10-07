@@ -12,8 +12,8 @@ use sha3::{Digest as _, Keccak256};
 
 use crate::commitment_tree::FrontierCommitmentTree;
 use crate::environment::{
-    DELETION_CRITERION_NEVER, Environment, Event, ExternalCall, Outcome, PayloadKind,
-    ProtocolAdapter, Refusal, TimeComparison,
+    DELETION_CRITERION_NEVER, DeniedLogicRef, Environment, Event, ExternalCall, Outcome,
+    PayloadKind, ProtocolAdapter, Refusal, TimeComparison,
 };
 use crate::fixtures::{passthrough, trivial};
 use crate::transaction::Transaction;
@@ -105,24 +105,45 @@ pub async fn settlement_refuses_an_unknown_root<Env: Environment>(
     refuses(env, tx, Refusal::UnknownRoot).await
 }
 
-/// The protocol adapter refuses a transaction proven against another kind
-/// table than the one it holds, and settles it once its owner installs that
-/// table.
-pub async fn settles_only_under_the_kind_table_it_was_proven_against<Env: Environment>(
+/// A kind table the suite installs and claims, which no fixture proves
+/// against.
+const OTHER_KIND_TABLE: Digest = Digest::from_bytes([0x4b; 32]);
+
+/// A transaction proven against the empty kind table settles whatever table
+/// the protocol adapter stores: the empty table merges no kinds, so what
+/// balances under it balances under any table.
+pub async fn settles_a_transaction_proven_against_the_empty_kind_table<Env: Environment>(
     env: &mut Env,
 ) -> anyhow::Result<()> {
+    anyhow::ensure!(
+        crate::fixtures::kind_table_commitment() == crate::fixtures::empty_kind_table_commitment(),
+        "the fixtures must prove against the empty kind table for this test, but a kind table is \
+         loaded"
+    );
     let tx = prove_actions(env, &[trivial_action(53, trivial::Overrides::default())?]).await?;
     env.protocol_adapter_mut()
-        .set_kind_table_commitment(Digest::from_bytes(*b"anoma pa-testkit suite: kindtabl"))
+        .set_kind_table_commitment(OTHER_KIND_TABLE)
         .await
         .context("failed to install another kind table")?;
-    refuses(env, tx.clone(), Refusal::InvalidAggregationProof).await?;
+    settles(env, tx).await
+}
+
+/// The protocol adapter refuses a transaction claiming a kind table it
+/// neither stores nor is the empty one, before verifying its proof; once its
+/// owner installs that table, the claim passes and the proof, which proves
+/// another table, does not.
+pub async fn settlement_refuses_a_kind_table_neither_stored_nor_empty<Env: Environment>(
+    env: &mut Env,
+) -> anyhow::Result<()> {
+    let mut tx = prove_actions(env, &[trivial_action(57, trivial::Overrides::default())?]).await?;
+    tx.claim_kind_table_commitment(OTHER_KIND_TABLE)?;
+    refuses(env, tx.clone(), Refusal::UnacceptedKindTableCommitment).await?;
 
     env.protocol_adapter_mut()
-        .set_kind_table_commitment(crate::fixtures::kind_table_commitment())
+        .set_kind_table_commitment(OTHER_KIND_TABLE)
         .await
-        .context("failed to install the kind table the transaction was proven against")?;
-    settles(env, tx).await
+        .context("failed to install the claimed kind table")?;
+    refuses(env, tx, Refusal::InvalidAggregationProof).await
 }
 
 /// The protocol adapter refuses every transaction while its owner has paused
@@ -143,18 +164,53 @@ pub async fn settles_only_while_unpaused<Env: Environment>(env: &mut Env) -> any
 }
 
 /// The protocol adapter refuses a transaction with a resource whose logic ref
-/// its owner denied.
+/// its owner denied: put on both denylists.
 pub async fn settlement_refuses_a_denied_logic_ref<Env: Environment>(
     env: &mut Env,
 ) -> anyhow::Result<()> {
+    let logic_ref = passthrough::PASSTHROUGH_LOGIC_VK;
     env.protocol_adapter_mut()
-        .deny_logic_ref(passthrough::PASSTHROUGH_LOGIC_VK)
+        .deny_logic_refs(&[
+            DeniedLogicRef {
+                logic_ref,
+                consumed: true,
+            },
+            DeniedLogicRef {
+                logic_ref,
+                consumed: false,
+            },
+        ])
         .await
         .context("failed to deny the pass-through logic")?;
     let action = passthrough::build(55, Vec::new(), passthrough::Overrides::default())
         .context("failed to build a pass-through action")?
         .witnesses;
     let tx = prove_actions(env, &[action]).await?;
+    refuses(env, tx, Refusal::DeniedLogicRef).await
+}
+
+/// A logic ref its owner deprecated, put on the denylist for created
+/// resources only, is still consumed but no longer created: the protocol
+/// adapter settles a transaction consuming resources of the trivial logic
+/// and refuses one creating them.
+pub async fn settles_consuming_a_deprecated_logic_ref_but_refuses_creating_one<Env: Environment>(
+    env: &mut Env,
+) -> anyhow::Result<()> {
+    deny_trivial_logic(env, false).await?;
+    proves_and_settles(env, &[trivial_consume_only_action(58)?]).await?;
+    let tx = prove_actions(env, &[trivial_action(59, trivial::Overrides::default())?]).await?;
+    refuses(env, tx, Refusal::DeniedLogicRef).await
+}
+
+/// The protocol adapter refuses a transaction consuming a resource whose
+/// logic ref is on the denylist for consumed resources.
+pub async fn settlement_refuses_consuming_a_logic_ref_denied_for_consumed_resources<
+    Env: Environment,
+>(
+    env: &mut Env,
+) -> anyhow::Result<()> {
+    deny_trivial_logic(env, true).await?;
+    let tx = prove_actions(env, &[trivial_consume_only_action(60)?]).await?;
     refuses(env, tx, Refusal::DeniedLogicRef).await
 }
 
@@ -216,38 +272,40 @@ mod tests {
     use crate::prover::{LocalProver, mock_aggregation_seal};
 
     /// A protocol adapter in memory that makes the checks the suite expects an
-    /// adapter to make: the pause, first, as on every chain; each resource's
-    /// logic ref, and each consumed resource's root and nullifier; the
-    /// external calls (whose one forwarder is a block-time forwarder taking
-    /// `[time, expected output]`); and the local prover's seal over the
-    /// aggregation journal in `encoding`, with the compliance key and the
-    /// kind-table commitment the adapter holds. The chains' adapters make
-    /// the checks after the pause in different orders, so a transaction
-    /// failing more than one of them would be refused for a different reason
-    /// on each: it fails the test instead. It emits its events as it settles,
+    /// adapter to make: the pause and then the transaction's kind table,
+    /// first, as on every chain; each resource's logic ref against the
+    /// denylist for its side, and each consumed resource's root and
+    /// nullifier; the external calls (whose one forwarder is a block-time
+    /// forwarder taking `[time, expected output]`); and the local prover's
+    /// seal over the aggregation journal in `encoding`, with the compliance
+    /// key. The chains' adapters make the checks after the kind table's in
+    /// different orders, so a transaction failing more than one of them would
+    /// be refused for a different reason on each: it fails the test instead. It emits its events as it settles,
     /// apart from the suite's `expected_events`, so the suite's check of
     /// them is a check here too.
     struct InMemoryAdapter {
         tree: FrontierCommitmentTree,
         roots: HashSet<Digest>,
         nullifiers: HashSet<Digest>,
-        denied_logic_refs: HashSet<Digest>,
+        denied_consumed_logic_refs: HashSet<Digest>,
+        denied_created_logic_refs: HashSet<Digest>,
         kind_table_commitment: Digest,
         paused: bool,
         encoding: JournalEncoding,
     }
 
     impl InMemoryAdapter {
-        /// An adapter with an empty tree, holding the kind table the fixtures
-        /// prove against.
+        /// An adapter with an empty tree, storing the empty kind table, as
+        /// both chains' adapters start.
         fn new(encoding: JournalEncoding) -> Self {
             let tree = FrontierCommitmentTree::new(0, Vec::new()).unwrap();
             Self {
                 roots: HashSet::from([tree.root()]),
                 tree,
                 nullifiers: HashSet::new(),
-                denied_logic_refs: HashSet::new(),
-                kind_table_commitment: crate::fixtures::kind_table_commitment(),
+                denied_consumed_logic_refs: HashSet::new(),
+                denied_created_logic_refs: HashSet::new(),
+                kind_table_commitment: crate::fixtures::empty_kind_table_commitment(),
                 paused: false,
                 encoding,
             }
@@ -258,14 +316,22 @@ mod tests {
             if self.paused {
                 return Ok(Some(Refusal::Paused));
             }
+            let aggregation = transaction.aggregation()?;
+            let instance = &aggregation.instance;
+            if ![
+                self.kind_table_commitment,
+                crate::fixtures::empty_kind_table_commitment(),
+            ]
+            .contains(&instance.kind_table_commitment)
+            {
+                return Ok(Some(Refusal::UnacceptedKindTableCommitment));
+            }
             let mut refusals = Vec::new();
             let mut refuse = |refusal| {
                 if !refusals.contains(&refusal) {
                     refusals.push(refusal);
                 }
             };
-            let aggregation = transaction.aggregation()?;
-            let instance = &aggregation.instance;
             // A nullifier repeated within the transaction is spent by its
             // first use, as both chains' adapters find.
             if instance.nf_duplication_check().is_err() {
@@ -283,15 +349,22 @@ mod tests {
                 let resources = action
                     .consumed_publics
                     .iter()
-                    .map(|c| (c.resource_logic_ref, &c.app_data))
-                    .chain(
-                        action
-                            .created_publics
-                            .iter()
-                            .map(|c| (c.resource_logic_ref, &c.app_data)),
-                    );
-                for (logic_ref, app_data) in resources {
-                    if self.denied_logic_refs.contains(&logic_ref) {
+                    .map(|c| {
+                        (
+                            c.resource_logic_ref,
+                            &c.app_data,
+                            &self.denied_consumed_logic_refs,
+                        )
+                    })
+                    .chain(action.created_publics.iter().map(|c| {
+                        (
+                            c.resource_logic_ref,
+                            &c.app_data,
+                            &self.denied_created_logic_refs,
+                        )
+                    }));
+                for (logic_ref, app_data, denylist) in resources {
+                    if denylist.contains(&logic_ref) {
                         refuse(Refusal::DeniedLogicRef);
                     }
                     for call in &app_data.external_payload {
@@ -303,7 +376,6 @@ mod tests {
             }
             let verified = AggregationInstance {
                 compliance_key: anoma_rm_risc0::constants::COMPLIANCE_VK,
-                kind_table_commitment: self.kind_table_commitment,
                 ..instance.clone()
             };
             if aggregation.proof != mock_aggregation_seal(&verified, self.encoding) {
@@ -435,15 +507,26 @@ mod tests {
             Ok(())
         }
 
-        async fn deny_logic_ref(&mut self, logic_ref: Digest) -> anyhow::Result<()> {
-            anyhow::ensure!(
-                logic_ref != Digest::ZERO,
-                "the zero logic ref is not allowed"
-            );
-            anyhow::ensure!(
-                self.denied_logic_refs.insert(logic_ref),
-                "the logic ref {logic_ref} is already denied"
-            );
+        async fn deny_logic_refs(&mut self, logic_refs: &[DeniedLogicRef]) -> anyhow::Result<()> {
+            let mut consumed = self.denied_consumed_logic_refs.clone();
+            let mut created = self.denied_created_logic_refs.clone();
+            for entry in logic_refs {
+                anyhow::ensure!(
+                    entry.logic_ref != Digest::ZERO,
+                    "the zero logic ref is not allowed"
+                );
+                let denylist = if entry.consumed {
+                    &mut consumed
+                } else {
+                    &mut created
+                };
+                anyhow::ensure!(
+                    denylist.insert(entry.logic_ref),
+                    "{entry:?} is already on its denylist"
+                );
+            }
+            self.denied_consumed_logic_refs = consumed;
+            self.denied_created_logic_refs = created;
             Ok(())
         }
     }
@@ -514,9 +597,11 @@ mod tests {
     }
 
     /// A transaction failing two checks can be refused for a different
-    /// reason on each chain (proven against another kind table and under an
-    /// unknown root: the Solana adapter checks the kind table first, pa-evm
-    /// the root), so the adapter in memory fails the test instead.
+    /// reason on each chain (consuming under an unknown root and creating a
+    /// resource of a deprecated logic ref: the Solana adapter checks every
+    /// resource's logic ref before any root, pa-evm each consumed resource's
+    /// root before the created resources' logic refs), so the adapter in
+    /// memory fails the test instead.
     #[tokio::test]
     async fn a_transaction_failing_two_checks_fails_the_test() -> anyhow::Result<()> {
         let mut env = InMemoryEnvironment::new(JournalEncoding::Risc0Serde);
@@ -528,11 +613,9 @@ mod tests {
             },
         )?;
         let tx = prove_actions(&env, &[action]).await?;
-        env.adapter
-            .set_kind_table_commitment(Digest::from_bytes([8; 32]))
-            .await?;
+        deny_trivial_logic(&mut env, false).await?;
         expect_integration_panic(Needle::Static(
-            "the transaction is refused for [UnknownRoot, InvalidAggregationProof]",
+            "the transaction is refused for [UnknownRoot, DeniedLogicRef]",
         ))(settle_tx(&mut env, tx).await)
     }
 
@@ -553,16 +636,32 @@ mod tests {
                 .is_err(),
             "installed the zero kind-table commitment"
         );
+        let deny = |logic_ref, consumed| DeniedLogicRef {
+            logic_ref,
+            consumed,
+        };
         anyhow::ensure!(
-            adapter.deny_logic_ref(Digest::ZERO).await.is_err(),
+            adapter
+                .deny_logic_refs(&[deny(Digest::ZERO, true)])
+                .await
+                .is_err(),
             "denied the zero logic ref"
         );
         let logic_ref = passthrough::PASSTHROUGH_LOGIC_VK;
-        adapter.deny_logic_ref(logic_ref).await?;
+        adapter.deny_logic_refs(&[deny(logic_ref, false)]).await?;
+        let other = Digest::from_bytes([9; 32]);
         anyhow::ensure!(
-            adapter.deny_logic_ref(logic_ref).await.is_err(),
-            "denied a logic ref twice"
+            adapter
+                .deny_logic_refs(&[deny(other, false), deny(logic_ref, false)])
+                .await
+                .is_err(),
+            "added a logic ref to a denylist it is on"
         );
+        anyhow::ensure!(
+            !adapter.denied_created_logic_refs.contains(&other),
+            "a refused call added its other entry"
+        );
+        adapter.deny_logic_refs(&[deny(logic_ref, true)]).await?;
         Ok(())
     }
 
@@ -591,6 +690,32 @@ fn trivial_action(seed: u8, overrides: trivial::Overrides) -> anyhow::Result<Act
     Ok(trivial::build(seed, overrides)
         .with_context(|| format!("failed to build trivial action {seed}"))?
         .witnesses)
+}
+
+/// A trivial action with nonces from `seed` that consumes two resources and
+/// creates none.
+fn trivial_consume_only_action(seed: u8) -> anyhow::Result<ActionWitnesses> {
+    trivial_action(
+        seed,
+        trivial::Overrides {
+            consumed_count: Some(2),
+            created_count: Some(0),
+            ..trivial::Overrides::default()
+        },
+    )
+}
+
+/// As the protocol adapter's owner, puts the trivial actions' logic ref on
+/// the denylist for consumed resources (`consumed`) or on the one for
+/// created resources.
+async fn deny_trivial_logic<Env: Environment>(env: &mut Env, consumed: bool) -> anyhow::Result<()> {
+    env.protocol_adapter_mut()
+        .deny_logic_refs(&[DeniedLogicRef {
+            logic_ref: anoma_rm_risc0::constants::PADDING_LOGIC_VK,
+            consumed,
+        }])
+        .await
+        .context("failed to deny the trivial logic")
 }
 
 async fn proves_and_settles<Env: Environment>(
@@ -764,9 +889,12 @@ macro_rules! suite_tests {
             settlement_refuses_a_tampered_aggregation_seal,
             settlement_refuses_a_spent_nullifier,
             settlement_refuses_an_unknown_root,
-            settles_only_under_the_kind_table_it_was_proven_against,
+            settles_a_transaction_proven_against_the_empty_kind_table,
+            settlement_refuses_a_kind_table_neither_stored_nor_empty,
             settles_only_while_unpaused,
             settlement_refuses_a_denied_logic_ref,
+            settles_consuming_a_deprecated_logic_ref_but_refuses_creating_one,
+            settlement_refuses_consuming_a_logic_ref_denied_for_consumed_resources,
             settles_an_external_call_whose_output_matches,
             settles_an_external_call_kept_as_a_payload,
             settlement_refuses_an_external_call_whose_output_differs,
