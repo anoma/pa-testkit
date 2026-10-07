@@ -106,3 +106,32 @@ fn a_crate_reading_the_build_environment_documents_with_it() {
         "the documented API holds ID: {lines:#?}"
     );
 }
+
+/// A blanket impl is listed where it is declared, and not again on each type
+/// it covers: whether a type has it follows from the declaration (the
+/// crate's own, or a dependency's) and the type's own impls, which stay.
+#[test]
+fn a_blanket_impl_is_listed_where_declared_not_on_each_type() {
+    let s = surface("blanket-repo", "blanket").unwrap();
+    let lines = compare("p", &s, &Surface::default());
+    let keys: Vec<&str> = lines.iter().map(|l| l.key.as_str()).collect();
+    assert!(
+        !keys.iter().any(|k| k.contains("impl core::convert::Into")
+            || k.contains("impl alloc::borrow::ToOwned")
+            || k.contains("impl core::borrow::Borrow")),
+        "an item from another crate's blanket impl: {keys:#?}"
+    );
+    assert!(
+        keys.contains(&"rust T impl crate::Labelled"),
+        "the crate's own blanket impl is gone: {keys:#?}"
+    );
+    assert!(
+        keys.contains(&"rust crate::Item impl crate::Marked"),
+        "Item's own impl is gone: {keys:#?}"
+    );
+    // Auto traits follow from field types, private ones included: they stay.
+    for auto in ["core::marker::Send", "core::marker::Sync"] {
+        let key = format!("rust crate::Item impl {auto}");
+        assert!(keys.contains(&key.as_str()), "{key} is gone: {keys:#?}");
+    }
+}

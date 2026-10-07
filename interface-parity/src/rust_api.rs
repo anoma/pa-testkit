@@ -57,6 +57,7 @@ pub fn surface(
         .map_err(|e| anyhow!("{e}\n{}", String::from_utf8_lossy(&stderr)))?;
     let api = public_api::Builder::from_rustdoc_json(rename_crate(&json)?)
         .include_function_parameter_names(true)
+        .omit_blanket_impls(true)
         .build()?;
     let mut s = Surface::default();
     for item in api.items() {
