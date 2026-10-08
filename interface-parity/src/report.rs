@@ -21,9 +21,9 @@ pub struct Report {
     pub failures: Vec<Failure>,
     /// Unexcused differences of paired repositories, packages and interfaces.
     pub unexcused: Vec<Line>,
-    /// Unexcused differences of a repository or package in no pair: every
-    /// item it publishes, compared with nothing. They fail the report like
-    /// any difference and are listed after the paired ones.
+    /// Each repository or package in no pair, as one line counting what it
+    /// publishes. They fail the report like any difference and are listed
+    /// after the paired ones.
     pub unpaired: Vec<Line>,
     pub stale: Vec<Excuse>,
     pub excused: Vec<(Line, Excuse)>,

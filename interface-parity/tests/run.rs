@@ -3,7 +3,7 @@ mod common;
 use std::fmt::Write;
 use std::path::PathBuf;
 
-use interface_parity::compare::Line;
+use interface_parity::compare::{Line, Outcome};
 use interface_parity::run::run;
 
 /// An inputs directory pinning each `(name, side, fixture)` repository at its
@@ -94,22 +94,23 @@ fn the_report_classifies_every_line_of_the_fixture_repositories() {
     ] {
         assert!(has(&report.unexcused, key), "{key} must be unexcused: {md}");
     }
-    assert!(
-        has(&report.unpaired, "ts VERSION VariableDeclaration"),
-        "an unpaired package's export must be listed apart: {md}"
-    );
-    // An unpaired crate's root is on one side only, so its items fold into
-    // the root's line.
-    let root = report
-        .unpaired
-        .iter()
-        .find(|l| l.pair == "evm/cargo:evm-extra (unpaired)" && l.key == "rust crate mod")
-        .unwrap_or_else(|| panic!("the unpaired crate's root must be listed apart: {md}"));
-    assert!(root.inside > 0, "its items fold into it: {root:#?}");
-    assert!(
-        !has(&report.unpaired, "rust crate::unpaired fn"),
-        "an item of the unpaired crate is listed on its own: {md}"
-    );
+    // Everything a package in no pair publishes is on its side only, so the
+    // package is one line, apart from the paired ones, counting its items.
+    for (pair, side) in [
+        ("evm/cargo:evm-extra (unpaired)", Outcome::OnlyEvm),
+        (
+            "solana/npm:@fixture/solana-client (unpaired)",
+            Outcome::OnlySolana,
+        ),
+    ] {
+        let lines: Vec<_> = report.unpaired.iter().filter(|l| l.pair == pair).collect();
+        let [package] = &lines[..] else {
+            panic!("{pair} must be one line: {md}");
+        };
+        assert_eq!(package.key, "package", "{package:#?}");
+        assert_eq!(package.outcome(), side, "{package:#?}");
+        assert!(package.inside > 0, "it counts its items: {package:#?}");
+    }
     assert!(
         !md.contains("unpublished"),
         "publish = false packages are not extracted: {md}"

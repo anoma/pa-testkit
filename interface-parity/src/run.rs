@@ -138,8 +138,20 @@ pub fn run(inputs: &Path, work: &Path) -> anyhow::Result<Report> {
 
     let mut labels = vec![];
     let mut lines = vec![];
-    compare_all(&pairs.repository, &repositories, &mut labels, &mut lines)?;
-    compare_all(&pairs.package, &packages, &mut labels, &mut lines)?;
+    compare_all(
+        &pairs.repository,
+        &repositories,
+        "repository",
+        &mut labels,
+        &mut lines,
+    )?;
+    compare_all(
+        &pairs.package,
+        &packages,
+        "package",
+        &mut labels,
+        &mut lines,
+    )?;
     for (entry, evm, solana) in interfaces {
         compare_interface(entry, evm, solana, &mut labels, &mut lines, &mut failures);
     }
@@ -196,12 +208,14 @@ fn compare_interface(
     labels.push(label);
 }
 
-/// Compares each pair, then each entry in no pair against nothing. A name may
-/// sit in several pairs. Pairs whose either side failed to extract add no
-/// lines; the failure itself is in the report.
+/// Compares each pair, then lists each entry in no pair as one line keyed
+/// `subject`: everything it publishes is on its side only, and the line
+/// counts it. A name may sit in several pairs. Pairs whose either side failed
+/// to extract add no lines; the failure itself is in the report.
 fn compare_all(
     pairs: &[PairEntry],
     surfaces: &Surfaces,
+    subject: &str,
     labels: &mut Vec<String>,
     lines: &mut Vec<Line>,
 ) -> anyhow::Result<()> {
@@ -223,16 +237,23 @@ fn compare_all(
         }
         labels.push(label);
     }
-    let empty = Surface::default();
     for (name, (side, surface)) in surfaces {
         if paired.contains(name) {
             continue;
         }
         let label = format!("{name}{}", crate::report::UNPAIRED);
         if let Some(s) = surface {
-            lines.extend(match side {
-                Side::Evm => compare(&label, s, &empty),
-                Side::Solana => compare(&label, &empty, s),
+            let published = vec!["published".to_owned()];
+            let (evm, solana) = match side {
+                Side::Evm => (published, vec![]),
+                Side::Solana => (vec![], published),
+            };
+            lines.push(Line {
+                pair: label.clone(),
+                key: subject.to_owned(),
+                evm,
+                solana,
+                inside: s.entries().count(),
             });
         }
         labels.push(label);
