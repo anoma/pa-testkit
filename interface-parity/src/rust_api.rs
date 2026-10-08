@@ -176,11 +176,25 @@ fn key(tokens: &[&Token]) -> String {
             )
         })
         .unwrap_or(tokens.len());
-    let end = tokens[start..]
-        .iter()
-        .position(|t| !is_path_token(t))
-        .map_or(tokens.len(), |n| start + n);
-    format!("rust {} {kind}", render(&tokens[start..end]))
+    format!("rust {} {kind}", path(&tokens[start..]))
+}
+
+/// The path at the start of `tokens`, without the generic arguments of its
+/// segments: `crate::Holder<'a, T>::get` is `crate::Holder::get`.
+fn path(tokens: &[&Token]) -> String {
+    let mut path = String::new();
+    let mut depth = 0;
+    for t in tokens {
+        let delta = angle_delta(t);
+        if depth > 0 || delta > 0 {
+            depth += delta;
+        } else if is_path_token(t) {
+            path.push_str(t.text());
+        } else {
+            break;
+        }
+    }
+    path
 }
 
 /// Splits `impl<G> Trait for Self where …` into (`Trait`, `Self`); an

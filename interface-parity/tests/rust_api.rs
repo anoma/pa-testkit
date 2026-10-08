@@ -141,8 +141,9 @@ fn a_blanket_impl_is_listed_where_declared_not_on_each_type() {
 }
 
 /// An item's key is its own path, whatever precedes it in the rendering: two
-/// enums with `#[repr]` attributes are two keys, and a method of an impl on a
-/// primitive type is keyed by the primitive's path.
+/// enums with `#[repr]` attributes are two keys, a method of an impl on a
+/// primitive type is keyed by the primitive's path, and each method of a
+/// generic type by its own name after the type's generic arguments.
 #[test]
 fn an_attribute_or_a_primitive_self_type_keeps_the_items_path_in_its_key() {
     let s = surface("keys-repo", "keys").unwrap();
@@ -153,6 +154,8 @@ fn an_attribute_or_a_primitive_self_type_keeps_the_items_path_in_its_key() {
         "rust crate::Small enum",
         "rust u8::from fn",
         "rust u8 impl core::convert::From<crate::Wrapped>",
+        "rust crate::Holder::get fn",
+        "rust crate::Holder::new fn",
     ] {
         assert!(keys.contains(&key), "no key {key}: {keys:#?}");
     }

@@ -19,3 +19,29 @@ pub enum Small {
 
 /// A wrapped byte.
 pub struct Wrapped(pub u8);
+
+/// A generic holder, whose methods render after its generic arguments.
+pub struct Holder<'a, T>(pub &'a T);
+
+impl<'a, T> Holder<'a, T> {
+    /// The held value.
+    pub fn get(&self) -> &T {
+        self.0
+    }
+
+    /// A holder of `value`.
+    pub fn new(value: &'a T) -> Self {
+        Self(value)
+    }
+}
+
+/// A module holding a type with a method.
+pub mod inner {
+    /// A type in the module.
+    pub struct Inside;
+
+    impl Inside {
+        /// A method of the type.
+        pub fn method(&self) {}
+    }
+}
