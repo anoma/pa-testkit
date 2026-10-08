@@ -137,27 +137,6 @@ pub fn run(inputs: &Path, work: &Path) -> anyhow::Result<Report> {
     Ok(Report::build(labels, failures, fold(lines), excuses))
 }
 
-/// The checkout path under `work` of an interface's file `f`, whose
-/// repository must be pinned on `side`.
-fn interface_file(
-    f: &RepoFile,
-    side: Side,
-    pins: &[crate::inputs::Pin],
-    work: &Path,
-) -> anyhow::Result<std::path::PathBuf> {
-    match pins.iter().find(|pin| pin.name == f.repository) {
-        Some(pin) if pin.side == side => Ok(work.join("repos").join(&f.repository).join(&f.path)),
-        Some(_) => bail!(
-            "{} is an interface's {side:?} side but pinned on the other",
-            f.repository
-        ),
-        None => bail!(
-            "{} is an interface's side but no pinned repository",
-            f.repository
-        ),
-    }
-}
-
 /// Compares an EVM contract's ABI with a Solana program's IDL, each read from
 /// its pinned repository's checkout under `work`. A file that cannot be read
 /// is a failure, and the pair adds no lines.
@@ -169,12 +148,27 @@ fn compare_interface(
     lines: &mut Vec<Line>,
     failures: &mut Vec<Failure>,
 ) -> anyhow::Result<()> {
+    let file = |f: &RepoFile, side: Side| -> anyhow::Result<std::path::PathBuf> {
+        match pins.iter().find(|pin| pin.name == f.repository) {
+            Some(pin) if pin.side == side => {
+                Ok(work.join("repos").join(&f.repository).join(&f.path))
+            }
+            Some(_) => bail!(
+                "{} is an interface's {side:?} side but pinned on the other",
+                f.repository
+            ),
+            None => bail!(
+                "{} is an interface's side but no pinned repository",
+                f.repository
+            ),
+        }
+    };
     let label = format!(
         "{}/{} ↔ {}/{}",
         entry.abi.repository, entry.abi.path, entry.idl.repository, entry.idl.path
     );
-    let evm = interface::abi_file(&interface_file(&entry.abi, Side::Evm, pins, work)?);
-    let solana = interface::idl_file(&interface_file(&entry.idl, Side::Solana, pins, work)?);
+    let evm = interface::abi_file(&file(&entry.abi, Side::Evm)?);
+    let solana = interface::idl_file(&file(&entry.idl, Side::Solana)?);
     match (evm, solana) {
         (Ok(evm), Ok(solana)) => lines.extend(compare(&label, &evm, &solana)),
         (evm, solana) => {
