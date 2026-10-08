@@ -1,3 +1,4 @@
+use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -27,15 +28,23 @@ fn nightly_binary(name: &str) -> anyhow::Result<PathBuf> {
     Ok(PathBuf::from(path.trim()))
 }
 
+/// A crate's public API: its items keyed for comparison, and which file
+/// declares each of them.
+#[derive(Debug, Default)]
+pub struct RustApi {
+    pub surface: Surface,
+    /// Each source file, as rustdoc names it (relative to the workspace
+    /// root), with the (key, rendering) of every item it declares. An impl
+    /// the compiler supplies, like `Send`, is declared in no file.
+    pub declared: BTreeMap<PathBuf, Vec<(String, String)>>,
+}
+
 /// The public API of the package's library target, built with all features
 /// and the repository's build environment `env`. A package without a library
 /// target exposes no Rust items.
-pub fn surface(
-    meta: &cargo_metadata::Package,
-    env: &[(String, String)],
-) -> anyhow::Result<Surface> {
+pub fn api(meta: &cargo_metadata::Package, env: &[(String, String)]) -> anyhow::Result<RustApi> {
     if !has_lib(meta) {
-        return Ok(Surface::default());
+        return Ok(RustApi::default());
     }
     let (mut stdout, mut stderr) = (Vec::new(), Vec::new());
     // rustdoc JSON only loads dependencies compiled by the same rustc, so both
@@ -55,23 +64,32 @@ pub fn surface(
         .all_features(true)
         .build_with_captured_output(&mut stdout, &mut stderr)
         .map_err(|e| anyhow!("{e}\n{}", String::from_utf8_lossy(&stderr)))?;
-    let api = public_api::Builder::from_rustdoc_json(rename_crate(&json)?)
+    let (renamed, files) = rename_crate(&json)?;
+    let public = public_api::Builder::from_rustdoc_json(renamed)
         .include_function_parameter_names(true)
         .omit_blanket_impls(true)
         .build()?;
-    let mut s = Surface::default();
-    for item in api.items() {
+    let mut api = RustApi::default();
+    for item in public.items() {
         let tokens: Vec<&Token> = item.tokens().collect();
-        s.insert(key(&tokens), item.to_string());
+        let (key, rendered) = (key(&tokens), item.to_string());
+        if let Some(file) = files.get(&item.id().0) {
+            api.declared
+                .entry(file.clone())
+                .or_default()
+                .push((key.clone(), rendered.clone()));
+        }
+        api.surface.insert(key, rendered);
     }
-    Ok(s)
+    Ok(api)
 }
 
 /// Writes a copy of the rustdoc JSON in which the documented crate is named
-/// `crate`, so the paths of paired crates with different names line up. Like
+/// `crate`, so the paths of paired crates with different names line up, and
+/// returns it with the file declaring each item of the crate, by item id. Like
 /// `public-api`, it reads the JSON without serde_json's recursion limit, which
 /// deeply nested types exceed.
-fn rename_crate(json: &Path) -> anyhow::Result<PathBuf> {
+fn rename_crate(json: &Path) -> anyhow::Result<(PathBuf, HashMap<u32, PathBuf>)> {
     let text =
         std::fs::read_to_string(json).with_context(|| format!("reading {}", json.display()))?;
     let mut de = serde_json::Deserializer::from_str(&text);
@@ -90,10 +108,22 @@ fn rename_crate(json: &Path) -> anyhow::Result<PathBuf> {
             summary["path"][0] = "crate".into();
         }
     }
+    let mut files = HashMap::new();
+    for (id, item) in doc["index"].as_object().into_iter().flatten() {
+        if item["crate_id"] != 0 {
+            continue;
+        }
+        if let Some(file) = item["span"]["filename"].as_str() {
+            let id = id
+                .parse()
+                .with_context(|| format!("{} has the item id {id}", json.display()))?;
+            files.insert(id, PathBuf::from(file));
+        }
+    }
     let renamed = json.with_extension("crate.json");
     std::fs::write(&renamed, serde_json::to_vec(&doc)?)
         .with_context(|| format!("writing {}", renamed.display()))?;
-    Ok(renamed)
+    Ok((renamed, files))
 }
 
 fn render(tokens: &[&Token]) -> String {

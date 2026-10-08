@@ -5,6 +5,7 @@ use interface_parity::compare::{Outcome, Surface, compare};
 use interface_parity::fetch;
 use interface_parity::generated::{self, ForgeBindModule};
 use interface_parity::inputs::Foundry;
+use interface_parity::rust_api::RustApi;
 
 /// The fixture crate source: `forge bind` v1.8.5's module for a small
 /// contract (`generated/token.rs`), a copy of it with one hand-written
@@ -103,10 +104,23 @@ fn forge_bind_reproduces_the_module_it_wrote_and_not_a_hand_edited_copy() {
     assert!(!generated::reproduces(&module("edited.rs"), &forge).unwrap());
 }
 
+/// An API of the given items, declared in no file.
+fn api(items: &[(&str, &str)]) -> RustApi {
+    let mut api = RustApi::default();
+    for (key, value) in items {
+        api.surface.insert(*key, *value);
+    }
+    api
+}
+
+/// The fixture module `name`'s file.
+fn file(name: &str) -> PathBuf {
+    fixture_src().join("generated").join(name)
+}
+
 #[test]
 fn collapsing_replaces_a_modules_rust_items_with_its_abi_and_keeps_every_other_item() {
-    let mut surface = Surface::default();
-    for (key, value) in [
+    let mut api = api(&[
         (
             "rust crate::generated::token::Token::transferCall struct",
             "pub struct crate::generated::token::Token::transferCall",
@@ -124,13 +138,17 @@ fn collapsing_replaces_a_modules_rust_items_with_its_abi_and_keeps_every_other_i
             "pub fn crate::generated::tokens()",
         ),
         ("rust crate::deployments fn", "pub fn crate::deployments()"),
-    ] {
-        surface.insert(key, value);
-    }
+    ]);
 
-    generated::collapse(&mut surface, "crate::generated::token", &module("token.rs")).unwrap();
+    generated::collapse(
+        &mut api,
+        "crate::generated::token",
+        &file("token.rs"),
+        &module("token.rs"),
+    )
+    .unwrap();
 
-    let got = items(&surface);
+    let got = items(&api.surface);
     let keys: Vec<&str> = got.iter().map(|(k, _)| k.as_str()).collect();
     assert_eq!(
         keys,
@@ -163,28 +181,96 @@ fn collapsing_replaces_a_modules_rust_items_with_its_abi_and_keeps_every_other_i
 
 #[test]
 fn collapsing_a_module_the_api_does_not_have_is_an_error() {
-    let mut surface = Surface::default();
-    surface.insert("rust crate::deployments fn", "pub fn crate::deployments()");
-    let err = generated::collapse(&mut surface, "crate::generated::token", &module("token.rs"))
-        .unwrap_err();
+    let mut api = api(&[("rust crate::deployments fn", "pub fn crate::deployments()")]);
+    let err = generated::collapse(
+        &mut api,
+        "crate::generated::token",
+        &file("token.rs"),
+        &module("token.rs"),
+    )
+    .unwrap_err();
     assert!(
         format!("{err:#}").contains("crate::generated::token"),
         "{err:#}"
     );
 }
 
+/// The items a module's file declares go with it wherever their path puts
+/// them: an impl of a foreign trait on a primitive, and an impl on a type
+/// from another crate. The same items declared in another file stay.
+#[test]
+fn collapsing_takes_the_items_the_modules_file_declares_and_keeps_those_of_other_files() {
+    let generated = [
+        (
+            "rust u8 impl core::convert::From<crate::generated::token::Token::Kind>",
+            "impl core::convert::From<crate::generated::token::Token::Kind> for u8",
+        ),
+        (
+            "rust u8::from fn",
+            "pub fn u8::from(value: crate::generated::token::Token::Kind) -> Self",
+        ),
+        (
+            "rust alloy_primitives::log::LogData impl core::convert::From<&crate::generated::token::Token::Transferred>",
+            "impl core::convert::From<&crate::generated::token::Token::Transferred> for alloy_primitives::log::LogData",
+        ),
+    ];
+    let hand_written = (
+        "rust u8::from fn",
+        "pub fn u8::from(value: crate::Code) -> Self",
+    );
+    let mut api = api(&[
+        generated[0],
+        generated[1],
+        generated[2],
+        hand_written,
+        (
+            "rust crate::generated::token mod",
+            "pub mod crate::generated::token",
+        ),
+    ]);
+    let declared = |items: &[(&str, &str)]| {
+        items
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect()
+    };
+    api.declared
+        .insert("src/generated/token.rs".into(), declared(&generated));
+    api.declared
+        .insert("src/conv.rs".into(), declared(&[hand_written]));
+
+    generated::collapse(
+        &mut api,
+        "crate::generated::token",
+        &file("token.rs"),
+        &module("token.rs"),
+    )
+    .unwrap();
+
+    let got = items(&api.surface);
+    let rust: Vec<_> = got.iter().filter(|(k, _)| k.starts_with("rust ")).collect();
+    assert_eq!(
+        rust,
+        vec![&(
+            "rust u8::from fn".to_owned(),
+            vec![hand_written.1.to_owned()]
+        )],
+        "only the item declared in another file stays: {got:#?}"
+    );
+}
+
 #[test]
 fn a_crates_reproduced_modules_collapse_and_the_others_stay_item_by_item() {
-    let mut surface = Surface::default();
+    let mut api = RustApi::default();
     for module in ["token", "edited"] {
-        surface.insert(
+        api.surface.insert(
             format!("rust crate::generated::{module}::Token::transferCall struct"),
             format!("pub struct crate::generated::{module}::Token::transferCall"),
         );
     }
-    let notes = generated::collapse_crate(&mut surface, &fixture_src(), Some(&forge())).unwrap();
+    let notes = generated::collapse_crate(&mut api, &fixture_src(), Some(&forge())).unwrap();
 
-    let keys: Vec<String> = items(&surface).into_iter().map(|(k, _)| k).collect();
+    let keys: Vec<String> = items(&api.surface).into_iter().map(|(k, _)| k).collect();
     assert!(
         keys.contains(&"rust crate::generated::edited::Token::transferCall struct".into()),
         "the hand-edited module keeps its items: {keys:#?}"
@@ -204,16 +290,15 @@ fn a_crates_reproduced_modules_collapse_and_the_others_stay_item_by_item() {
 
 #[test]
 fn without_a_pinned_foundry_every_module_stays_item_by_item_and_is_noted() {
-    let mut surface = Surface::default();
-    surface.insert(
+    let mut api = api(&[(
         "rust crate::generated::token::Token::transferCall struct",
         "pub struct crate::generated::token::Token::transferCall",
-    );
-    let before = surface.clone();
-    let notes = generated::collapse_crate(&mut surface, &fixture_src(), None).unwrap();
-    assert_eq!(surface, before);
+    )]);
+    let before = api.surface.clone();
+    let notes = generated::collapse_crate(&mut api, &fixture_src(), None).unwrap();
+    assert_eq!(api.surface, before);
     assert_eq!(notes.len(), 2, "one note per module: {notes:#?}");
     assert!(notes.iter().all(|n| n.contains("Foundry")), "{notes:#?}");
-    let lines = compare("x", &surface, &Surface::default());
+    let lines = compare("x", &api.surface, &Surface::default());
     assert!(lines.iter().all(|l| l.outcome() == Outcome::OnlyEvm));
 }

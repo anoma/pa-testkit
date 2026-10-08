@@ -24,6 +24,22 @@ impl Surface {
         before - self.0.len()
     }
 
+    /// Removes one `value` from under `key`, and the key once it holds no
+    /// value. Returns whether there was one to remove.
+    pub fn remove(&mut self, key: &str, value: &str) -> bool {
+        let Some(values) = self.0.get_mut(key) else {
+            return false;
+        };
+        let Some(at) = values.iter().position(|v| v == value) else {
+            return false;
+        };
+        values.remove(at);
+        if values.is_empty() {
+            self.0.remove(key);
+        }
+        true
+    }
+
     /// Each key with its values, in key order.
     pub fn entries(&self) -> impl Iterator<Item = (&String, &Vec<String>)> {
         self.0.iter()

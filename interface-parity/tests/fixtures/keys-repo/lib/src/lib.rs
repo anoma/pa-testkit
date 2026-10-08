@@ -1,5 +1,7 @@
 //! Items whose rendering starts with an attribute, and an impl on a
-//! primitive type with its method.
+//! primitive type with its method, declared in another file.
+
+mod conv;
 
 /// An enum with an explicit representation.
 #[repr(u32)]
@@ -17,9 +19,3 @@ pub enum Small {
 
 /// A wrapped byte.
 pub struct Wrapped(pub u8);
-
-impl From<Wrapped> for u8 {
-    fn from(w: Wrapped) -> u8 {
-        w.0
-    }
-}

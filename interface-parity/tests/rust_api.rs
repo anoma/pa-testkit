@@ -7,12 +7,16 @@ use interface_parity::packages::{Kind, discover};
 use interface_parity::rust_api;
 
 /// The Rust API of the first package of the fixture repository.
-fn surface(fixture: &str, repo: &str) -> anyhow::Result<Surface> {
+fn api(fixture: &str, repo: &str) -> anyhow::Result<rust_api::RustApi> {
     let (packages, _) = discover(repo, &checkout(fixture));
     let Kind::Cargo(meta) = &packages[0].kind else {
         panic!("{:?} is not a Cargo package", packages[0].id);
     };
-    rust_api::surface(meta, &[])
+    rust_api::api(meta, &[])
+}
+
+fn surface(fixture: &str, repo: &str) -> anyhow::Result<Surface> {
+    api(fixture, repo).map(|api| api.surface)
 }
 
 #[test]
@@ -85,7 +89,7 @@ fn a_crate_reading_the_build_environment_documents_with_it() {
     let Kind::Cargo(meta) = &packages[0].kind else {
         panic!("{:?} is not a Cargo package", packages[0].id);
     };
-    let error = rust_api::surface(meta, &[]).expect_err("FIXTURE_PROGRAM_ID is unset");
+    let error = rust_api::api(meta, &[]).expect_err("FIXTURE_PROGRAM_ID is unset");
     assert!(
         format!("{error:#}").contains("FIXTURE_PROGRAM_ID"),
         "the failure names the variable: {error:#}"
@@ -99,7 +103,7 @@ fn a_crate_reading_the_build_environment_documents_with_it() {
             "Fixture1111111111111111111111111111111111111".to_owned()
         )]
     );
-    let s = rust_api::surface(meta, &env).unwrap();
+    let s = rust_api::api(meta, &env).unwrap().surface;
     let lines = compare("p", &s, &Surface::default());
     assert!(
         lines.iter().any(|l| l.key == "rust crate::ID const"),
@@ -155,5 +159,46 @@ fn an_attribute_or_a_primitive_self_type_keeps_the_items_path_in_its_key() {
     assert!(
         !keys.iter().any(|k| k.starts_with("rust  ")),
         "an item keyed with an empty path: {keys:#?}"
+    );
+}
+
+/// Each item is recorded under the file that declares it, wherever its path
+/// puts it: the impl on `u8` and its method under `src/conv.rs`. An impl the
+/// compiler supplies, like `Send`, is declared in no file.
+#[test]
+fn each_item_is_recorded_under_the_file_declaring_it() {
+    let api = api("keys-repo", "keys").unwrap();
+    let keys_in = |file: &str| -> Vec<&str> {
+        api.declared
+            .get(std::path::Path::new(file))
+            .unwrap_or_else(|| panic!("nothing declared in {file}: {:#?}", api.declared))
+            .iter()
+            .map(|(key, _)| key.as_str())
+            .collect()
+    };
+    let conv = keys_in("src/conv.rs");
+    for key in [
+        "rust u8 impl core::convert::From<crate::Wrapped>",
+        "rust u8::from fn",
+    ] {
+        assert!(
+            conv.contains(&key),
+            "{key} is not declared in src/conv.rs: {conv:#?}"
+        );
+    }
+    assert!(
+        keys_in("src/lib.rs").contains(&"rust crate::Wrapped struct"),
+        "{:#?}",
+        api.declared
+    );
+    let send = "rust crate::Wrapped impl core::marker::Send";
+    assert!(
+        api.surface.entries().any(|(key, _)| key == send),
+        "{send} is in the API"
+    );
+    assert!(
+        !api.declared.values().flatten().any(|(key, _)| key == send),
+        "{send} is declared in a file: {:#?}",
+        api.declared
     );
 }

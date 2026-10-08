@@ -72,7 +72,9 @@ fn a_crate_a_registry_cannot_take_ships_no_files_but_still_has_its_api() {
     let lines = compare("p", &files, &Default::default());
     assert!(lines.is_empty(), "{lines:#?}");
 
-    let surface = interface_parity::run::package_surface(pkg, &work, &[]).unwrap();
+    let surface = interface_parity::run::package_surface(pkg, &work, &[], None)
+        .unwrap()
+        .0;
     let lines = compare("p", &surface, &Default::default());
     assert!(
         lines

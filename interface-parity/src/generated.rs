@@ -14,7 +14,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use anyhow::{Context, bail, ensure};
 use serde_json::Value;
 
-use crate::compare::Surface;
+use crate::rust_api::RustApi;
 use crate::{cmd, interface};
 
 /// A module `forge bind` wrote, with the inputs it embeds: the contract's
@@ -191,15 +191,31 @@ pub fn module_path(src: &Path, file: &Path) -> anyhow::Result<String> {
 }
 
 /// Replaces the Rust items of `module`, the `forge bind` module at the Rust
-/// path `path`, with the entries of the ABI it was generated from, the
-/// contract it binds and which bytecode it carries. A path with no items in
-/// `surface` is an error: the module would compare as nothing at all.
-pub fn collapse(surface: &mut Surface, path: &str, module: &ForgeBindModule) -> anyhow::Result<()> {
+/// path `path` written to `file`, with the entries of the ABI it was
+/// generated from, the contract it binds and which bytecode it carries. Its
+/// items are those under its path, and those `file` declares wherever their
+/// path puts them, like its conversions of primitives. A module with no items
+/// in `api` is an error: it would compare as nothing at all.
+pub fn collapse(
+    api: &mut RustApi,
+    path: &str,
+    file: &Path,
+    module: &ForgeBindModule,
+) -> anyhow::Result<()> {
     let abi = interface::abi_surface(&module.abi)?;
+    let mut removed = api.surface.remove_rust_module(path);
+    for (declaring, items) in &api.declared {
+        if file.ends_with(declaring) {
+            for (key, value) in items {
+                removed += usize::from(api.surface.remove(key, value));
+            }
+        }
+    }
     ensure!(
-        surface.remove_rust_module(path) > 0,
+        removed > 0,
         "the crate's API has no items under {path}, the module forge bind wrote"
     );
+    let surface = &mut api.surface;
     let key = |entry: &str| format!("forge bind {path} {entry}");
     surface.insert(key("contract"), module.contract.clone());
     for (name, code) in [
@@ -222,7 +238,7 @@ pub fn collapse(surface: &mut Surface, path: &str, module: &ForgeBindModule) -> 
 /// `forge` reproduces, and returns a note for each module left item by item:
 /// one `forge` does not reproduce, or, with no pinned `forge`, every module.
 pub fn collapse_crate(
-    surface: &mut Surface,
+    api: &mut RustApi,
     src: &Path,
     forge: Option<&Path>,
 ) -> anyhow::Result<Vec<String>> {
@@ -237,7 +253,7 @@ pub fn collapse_crate(
                 "{path} is a forge bind module, compared item by item: the repository pins no \
                  Foundry release to reproduce it from its ABI"
             )),
-            Some(forge) if reproduces(&module, forge)? => collapse(surface, &path, &module)?,
+            Some(forge) if reproduces(&module, forge)? => collapse(api, &path, &file, &module)?,
             Some(forge) => notes.push(format!(
                 "{path} is not what {} writes from its embedded ABI and bytecode, so it is \
                  compared item by item",
