@@ -4,7 +4,7 @@ use std::process::Command;
 
 use anyhow::{Context, bail};
 
-use crate::compare::{Line, Surface, compare};
+use crate::compare::{Line, Surface, compare, fold};
 use crate::inputs::{InterfaceEntry, PairEntry, Pairs, RepoFile, Side, load_env, load_pins, read};
 use crate::packages::{Kind, Package, cargo_metadata_surface, discover};
 use crate::report::{Failure, Report};
@@ -143,7 +143,7 @@ pub fn run(inputs: &Path, work: &Path) -> anyhow::Result<Report> {
     for (entry, evm, solana) in interfaces {
         compare_interface(entry, evm, solana, &mut labels, &mut lines, &mut failures);
     }
-    Ok(Report::build(labels, failures, lines, excuses))
+    Ok(Report::build(labels, failures, fold(lines), excuses))
 }
 
 /// The checkout path under `work` of an interface's file `f`, whose

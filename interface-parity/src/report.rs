@@ -169,6 +169,14 @@ fn write_lines<'a>(
         for v in &line.solana {
             writeln!(out, "    Solana: {v}").unwrap();
         }
+        if line.inside > 0 {
+            writeln!(
+                out,
+                "    and {} items inside it, on the same side",
+                line.inside
+            )
+            .unwrap();
+        }
         if let Some(e) = excuse {
             writeln!(out, "    excused by {}: {}", e.id, e.reason).unwrap();
         }
@@ -277,6 +285,20 @@ mod tests {
         assert!(
             !Report::build(vec![], vec![], vec![unpaired], vec![]).passes(),
             "an unpaired difference fails the report"
+        );
+    }
+
+    #[test]
+    fn a_container_line_says_how_many_items_were_folded_into_it() {
+        let mut container = line("rust crate::E enum", &[], &["pub enum crate::E"]);
+        container.inside = 3;
+        let md = Report::build(vec!["E ↔ S".into()], vec![], vec![container], vec![]).to_markdown();
+        assert!(
+            md.contains(
+                "only on Solana  rust crate::E enum\n    Solana: pub enum crate::E\n    \
+                 and 3 items inside it, on the same side\n"
+            ),
+            "{md}"
         );
     }
 

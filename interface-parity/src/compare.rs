@@ -79,6 +79,9 @@ pub struct Line {
     pub key: String,
     pub evm: Vec<String>,
     pub solana: Vec<String>,
+    /// How many items inside this one-sided container were folded into it
+    /// ([`fold`]).
+    pub inside: usize,
 }
 
 impl Line {
@@ -101,8 +104,84 @@ pub fn compare(pair: &str, evm: &Surface, solana: &Surface) -> Vec<Line> {
             key: key.clone(),
             evm: evm.0.get(key).cloned().unwrap_or_default(),
             solana: solana.0.get(key).cloned().unwrap_or_default(),
+            inside: 0,
         })
         .collect()
+}
+
+/// The Rust item kinds that hold other items.
+const CONTAINERS: &[&str] = &["mod", "struct", "enum", "union", "trait"];
+
+/// A Rust key's path and whether it names an impl: `rust <path> <kind>`, or
+/// `rust <self type> impl <trait>` with the self type's generics dropped.
+fn rust_path(key: &str) -> Option<(&str, bool)> {
+    let rest = key.strip_prefix("rust ")?;
+    let (path, tail) = rest.split_once(' ')?;
+    let is_impl = tail == "impl" || tail.starts_with("impl ");
+    let path = if is_impl {
+        path.split_once('<').map_or(path, |(path, _)| path)
+    } else {
+        path
+    };
+    Some((path, is_impl))
+}
+
+/// Folds each line into the outermost container of its pair that only the
+/// same side has and that holds it: its members and the items under its path,
+/// and the impls on it. Such an item is necessarily on that side only too, so
+/// the container's line, which counts it, says all it would.
+pub fn fold(lines: Vec<Line>) -> Vec<Line> {
+    let containers: BTreeSet<(String, bool, String)> = lines
+        .iter()
+        .filter(|l| matches!(l.outcome(), Outcome::OnlyEvm | Outcome::OnlySolana))
+        .filter_map(|l| {
+            let (path, is_impl) = rust_path(&l.key)?;
+            let kind = l.key.rsplit(' ').next()?;
+            (!is_impl && CONTAINERS.contains(&kind)).then(|| {
+                (
+                    l.pair.clone(),
+                    l.outcome() == Outcome::OnlyEvm,
+                    path.to_owned(),
+                )
+            })
+        })
+        .collect();
+    // The outermost container holding `line`, by its path.
+    let holder = |line: &Line| -> Option<String> {
+        let side = match line.outcome() {
+            Outcome::OnlyEvm => true,
+            Outcome::OnlySolana => false,
+            _ => return None,
+        };
+        let (path, is_impl) = rust_path(&line.key)?;
+        let segments: Vec<&str> = path.split("::").collect();
+        // An impl is held by its self type; any other item only by a
+        // container strictly above it.
+        let deepest = if is_impl {
+            segments.len()
+        } else {
+            segments.len() - 1
+        };
+        (1..=deepest)
+            .map(|n| segments[..n].join("::"))
+            .find(|prefix| containers.contains(&(line.pair.clone(), side, prefix.clone())))
+    };
+    let mut counts: BTreeMap<(String, String), usize> = BTreeMap::new();
+    let mut kept = vec![];
+    for line in lines {
+        match holder(&line) {
+            Some(path) => *counts.entry((line.pair.clone(), path)).or_default() += 1,
+            None => kept.push(line),
+        }
+    }
+    for line in &mut kept {
+        if let Some((path, false)) = rust_path(&line.key) {
+            line.inside = counts
+                .remove(&(line.pair.clone(), path.to_owned()))
+                .unwrap_or(0);
+        }
+    }
+    kept
 }
 
 /// A line of the pair `E ↔ S`, for tests.
@@ -113,6 +192,7 @@ pub(crate) fn test_line(key: &str, evm: &[&str], solana: &[&str]) -> Line {
         key: key.into(),
         evm: evm.iter().map(|s| s.to_string()).collect(),
         solana: solana.iter().map(|s| s.to_string()).collect(),
+        inside: 0,
     }
 }
 
@@ -149,6 +229,59 @@ mod tests {
         );
         assert_eq!(lines[1].evm, vec!["1"]);
         assert_eq!(lines[1].solana, vec!["2"]);
+    }
+
+    /// The pair `E ↔ S`'s lines for `keys`, each only on the side named.
+    fn one_sided(keys: &[(&str, Outcome)]) -> Vec<Line> {
+        keys.iter()
+            .map(|(key, side)| match side {
+                Outcome::OnlyEvm => test_line(key, &["e"], &[]),
+                Outcome::OnlySolana => test_line(key, &[], &["s"]),
+                _ => test_line(key, &["e"], &["s"]),
+            })
+            .collect()
+    }
+
+    /// An item inside a container that only one side has is only on that
+    /// side too, so it folds into the outermost such container's count: its
+    /// members and the items under its path, and impls on it, generic or
+    /// not. Items on the other side, items that differ, and a container
+    /// whose name only starts the same stay.
+    #[test]
+    fn items_inside_a_one_sided_container_fold_into_its_count() {
+        use Outcome::{Differs, OnlyEvm, OnlySolana};
+        let lines = one_sided(&[
+            ("rust crate::E enum", OnlySolana),
+            ("rust crate::E::A member", OnlySolana),
+            ("rust crate::E impl core::marker::Send", OnlySolana),
+            ("rust crate::E::B member", OnlyEvm),
+            ("rust crate::E::d fn", Differs),
+            ("rust crate::Ex struct", OnlySolana),
+            ("rust crate::G struct", OnlySolana),
+            ("rust crate::G<T> impl core::clone::Clone", OnlySolana),
+            ("rust crate::m mod", OnlySolana),
+            ("rust crate::m::S struct", OnlySolana),
+            ("rust crate::m::S::f fn", OnlySolana),
+            ("rust crate::m::S impl core::marker::Sync", OnlySolana),
+            ("fn settle", OnlySolana),
+        ]);
+
+        let folded = fold(lines);
+
+        let got: Vec<(&str, usize)> = folded.iter().map(|l| (l.key.as_str(), l.inside)).collect();
+        assert_eq!(
+            got,
+            vec![
+                ("rust crate::E enum", 2),
+                ("rust crate::E::B member", 0),
+                ("rust crate::E::d fn", 0),
+                ("rust crate::Ex struct", 0),
+                ("rust crate::G struct", 1),
+                ("rust crate::m mod", 3),
+                ("fn settle", 0),
+            ],
+            "{folded:#?}"
+        );
     }
 
     #[test]

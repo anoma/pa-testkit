@@ -94,12 +94,22 @@ fn the_report_classifies_every_line_of_the_fixture_repositories() {
     ] {
         assert!(has(&report.unexcused, key), "{key} must be unexcused: {md}");
     }
-    for key in ["rust crate::unpaired fn", "ts VERSION VariableDeclaration"] {
-        assert!(
-            has(&report.unpaired, key),
-            "{key}, of an unpaired package, must be listed apart: {md}"
-        );
-    }
+    assert!(
+        has(&report.unpaired, "ts VERSION VariableDeclaration"),
+        "an unpaired package's export must be listed apart: {md}"
+    );
+    // An unpaired crate's root is on one side only, so its items fold into
+    // the root's line.
+    let root = report
+        .unpaired
+        .iter()
+        .find(|l| l.pair == "evm/cargo:evm-extra (unpaired)" && l.key == "rust crate mod")
+        .unwrap_or_else(|| panic!("the unpaired crate's root must be listed apart: {md}"));
+    assert!(root.inside > 0, "its items fold into it: {root:#?}");
+    assert!(
+        !has(&report.unpaired, "rust crate::unpaired fn"),
+        "an item of the unpaired crate is listed on its own: {md}"
+    );
     assert!(
         !md.contains("unpublished"),
         "publish = false packages are not extracted: {md}"
