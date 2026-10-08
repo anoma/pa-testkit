@@ -110,12 +110,31 @@ fn package_dir(work: &Path, pkg: &Package, what: &str) -> PathBuf {
     work.join(what).join(pkg.id.replace(['/', ':', '@'], "_"))
 }
 
-/// The non-source files of the `.crate` archive `cargo package` builds.
+/// Whether a registry can take the crate: cargo packages a crate only when
+/// every dependency it keeps names a version, and a git or path dependency
+/// without one leaves the crate to consumers who take it from git, with no
+/// archive. Development dependencies do not count; packaging drops those
+/// without a version.
+fn registry_can_take(meta: &cargo_metadata::Package) -> bool {
+    meta.dependencies.iter().all(|dep| {
+        dep.kind == cargo_metadata::DependencyKind::Development
+            || dep.req != semver::VersionReq::STAR
+            || dep.source.as_ref().is_some_and(|source| {
+                source.repr.starts_with("registry+") || source.repr.starts_with("sparse+")
+            })
+    })
+}
+
+/// The non-source files of the `.crate` archive `cargo package` builds; none
+/// for a crate a registry cannot take ([`registry_can_take`]).
 pub fn cargo_files(
     pkg: &Package,
     meta: &cargo_metadata::Package,
     work: &Path,
 ) -> anyhow::Result<Surface> {
+    if !registry_can_take(meta) {
+        return Ok(Surface::default());
+    }
     let target = package_dir(work, pkg, "cargo-package");
     cmd::stdout(
         Command::new("cargo")

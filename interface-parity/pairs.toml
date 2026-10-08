@@ -16,3 +16,13 @@ solana = "anoma-pa-solana-client/cargo:anoma-pa-solana-client"
 [[package]]
 evm = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings"
 solana = "anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+
+# An EVM contract's ABI (as its bindings embed it) and the Solana program's
+# Anchor IDL (as its client ships it), compared entry by entry.
+[[interface]]
+abi = { repository = "pa-evm", path = "crates/bindings/src/generated/protocol_adapter.rs" }
+idl = { repository = "anoma-pa-solana-client", path = "idl/protocol_adapter.json" }
+
+[[interface]]
+abi = { repository = "anomapay-erc20-forwarder", path = "crates/bindings/src/generated/erc20_forwarder.rs" }
+idl = { repository = "anomapay-spl-token-forwarder", path = "crates/client/idl/spl_token_forwarder.json" }

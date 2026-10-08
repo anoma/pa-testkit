@@ -1,0 +1,11 @@
+[package]
+name = "unversioned-client"
+version = "1.0.0"
+edition = "2024"
+
+# A dependency with no version, as a git or path dependency without one: a
+# registry cannot take this crate, so it is consumed from git.
+[dependencies]
+unversioned-core = { path = "../core" }
+
+[workspace]

@@ -12,7 +12,7 @@ fn surface(fixture: &str, repo: &str) -> anyhow::Result<Surface> {
     let Kind::Cargo(meta) = &packages[0].kind else {
         panic!("{:?} is not a Cargo package", packages[0].id);
     };
-    rust_api::surface(meta)
+    rust_api::surface(meta, &[])
 }
 
 #[test]
@@ -74,4 +74,64 @@ fn items_pair_by_path_with_the_crate_name_replaced() {
 fn a_package_that_fails_to_build_is_an_error_carrying_the_compiler_output() {
     let err = format!("{:#}", surface("broken-repo", "broken").unwrap_err());
     assert!(err.contains("cannot find type `NoSuchType`"), "{err}");
+}
+
+/// A crate that takes a value from the build environment documents only
+/// with its repository's build environment set.
+#[test]
+fn a_crate_reading_the_build_environment_documents_with_it() {
+    let dir = checkout("env-repo");
+    let (packages, _) = discover("env", &dir);
+    let Kind::Cargo(meta) = &packages[0].kind else {
+        panic!("{:?} is not a Cargo package", packages[0].id);
+    };
+    let error = rust_api::surface(meta, &[]).expect_err("FIXTURE_PROGRAM_ID is unset");
+    assert!(
+        format!("{error:#}").contains("FIXTURE_PROGRAM_ID"),
+        "the failure names the variable: {error:#}"
+    );
+
+    let env = interface_parity::inputs::load_env(&dir.join("env/localnet.env")).unwrap();
+    assert_eq!(
+        env,
+        vec![(
+            "FIXTURE_PROGRAM_ID".to_owned(),
+            "Fixture1111111111111111111111111111111111111".to_owned()
+        )]
+    );
+    let s = rust_api::surface(meta, &env).unwrap();
+    let lines = compare("p", &s, &Surface::default());
+    assert!(
+        lines.iter().any(|l| l.key == "rust crate::ID const"),
+        "the documented API holds ID: {lines:#?}"
+    );
+}
+
+/// A blanket impl is listed where it is declared, and not again on each type
+/// it covers: whether a type has it follows from the declaration (the
+/// crate's own, or a dependency's) and the type's own impls, which stay.
+#[test]
+fn a_blanket_impl_is_listed_where_declared_not_on_each_type() {
+    let s = surface("blanket-repo", "blanket").unwrap();
+    let lines = compare("p", &s, &Surface::default());
+    let keys: Vec<&str> = lines.iter().map(|l| l.key.as_str()).collect();
+    assert!(
+        !keys.iter().any(|k| k.contains("impl core::convert::Into")
+            || k.contains("impl alloc::borrow::ToOwned")
+            || k.contains("impl core::borrow::Borrow")),
+        "an item from another crate's blanket impl: {keys:#?}"
+    );
+    assert!(
+        keys.contains(&"rust T impl crate::Labelled"),
+        "the crate's own blanket impl is gone: {keys:#?}"
+    );
+    assert!(
+        keys.contains(&"rust crate::Item impl crate::Marked"),
+        "Item's own impl is gone: {keys:#?}"
+    );
+    // Auto traits follow from field types, private ones included: they stay.
+    for auto in ["core::marker::Send", "core::marker::Sync"] {
+        let key = format!("rust crate::Item impl {auto}");
+        assert!(keys.contains(&key.as_str()), "{key} is gone: {keys:#?}");
+    }
 }

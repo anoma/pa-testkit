@@ -1,0 +1,7 @@
+[package]
+name = "unversioned-core"
+version = "1.0.0"
+edition = "2024"
+publish = false
+
+[workspace]

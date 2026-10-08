@@ -91,10 +91,14 @@ fn the_report_classifies_every_line_of_the_fixture_repositories() {
         "rust crate::addresses::adapter_address fn",
         "rust crate::addresses::only_on_evm fn",
         "tag-prefix contracts/v",
-        "rust crate::unpaired fn",
-        "ts VERSION VariableDeclaration",
     ] {
         assert!(has(&report.unexcused, key), "{key} must be unexcused: {md}");
+    }
+    for key in ["rust crate::unpaired fn", "ts VERSION VariableDeclaration"] {
+        assert!(
+            has(&report.unpaired, key),
+            "{key}, of an unpaired package, must be listed apart: {md}"
+        );
     }
     assert!(
         !md.contains("unpublished"),
@@ -165,7 +169,7 @@ fn a_package_that_fails_to_extract_is_a_failure_and_the_rest_is_still_compared()
     );
     assert!(
         report
-            .unexcused
+            .unpaired
             .iter()
             .any(|l| l.pair == "evm/cargo:evm-extra (unpaired)"),
         "{md}"
