@@ -6,7 +6,7 @@ use anyhow::{Context, bail};
 
 use crate::compare::{Line, Surface, compare, fold};
 use crate::inputs::{InterfaceEntry, PairEntry, Pairs, RepoFile, Side, load_env, load_pins, read};
-use crate::packages::{Kind, Package, cargo_metadata_surface, discover};
+use crate::packages::{Kind, Package, cargo_metadata_surface, discover, lib_target};
 use crate::report::{Failure, Report};
 use crate::{cmd, excuses, fetch, files, generated, interface, rust_api, tags, ts_api};
 
@@ -28,7 +28,7 @@ pub fn package_surface(
     match &pkg.kind {
         Kind::Cargo(meta) => {
             let mut api = rust_api::api(meta, env)?;
-            let notes = match meta.targets.iter().find(|t| t.is_lib()) {
+            let notes = match lib_target(meta) {
                 Some(lib) => {
                     let src = lib.src_path.parent().with_context(|| {
                         format!("{} is a library root with no directory", lib.src_path)
@@ -115,27 +115,6 @@ pub fn run(inputs: &Path, work: &Path) -> anyhow::Result<Report> {
         }
     }
 
-    // Each interface pair's ABI and IDL, read once. The pair compares its
-    // ABI's entries, so the packages of the ABI's repository do not list
-    // them again.
-    let mut interfaces = vec![];
-    for entry in &pairs.interface {
-        let evm = interface::abi_file(&interface_file(&entry.abi, Side::Evm, &pins, work)?);
-        let solana = interface::idl_file(&interface_file(&entry.idl, Side::Solana, &pins, work)?);
-        if let Ok(abi) = &evm {
-            let repository = format!("{}/", entry.abi.repository);
-            for (_, (_, surface)) in packages
-                .iter_mut()
-                .filter(|(id, _)| id.starts_with(&repository))
-            {
-                if let Some(surface) = surface {
-                    generated::remove_compared(surface, abi);
-                }
-            }
-        }
-        interfaces.push((entry, evm, solana));
-    }
-
     let mut labels = vec![];
     let mut lines = vec![];
     compare_all(
@@ -152,8 +131,8 @@ pub fn run(inputs: &Path, work: &Path) -> anyhow::Result<Report> {
         &mut labels,
         &mut lines,
     )?;
-    for (entry, evm, solana) in interfaces {
-        compare_interface(entry, evm, solana, &mut labels, &mut lines, &mut failures);
+    for entry in &pairs.interface {
+        compare_interface(entry, &pins, work, &mut labels, &mut lines, &mut failures)?;
     }
     Ok(Report::build(labels, failures, fold(lines), excuses))
 }
@@ -179,21 +158,23 @@ fn interface_file(
     }
 }
 
-/// Compares an EVM contract's ABI with a Solana program's IDL, as read from
-/// their pinned repositories' checkouts. A file that could not be read is a
-/// failure, and the pair adds no lines.
+/// Compares an EVM contract's ABI with a Solana program's IDL, each read from
+/// its pinned repository's checkout under `work`. A file that cannot be read
+/// is a failure, and the pair adds no lines.
 fn compare_interface(
     entry: &InterfaceEntry,
-    evm: anyhow::Result<Surface>,
-    solana: anyhow::Result<Surface>,
+    pins: &[crate::inputs::Pin],
+    work: &Path,
     labels: &mut Vec<String>,
     lines: &mut Vec<Line>,
     failures: &mut Vec<Failure>,
-) {
+) -> anyhow::Result<()> {
     let label = format!(
         "{}/{} ↔ {}/{}",
         entry.abi.repository, entry.abi.path, entry.idl.repository, entry.idl.path
     );
+    let evm = interface::abi_file(&interface_file(&entry.abi, Side::Evm, pins, work)?);
+    let solana = interface::idl_file(&interface_file(&entry.idl, Side::Solana, pins, work)?);
     match (evm, solana) {
         (Ok(evm), Ok(solana)) => lines.extend(compare(&label, &evm, &solana)),
         (evm, solana) => {
@@ -206,6 +187,7 @@ fn compare_interface(
         }
     }
     labels.push(label);
+    Ok(())
 }
 
 /// Compares each pair, then lists each entry in no pair as one line keyed
@@ -253,6 +235,7 @@ fn compare_all(
                 key: subject.to_owned(),
                 evm,
                 solana,
+                parent: None,
                 inside: s.entries().count(),
             });
         }

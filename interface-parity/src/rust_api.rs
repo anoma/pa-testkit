@@ -7,7 +7,7 @@ use public_api::tokens::Token;
 
 use crate::cmd;
 use crate::compare::Surface;
-use crate::packages::has_lib;
+use crate::packages::lib_target;
 
 /// The toolchain whose rustdoc JSON `public-api` 0.52.2 reads. The justfile's
 /// `nightly` variable names the same toolchain for `just install-nightly`.
@@ -43,7 +43,7 @@ pub struct RustApi {
 /// and the repository's build environment `env`. A package without a library
 /// target exposes no Rust items.
 pub fn api(meta: &cargo_metadata::Package, env: &[(String, String)]) -> anyhow::Result<RustApi> {
-    if !has_lib(meta) {
+    if lib_target(meta).is_none() {
         return Ok(RustApi::default());
     }
     let (mut stdout, mut stderr) = (Vec::new(), Vec::new());
@@ -70,9 +70,17 @@ pub fn api(meta: &cargo_metadata::Package, env: &[(String, String)]) -> anyhow::
         .omit_blanket_impls(true)
         .build()?;
     let mut api = RustApi::default();
+    // public-api lists an item after the item it belongs to, at each path
+    // it is published under: the key last given to an id is its parent's key
+    // at the path being listed.
+    let mut key_of: HashMap<u32, String> = HashMap::new();
     for item in public.items() {
         let tokens: Vec<&Token> = item.tokens().collect();
         let (key, rendered) = (key(&tokens), item.to_string());
+        if let Some(parent) = item.parent_id().and_then(|p| key_of.get(&p.0)) {
+            api.surface.set_parent(&key, parent);
+        }
+        key_of.insert(item.id().0, key.clone());
         if let Some(file) = files.get(&item.id().0) {
             api.declared
                 .entry(file.clone())

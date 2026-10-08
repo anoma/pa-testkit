@@ -34,20 +34,28 @@ fn cargo_shipped_files_are_read_from_the_package_archive() {
         line("file deployments.json#/production").outcome(),
         Outcome::Match
     );
+    // A JSON file is an item, present on both sides, and each of its values
+    // belongs to it.
+    assert_eq!(line("file deployments.json").outcome(), Outcome::Match);
+    assert_eq!(
+        line("file deployments.json#/staging/0/chainId")
+            .parent
+            .as_deref(),
+        Some("file deployments.json")
+    );
     assert_eq!(
         line("file deployments.json#/staging/0/chainId").outcome(),
         Outcome::Differs
     );
-    // The files that describe the package rather than ship with it (cargo's
-    // record of the manifest, the commit and the lock, and the README's
-    // prose) compare by presence: their content cannot match across two
-    // repositories, and the manifest compares field by field elsewhere.
+    // The files that describe the package compare by presence (files.rs,
+    // `is_description`): the EVM fixture's readme is README.md, the Solana
+    // one's readme.txt.
     for key in [
         "file Cargo.toml",
         "file Cargo.toml.orig",
         "file Cargo.lock",
         "file .cargo_vcs_info.json",
-        "file README.md",
+        "file README",
     ] {
         let l = line(key);
         assert_eq!(l.outcome(), Outcome::Match, "{l:#?}");

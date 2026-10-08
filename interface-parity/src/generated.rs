@@ -14,7 +14,6 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use anyhow::{Context, bail, ensure};
 use serde_json::Value;
 
-use crate::compare::Surface;
 use crate::rust_api::RustApi;
 use crate::{cmd, interface};
 
@@ -192,8 +191,9 @@ pub fn module_path(src: &Path, file: &Path) -> anyhow::Result<String> {
 }
 
 /// Replaces the Rust items of `module`, the `forge bind` module at the Rust
-/// path `path` written to `file`, with the entries of the ABI it was
-/// generated from, the contract it binds and which bytecode it carries. Its
+/// path `path` written to `file`, with one item for the module, valued with
+/// the contract it binds, and, belonging to it, the entries of the ABI it was
+/// generated from and which bytecode it carries. Its
 /// items are those under its path, and those `file` declares wherever their
 /// path puts them, like its conversions of primitives. A module with no items
 /// in `api` is an error: it would compare as nothing at all.
@@ -218,35 +218,26 @@ pub fn collapse(
     );
     let surface = &mut api.surface;
     let key = |entry: &str| format!("forge bind {path} {entry}");
-    surface.insert(key("contract"), module.contract.clone());
+    let container = key("module");
+    surface.insert(&container, module.contract.clone());
+    let mut insert = |entry: &str, value: &str| {
+        surface.insert(key(entry), value);
+        surface.set_parent(key(entry), &container);
+    };
     for (name, code) in [
         ("creation", &module.bytecode),
         ("runtime", &module.deployed_bytecode),
     ] {
         if code.is_some() {
-            surface.insert(key("bytecode"), name);
+            insert("bytecode", name);
         }
     }
     for (entry, values) in abi.entries() {
         for value in values {
-            surface.insert(key(entry), value.clone());
+            insert(entry, value);
         }
     }
     Ok(())
-}
-
-/// Removes from `surface` each `forge bind` module's ABI entry that `abi`, the
-/// ABI an interface pair compares, carries with the same values: the pair
-/// already compares it. The module's other entries, its contract and its
-/// bytecode stay.
-pub fn remove_compared(surface: &mut Surface, abi: &Surface) {
-    surface.retain(|key, values| {
-        let entry = key
-            .strip_prefix("forge bind ")
-            .and_then(|module_and_entry| module_and_entry.split_once(' '))
-            .map(|(_, entry)| entry);
-        !entry.is_some_and(|entry| abi.get(entry).is_some_and(|abi| abi == values))
-    });
 }
 
 /// Collapses every `forge bind` module of the crate rooted at `src` that

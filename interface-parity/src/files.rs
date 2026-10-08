@@ -13,23 +13,35 @@ use crate::packages::Package;
 const CARGO_SOURCES: &[&str] = &[".rs"];
 const NPM_SOURCES: &[&str] = &[".ts", ".js", ".mjs", ".cjs", ".map"];
 
-/// The files of a package archive that describe the package rather than ship
-/// with it: cargo's record of the manifest, the commit and the lock, and the
-/// README's prose. Their content cannot match across two repositories, and
-/// the manifest compares field by field elsewhere, so they compare by
-/// presence.
+/// The files cargo writes into a package archive to describe it: its record
+/// of the manifest, the commit and the lock.
 const CARGO_DESCRIPTIONS: &[&str] = &[
     ".cargo_vcs_info.json",
     "Cargo.lock",
     "Cargo.toml",
     "Cargo.toml.orig",
-    "README.md",
 ];
-const NPM_DESCRIPTIONS: &[&str] = &["README.md"];
 
-/// One item per JSON scalar and per empty array or object, keyed by its JSON
-/// pointer (RFC 6901), so a difference names the exact place in the file.
+/// The key under which a file that describes the package rather than ships
+/// with it compares, by presence: cargo's `descriptions`, and a readme (any
+/// root file whose name starts with `README`, in any case, as npm counts
+/// one). Their content cannot match across two repositories, and the
+/// manifest compares field by field elsewhere. None for any other file.
+fn description_key(path: &str, descriptions: &[&str]) -> Option<String> {
+    if descriptions.contains(&path) {
+        Some(format!("file {path}"))
+    } else if !path.contains('/') && path.to_ascii_uppercase().starts_with("README") {
+        Some("file README".to_owned())
+    } else {
+        None
+    }
+}
+
+/// The file `prefix` as an item present, and, belonging to it, one item per
+/// JSON scalar and per empty array or object, keyed by its JSON pointer
+/// (RFC 6901), so a difference names the exact place in the file.
 fn flatten_json(prefix: &str, value: &serde_json::Value, s: &mut Surface) {
+    s.insert(prefix, "present");
     fn walk(prefix: &str, pointer: String, value: &serde_json::Value, s: &mut Surface) {
         match value {
             serde_json::Value::Object(map) if !map.is_empty() => {
@@ -43,7 +55,11 @@ fn flatten_json(prefix: &str, value: &serde_json::Value, s: &mut Surface) {
                     walk(prefix, format!("{pointer}/{i}"), v, s);
                 }
             }
-            other => s.insert(format!("{prefix}#{pointer}"), other.to_string()),
+            other => {
+                let key = format!("{prefix}#{pointer}");
+                s.insert(&key, other.to_string());
+                s.set_parent(key, prefix);
+            }
         }
     }
     walk(prefix, String::new(), value, s);
@@ -75,8 +91,9 @@ pub(crate) fn walk(
     Ok(())
 }
 
-/// The non-source files of an unpacked package: the `descriptions` by
-/// presence, other JSON files key by key, any other file by its SHA-256.
+/// The non-source files of an unpacked package: those describing it
+/// ([`description_key`], with cargo's `descriptions`) by presence, other JSON
+/// files key by key, any other file by its SHA-256.
 fn unpacked_surface(
     root: &Path,
     sources: &[&str],
@@ -95,8 +112,8 @@ fn unpacked_surface(
         if sources.iter().any(|ext| path.ends_with(ext)) {
             continue;
         }
-        if descriptions.contains(&path.as_str()) {
-            s.insert(format!("file {path}"), "present");
+        if let Some(key) = description_key(&path, descriptions) {
+            s.insert(key, "present");
             continue;
         }
         let bytes = std::fs::read(&full).with_context(|| format!("reading {}", full.display()))?;
@@ -193,7 +210,7 @@ pub fn npm_files(pkg: &Package, work: &Path) -> anyhow::Result<Surface> {
         .with_context(|| format!("npm pack --json named no tarball: {packed}"))?;
     let unpacked = package_dir(work, pkg, "unpacked");
     unpack(&destination.join(filename), &unpacked)?;
-    unpacked_surface(&unpacked.join("package"), NPM_SOURCES, NPM_DESCRIPTIONS)
+    unpacked_surface(&unpacked.join("package"), NPM_SOURCES, &[])
 }
 
 #[cfg(test)]
@@ -202,7 +219,7 @@ mod tests {
     use crate::compare::compare;
 
     #[test]
-    fn json_flattens_to_one_key_per_scalar_and_empty_container() {
+    fn json_flattens_to_the_file_and_one_key_per_scalar_and_empty_container_in_it() {
         let mut s = Surface::default();
         flatten_json(
             "file d.json",
@@ -217,10 +234,17 @@ mod tests {
         assert_eq!(
             got,
             vec![
+                ("file d.json", "present"),
                 ("file d.json#/a~1b/~0", "true"),
                 ("file d.json#/production", "[]"),
                 ("file d.json#/staging/0/chainId", "1"),
             ]
+        );
+        assert!(
+            lines[1..]
+                .iter()
+                .all(|l| l.parent.as_deref() == Some("file d.json")),
+            "{lines:#?}"
         );
     }
 }

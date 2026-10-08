@@ -205,3 +205,40 @@ fn each_item_is_recorded_under_the_file_declaring_it() {
         api.declared
     );
 }
+
+/// Each item records the item it belongs to: a variant its enum, an impl the
+/// type it is on, a method its impl, a module's item the module. Following
+/// parents from a method reaches its type.
+#[test]
+fn each_item_records_the_item_it_belongs_to() {
+    let s = surface("keys-repo", "keys").unwrap();
+    let ancestors = |key: &str| -> Vec<String> {
+        std::iter::successors(s.parent(key).map(str::to_owned), |k| {
+            s.parent(k).map(str::to_owned)
+        })
+        .collect()
+    };
+    let has_ancestor = |key: &str, ancestor: &str| {
+        let chain = ancestors(key);
+        assert!(
+            chain.iter().any(|k| k == ancestor),
+            "{key} does not belong to {ancestor}: {chain:#?}"
+        );
+    };
+    has_ancestor("rust crate::Code::Only member", "rust crate::Code enum");
+    has_ancestor("rust crate::Holder::get fn", "rust crate::Holder struct");
+    has_ancestor(
+        "rust crate::Holder<'a, T> impl core::marker::Send",
+        "rust crate::Holder struct",
+    );
+    has_ancestor("rust crate::inner::Inside struct", "rust crate::inner mod");
+    has_ancestor(
+        "rust crate::inner::Inside::method fn",
+        "rust crate::inner mod",
+    );
+    assert_eq!(
+        s.parent("rust crate mod"),
+        None,
+        "the crate root belongs to nothing"
+    );
+}
