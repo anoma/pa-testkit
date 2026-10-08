@@ -103,12 +103,18 @@ fn render(tokens: &[&Token]) -> String {
 fn is_path_token(t: &Token) -> bool {
     matches!(
         t,
-        Token::Identifier(_) | Token::Type(_) | Token::Function(_) | Token::Self_(_)
+        Token::Identifier(_)
+            | Token::Type(_)
+            | Token::Function(_)
+            | Token::Self_(_)
+            | Token::Primitive(_)
     ) || matches!(t, Token::Symbol(s) if s == "::")
 }
 
 /// `rust <self type> impl <trait>` for an impl, `rust <path> <kind>` for any
-/// other item (`member` for struct fields and enum variants, which have no kind).
+/// other item (`member` for struct fields and enum variants, which have no
+/// kind). The path skips the attributes and qualifiers rendered before it,
+/// and starts with a primitive for an item of an impl on one (`u8::from`).
 fn key(tokens: &[&Token]) -> String {
     if matches!(tokens.first(), Some(Token::Keyword(k)) if k == "impl") {
         let (trait_part, self_part) = impl_parts(tokens);
@@ -132,7 +138,11 @@ fn key(tokens: &[&Token]) -> String {
         .position(|t| {
             !matches!(
                 t,
-                Token::Qualifier(_) | Token::Kind(_) | Token::Keyword(_) | Token::Whitespace
+                Token::Annotation(_)
+                    | Token::Qualifier(_)
+                    | Token::Kind(_)
+                    | Token::Keyword(_)
+                    | Token::Whitespace
             )
         })
         .unwrap_or(tokens.len());

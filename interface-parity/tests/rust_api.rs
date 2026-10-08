@@ -135,3 +135,25 @@ fn a_blanket_impl_is_listed_where_declared_not_on_each_type() {
         assert!(keys.contains(&key.as_str()), "{key} is gone: {keys:#?}");
     }
 }
+
+/// An item's key is its own path, whatever precedes it in the rendering: two
+/// enums with `#[repr]` attributes are two keys, and a method of an impl on a
+/// primitive type is keyed by the primitive's path.
+#[test]
+fn an_attribute_or_a_primitive_self_type_keeps_the_items_path_in_its_key() {
+    let s = surface("keys-repo", "keys").unwrap();
+    let lines = compare("p", &s, &Surface::default());
+    let keys: Vec<&str> = lines.iter().map(|l| l.key.as_str()).collect();
+    for key in [
+        "rust crate::Code enum",
+        "rust crate::Small enum",
+        "rust u8::from fn",
+        "rust u8 impl core::convert::From<crate::Wrapped>",
+    ] {
+        assert!(keys.contains(&key), "no key {key}: {keys:#?}");
+    }
+    assert!(
+        !keys.iter().any(|k| k.starts_with("rust  ")),
+        "an item keyed with an empty path: {keys:#?}"
+    );
+}
