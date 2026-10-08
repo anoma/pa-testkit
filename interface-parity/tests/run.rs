@@ -3,7 +3,7 @@ mod common;
 use std::fmt::Write;
 use std::path::PathBuf;
 
-use interface_parity::compare::Line;
+use interface_parity::compare::{Line, Outcome};
 use interface_parity::run::run;
 
 /// An inputs directory pinning each `(name, side, fixture)` repository at its
@@ -94,11 +94,22 @@ fn the_report_classifies_every_line_of_the_fixture_repositories() {
     ] {
         assert!(has(&report.unexcused, key), "{key} must be unexcused: {md}");
     }
-    for key in ["rust crate::unpaired fn", "ts VERSION VariableDeclaration"] {
-        assert!(
-            has(&report.unpaired, key),
-            "{key}, of an unpaired package, must be listed apart: {md}"
-        );
+    // Everything a package in no pair publishes is on its side only, so the
+    // package is one line, apart from the paired ones, counting its items.
+    for (pair, side) in [
+        ("evm/cargo:evm-extra (unpaired)", Outcome::OnlyEvm),
+        (
+            "solana/npm:@fixture/solana-client (unpaired)",
+            Outcome::OnlySolana,
+        ),
+    ] {
+        let lines: Vec<_> = report.unpaired.iter().filter(|l| l.pair == pair).collect();
+        let [package] = &lines[..] else {
+            panic!("{pair} must be one line: {md}");
+        };
+        assert_eq!(package.key, "package", "{package:#?}");
+        assert_eq!(package.outcome(), side, "{package:#?}");
+        assert!(package.inside > 0, "it counts its items: {package:#?}");
     }
     assert!(
         !md.contains("unpublished"),

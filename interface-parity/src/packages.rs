@@ -31,9 +31,9 @@ impl Package {
     }
 }
 
-/// Whether a Cargo package has a library target.
-pub fn has_lib(pkg: &cargo_metadata::Package) -> bool {
-    pkg.targets.iter().any(|t| {
+/// A Cargo package's library target, of any crate type.
+pub fn lib_target(pkg: &cargo_metadata::Package) -> Option<&cargo_metadata::Target> {
+    pkg.targets.iter().find(|t| {
         t.is_lib()
             || t.is_rlib()
             || t.is_dylib()

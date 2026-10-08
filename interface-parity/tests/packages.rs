@@ -3,7 +3,7 @@ mod common;
 
 use checkout::checkout;
 use interface_parity::compare::compare;
-use interface_parity::packages::{Kind, cargo_metadata_surface, discover, has_lib};
+use interface_parity::packages::{Kind, cargo_metadata_surface, discover, lib_target};
 
 #[test]
 fn discovery_finds_published_packages_only() {
@@ -18,7 +18,7 @@ fn discovery_finds_published_packages_only() {
     let Kind::Cargo(meta) = &packages[0].kind else {
         panic!("{:?} is not a Cargo package", packages[0].id);
     };
-    assert!(has_lib(meta), "{meta:#?} has a library target");
+    assert!(lib_target(meta).is_some(), "{meta:#?} has a library target");
 }
 
 #[test]

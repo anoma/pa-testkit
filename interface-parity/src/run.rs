@@ -4,9 +4,9 @@ use std::process::Command;
 
 use anyhow::{Context, bail};
 
-use crate::compare::{Line, Surface, compare};
+use crate::compare::{Line, Surface, compare, fold};
 use crate::inputs::{InterfaceEntry, PairEntry, Pairs, RepoFile, Side, load_env, load_pins, read};
-use crate::packages::{Kind, Package, cargo_metadata_surface, discover};
+use crate::packages::{Kind, Package, cargo_metadata_surface, discover, lib_target};
 use crate::report::{Failure, Report};
 use crate::{cmd, excuses, fetch, files, generated, interface, rust_api, tags, ts_api};
 
@@ -14,18 +14,33 @@ use crate::{cmd, excuses, fetch, files, generated, interface, rust_api, tags, ts
 type Surfaces = BTreeMap<String, (Side, Option<Surface>)>;
 
 /// Everything a package publishes: its metadata or manifest, its API and its
-/// non-source shipped files. `env` is its repository's build environment.
+/// non-source shipped files. `env` is its repository's build environment and
+/// `forge` the Foundry release it pins, which collapses the `forge bind`
+/// modules it reproduces into their ABIs. Returns, with the surface, a note
+/// for each module left item by item: the report must show why its items are
+/// all listed.
 pub fn package_surface(
     pkg: &Package,
     work: &Path,
     env: &[(String, String)],
-) -> anyhow::Result<Surface> {
+    forge: Option<&Path>,
+) -> anyhow::Result<(Surface, Vec<String>)> {
     match &pkg.kind {
         Kind::Cargo(meta) => {
+            let mut api = rust_api::api(meta, env)?;
+            let notes = match lib_target(meta) {
+                Some(lib) => {
+                    let src = lib.src_path.parent().with_context(|| {
+                        format!("{} is a library root with no directory", lib.src_path)
+                    })?;
+                    generated::collapse_crate(&mut api, src.as_std_path(), forge)?
+                }
+                None => vec![],
+            };
             let mut s = cargo_metadata_surface(meta);
-            s.extend(rust_api::surface(meta, env)?);
+            s.extend(api.surface);
             s.extend(files::cargo_files(pkg, meta, work)?);
-            Ok(s)
+            Ok((s, notes))
         }
         Kind::Npm(manifest) => {
             // Install, then build the package as publishing would.
@@ -42,7 +57,7 @@ pub fn package_surface(
             )?;
             let mut s = ts_api::exports(pkg, manifest)?;
             s.extend(files::npm_files(pkg, work)?);
-            Ok(s)
+            Ok((s, vec![]))
         }
     }
 }
@@ -80,59 +95,46 @@ pub fn run(inputs: &Path, work: &Path) -> anyhow::Result<Report> {
         let (found, discovery_failures) = discover(&pin.name, &dir);
         failures.extend(discovery_failures);
         for pkg in found {
-            let surface = package_surface(&pkg, work, &env)
-                .and_then(|mut surface| {
-                    failures.extend(collapse_generated(&pkg, &mut surface, forge.as_deref())?);
-                    Ok(surface)
-                })
-                .map_err(|e| {
+            let surface = match package_surface(&pkg, work, &env, forge.as_deref()) {
+                Ok((surface, notes)) => {
+                    failures.extend(notes.into_iter().map(|note| Failure {
+                        subject: pkg.id.clone(),
+                        error: note,
+                    }));
+                    Some(surface)
+                }
+                Err(e) => {
                     failures.push(Failure {
                         subject: pkg.id.clone(),
                         error: format!("{e:#}"),
-                    })
-                })
-                .ok();
+                    });
+                    None
+                }
+            };
             packages.insert(pkg.id, (pin.side, surface));
         }
     }
 
     let mut labels = vec![];
     let mut lines = vec![];
-    compare_all(&pairs.repository, &repositories, &mut labels, &mut lines)?;
-    compare_all(&pairs.package, &packages, &mut labels, &mut lines)?;
+    compare_all(
+        &pairs.repository,
+        &repositories,
+        "repository",
+        &mut labels,
+        &mut lines,
+    )?;
+    compare_all(
+        &pairs.package,
+        &packages,
+        "package",
+        &mut labels,
+        &mut lines,
+    )?;
     for entry in &pairs.interface {
         compare_interface(entry, &pins, work, &mut labels, &mut lines, &mut failures)?;
     }
-    Ok(Report::build(labels, failures, lines, excuses))
-}
-
-/// Collapses the `forge bind` modules of `pkg`'s library into the ABIs they
-/// were generated from (`generated`), returning each module left item by
-/// item as a failure: the report must show why its items are all listed.
-fn collapse_generated(
-    pkg: &Package,
-    surface: &mut Surface,
-    forge: Option<&Path>,
-) -> anyhow::Result<Vec<Failure>> {
-    let Kind::Cargo(meta) = &pkg.kind else {
-        return Ok(vec![]);
-    };
-    let Some(lib) = meta.targets.iter().find(|t| t.is_lib()) else {
-        return Ok(vec![]);
-    };
-    let src = lib
-        .src_path
-        .parent()
-        .with_context(|| format!("{} is a library root with no directory", lib.src_path))?;
-    Ok(
-        generated::collapse_crate(surface, src.as_std_path(), forge)?
-            .into_iter()
-            .map(|note| Failure {
-                subject: pkg.id.clone(),
-                error: note,
-            })
-            .collect(),
-    )
+    Ok(Report::build(labels, failures, fold(lines), excuses))
 }
 
 /// Compares an EVM contract's ABI with a Solana program's IDL, each read from
@@ -182,12 +184,14 @@ fn compare_interface(
     Ok(())
 }
 
-/// Compares each pair, then each entry in no pair against nothing. A name may
-/// sit in several pairs. Pairs whose either side failed to extract add no
-/// lines; the failure itself is in the report.
+/// Compares each pair, then lists each entry in no pair as one line keyed
+/// `subject`: everything it publishes is on its side only, and the line
+/// counts it. A name may sit in several pairs. Pairs whose either side failed
+/// to extract add no lines; the failure itself is in the report.
 fn compare_all(
     pairs: &[PairEntry],
     surfaces: &Surfaces,
+    subject: &str,
     labels: &mut Vec<String>,
     lines: &mut Vec<Line>,
 ) -> anyhow::Result<()> {
@@ -209,16 +213,24 @@ fn compare_all(
         }
         labels.push(label);
     }
-    let empty = Surface::default();
     for (name, (side, surface)) in surfaces {
         if paired.contains(name) {
             continue;
         }
         let label = format!("{name}{}", crate::report::UNPAIRED);
         if let Some(s) = surface {
-            lines.extend(match side {
-                Side::Evm => compare(&label, s, &empty),
-                Side::Solana => compare(&label, &empty, s),
+            let published = vec!["published".to_owned()];
+            let (evm, solana) = match side {
+                Side::Evm => (published, vec![]),
+                Side::Solana => (vec![], published),
+            };
+            lines.push(Line {
+                pair: label.clone(),
+                key: subject.to_owned(),
+                evm,
+                solana,
+                parent: None,
+                inside: s.entries().count(),
             });
         }
         labels.push(label);

@@ -34,20 +34,35 @@ fn cargo_shipped_files_are_read_from_the_package_archive() {
         line("file deployments.json#/production").outcome(),
         Outcome::Match
     );
+    // A JSON file is an item, present on both sides, and each of its values
+    // belongs to it.
+    assert_eq!(line("file deployments.json").outcome(), Outcome::Match);
+    assert_eq!(
+        line("file deployments.json#/staging/0/chainId")
+            .parent
+            .as_deref(),
+        Some("file deployments.json")
+    );
     assert_eq!(
         line("file deployments.json#/staging/0/chainId").outcome(),
         Outcome::Differs
     );
-    // The archive holds the normalized manifest and cargo's own files, with content.
-    for key in ["file Cargo.toml", "file Cargo.toml.orig", "file Cargo.lock"] {
+    // The files that describe the package compare by presence (files.rs,
+    // `is_description`): the EVM fixture's readme is README.md, the Solana
+    // one's readme.txt.
+    for key in [
+        "file Cargo.toml",
+        "file Cargo.toml.orig",
+        "file Cargo.lock",
+        "file .cargo_vcs_info.json",
+        "file README",
+    ] {
         let l = line(key);
-        assert!(
-            l.evm[0].starts_with("sha256 ") && l.solana[0].starts_with("sha256 "),
-            "{l:#?}"
-        );
+        assert_eq!(l.outcome(), Outcome::Match, "{l:#?}");
+        assert_eq!(l.evm, vec!["present"], "{l:#?}");
     }
     assert!(
-        lines
+        !lines
             .iter()
             .any(|l| l.key.starts_with("file .cargo_vcs_info.json#/")),
         "{lines:#?}"
@@ -72,7 +87,9 @@ fn a_crate_a_registry_cannot_take_ships_no_files_but_still_has_its_api() {
     let lines = compare("p", &files, &Default::default());
     assert!(lines.is_empty(), "{lines:#?}");
 
-    let surface = interface_parity::run::package_surface(pkg, &work, &[]).unwrap();
+    let surface = interface_parity::run::package_surface(pkg, &work, &[], None)
+        .unwrap()
+        .0;
     let lines = compare("p", &surface, &Default::default());
     assert!(
         lines
