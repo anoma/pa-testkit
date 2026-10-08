@@ -14,6 +14,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use anyhow::{Context, bail, ensure};
 use serde_json::Value;
 
+use crate::compare::Surface;
 use crate::rust_api::RustApi;
 use crate::{cmd, interface};
 
@@ -232,6 +233,20 @@ pub fn collapse(
         }
     }
     Ok(())
+}
+
+/// Removes from `surface` each `forge bind` module's ABI entry that `abi`, the
+/// ABI an interface pair compares, carries with the same values: the pair
+/// already compares it. The module's other entries, its contract and its
+/// bytecode stay.
+pub fn remove_compared(surface: &mut Surface, abi: &Surface) {
+    surface.retain(|key, values| {
+        let entry = key
+            .strip_prefix("forge bind ")
+            .and_then(|module_and_entry| module_and_entry.split_once(' '))
+            .map(|(_, entry)| entry);
+        !entry.is_some_and(|entry| abi.get(entry).is_some_and(|abi| abi == values))
+    });
 }
 
 /// Collapses every `forge bind` module of the crate rooted at `src` that

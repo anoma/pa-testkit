@@ -115,48 +115,73 @@ pub fn run(inputs: &Path, work: &Path) -> anyhow::Result<Report> {
         }
     }
 
+    // Each interface pair's ABI and IDL, read once. The pair compares its
+    // ABI's entries, so the packages of the ABI's repository do not list
+    // them again.
+    let mut interfaces = vec![];
+    for entry in &pairs.interface {
+        let evm = interface::abi_file(&interface_file(&entry.abi, Side::Evm, &pins, work)?);
+        let solana = interface::idl_file(&interface_file(&entry.idl, Side::Solana, &pins, work)?);
+        if let Ok(abi) = &evm {
+            let repository = format!("{}/", entry.abi.repository);
+            for (_, (_, surface)) in packages
+                .iter_mut()
+                .filter(|(id, _)| id.starts_with(&repository))
+            {
+                if let Some(surface) = surface {
+                    generated::remove_compared(surface, abi);
+                }
+            }
+        }
+        interfaces.push((entry, evm, solana));
+    }
+
     let mut labels = vec![];
     let mut lines = vec![];
     compare_all(&pairs.repository, &repositories, &mut labels, &mut lines)?;
     compare_all(&pairs.package, &packages, &mut labels, &mut lines)?;
-    for entry in &pairs.interface {
-        compare_interface(entry, &pins, work, &mut labels, &mut lines, &mut failures)?;
+    for (entry, evm, solana) in interfaces {
+        compare_interface(entry, evm, solana, &mut labels, &mut lines, &mut failures);
     }
     Ok(Report::build(labels, failures, lines, excuses))
 }
 
-/// Compares an EVM contract's ABI with a Solana program's IDL, each read from
-/// its pinned repository's checkout under `work`. A file that cannot be read
-/// is a failure, and the pair adds no lines.
-fn compare_interface(
-    entry: &InterfaceEntry,
+/// The checkout path under `work` of an interface's file `f`, whose
+/// repository must be pinned on `side`.
+fn interface_file(
+    f: &RepoFile,
+    side: Side,
     pins: &[crate::inputs::Pin],
     work: &Path,
+) -> anyhow::Result<std::path::PathBuf> {
+    match pins.iter().find(|pin| pin.name == f.repository) {
+        Some(pin) if pin.side == side => Ok(work.join("repos").join(&f.repository).join(&f.path)),
+        Some(_) => bail!(
+            "{} is an interface's {side:?} side but pinned on the other",
+            f.repository
+        ),
+        None => bail!(
+            "{} is an interface's side but no pinned repository",
+            f.repository
+        ),
+    }
+}
+
+/// Compares an EVM contract's ABI with a Solana program's IDL, as read from
+/// their pinned repositories' checkouts. A file that could not be read is a
+/// failure, and the pair adds no lines.
+fn compare_interface(
+    entry: &InterfaceEntry,
+    evm: anyhow::Result<Surface>,
+    solana: anyhow::Result<Surface>,
     labels: &mut Vec<String>,
     lines: &mut Vec<Line>,
     failures: &mut Vec<Failure>,
-) -> anyhow::Result<()> {
-    let file = |f: &RepoFile, side: Side| -> anyhow::Result<std::path::PathBuf> {
-        match pins.iter().find(|pin| pin.name == f.repository) {
-            Some(pin) if pin.side == side => {
-                Ok(work.join("repos").join(&f.repository).join(&f.path))
-            }
-            Some(_) => bail!(
-                "{} is an interface's {side:?} side but pinned on the other",
-                f.repository
-            ),
-            None => bail!(
-                "{} is an interface's side but no pinned repository",
-                f.repository
-            ),
-        }
-    };
+) {
     let label = format!(
         "{}/{} ↔ {}/{}",
         entry.abi.repository, entry.abi.path, entry.idl.repository, entry.idl.path
     );
-    let evm = interface::abi_file(&file(&entry.abi, Side::Evm)?);
-    let solana = interface::idl_file(&file(&entry.idl, Side::Solana)?);
     match (evm, solana) {
         (Ok(evm), Ok(solana)) => lines.extend(compare(&label, &evm, &solana)),
         (evm, solana) => {
@@ -169,7 +194,6 @@ fn compare_interface(
         }
     }
     labels.push(label);
-    Ok(())
 }
 
 /// Compares each pair, then each entry in no pair against nothing. A name may

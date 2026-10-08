@@ -40,6 +40,16 @@ impl Surface {
         true
     }
 
+    /// The values under `key`.
+    pub fn get(&self, key: &str) -> Option<&Vec<String>> {
+        self.0.get(key)
+    }
+
+    /// Keeps the keys, with their values, for which `keep` holds.
+    pub fn retain(&mut self, mut keep: impl FnMut(&str, &[String]) -> bool) {
+        self.0.retain(|key, values| keep(key, values));
+    }
+
     /// Each key with its values, in key order.
     pub fn entries(&self) -> impl Iterator<Item = (&String, &Vec<String>)> {
         self.0.iter()

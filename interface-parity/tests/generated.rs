@@ -302,3 +302,47 @@ fn without_a_pinned_foundry_every_module_stays_item_by_item_and_is_noted() {
     let lines = compare("x", &api.surface, &Surface::default());
     assert!(lines.iter().all(|l| l.outcome() == Outcome::OnlyEvm));
 }
+
+/// A package lists only the ABI entries no interface pair compares: an entry
+/// the pair's ABI carries with the same values goes, one whose values differ
+/// stays, and so do the module's contract and bytecode.
+#[test]
+fn a_packages_abi_entries_that_an_interface_pair_compares_are_not_listed_again() {
+    let mut surface = Surface::default();
+    for (key, value) in [
+        ("forge bind crate::generated::token contract", "Token"),
+        ("forge bind crate::generated::token bytecode", "runtime"),
+        (
+            "forge bind crate::generated::token fn transfer",
+            "(to: address, amount: u256) -> bool",
+        ),
+        (
+            "forge bind crate::generated::i_token fn transfer",
+            "(to: address, amount: u256) -> bool",
+        ),
+        (
+            "forge bind crate::generated::token event Transferred",
+            "(from: address, to: address, amount: u256)",
+        ),
+        ("rust crate::deployments fn", "pub fn crate::deployments()"),
+    ] {
+        surface.insert(key, value);
+    }
+    let mut abi = Surface::default();
+    abi.insert("fn transfer", "(to: address, amount: u256) -> bool");
+    abi.insert("event Transferred", "(from: address, amount: u256)");
+
+    generated::remove_compared(&mut surface, &abi);
+
+    let keys: Vec<String> = items(&surface).into_iter().map(|(k, _)| k).collect();
+    assert_eq!(
+        keys,
+        vec![
+            "forge bind crate::generated::token bytecode",
+            "forge bind crate::generated::token contract",
+            "forge bind crate::generated::token event Transferred",
+            "rust crate::deployments fn",
+        ],
+        "{keys:#?}"
+    );
+}
