@@ -38,16 +38,23 @@ fn cargo_shipped_files_are_read_from_the_package_archive() {
         line("file deployments.json#/staging/0/chainId").outcome(),
         Outcome::Differs
     );
-    // The archive holds the normalized manifest and cargo's own files, with content.
-    for key in ["file Cargo.toml", "file Cargo.toml.orig", "file Cargo.lock"] {
+    // The files that describe the package rather than ship with it (cargo's
+    // record of the manifest, the commit and the lock, and the README's
+    // prose) compare by presence: their content cannot match across two
+    // repositories, and the manifest compares field by field elsewhere.
+    for key in [
+        "file Cargo.toml",
+        "file Cargo.toml.orig",
+        "file Cargo.lock",
+        "file .cargo_vcs_info.json",
+        "file README.md",
+    ] {
         let l = line(key);
-        assert!(
-            l.evm[0].starts_with("sha256 ") && l.solana[0].starts_with("sha256 "),
-            "{l:#?}"
-        );
+        assert_eq!(l.outcome(), Outcome::Match, "{l:#?}");
+        assert_eq!(l.evm, vec!["present"], "{l:#?}");
     }
     assert!(
-        lines
+        !lines
             .iter()
             .any(|l| l.key.starts_with("file .cargo_vcs_info.json#/")),
         "{lines:#?}"

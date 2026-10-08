@@ -13,6 +13,20 @@ use crate::packages::Package;
 const CARGO_SOURCES: &[&str] = &[".rs"];
 const NPM_SOURCES: &[&str] = &[".ts", ".js", ".mjs", ".cjs", ".map"];
 
+/// The files of a package archive that describe the package rather than ship
+/// with it: cargo's record of the manifest, the commit and the lock, and the
+/// README's prose. Their content cannot match across two repositories, and
+/// the manifest compares field by field elsewhere, so they compare by
+/// presence.
+const CARGO_DESCRIPTIONS: &[&str] = &[
+    ".cargo_vcs_info.json",
+    "Cargo.lock",
+    "Cargo.toml",
+    "Cargo.toml.orig",
+    "README.md",
+];
+const NPM_DESCRIPTIONS: &[&str] = &["README.md"];
+
 /// One item per JSON scalar and per empty array or object, keyed by its JSON
 /// pointer (RFC 6901), so a difference names the exact place in the file.
 fn flatten_json(prefix: &str, value: &serde_json::Value, s: &mut Surface) {
@@ -61,9 +75,13 @@ pub(crate) fn walk(
     Ok(())
 }
 
-/// The non-source files of an unpacked package: JSON files key by key, any
-/// other file by its SHA-256.
-fn unpacked_surface(root: &Path, sources: &[&str]) -> anyhow::Result<Surface> {
+/// The non-source files of an unpacked package: the `descriptions` by
+/// presence, other JSON files key by key, any other file by its SHA-256.
+fn unpacked_surface(
+    root: &Path,
+    sources: &[&str],
+    descriptions: &[&str],
+) -> anyhow::Result<Surface> {
     let mut paths = vec![];
     walk(root, &|_| false, &mut paths)?;
     let mut s = Surface::default();
@@ -75,6 +93,10 @@ fn unpacked_surface(root: &Path, sources: &[&str]) -> anyhow::Result<Surface> {
             .collect::<Vec<_>>()
             .join("/");
         if sources.iter().any(|ext| path.ends_with(ext)) {
+            continue;
+        }
+        if descriptions.contains(&path.as_str()) {
+            s.insert(format!("file {path}"), "present");
             continue;
         }
         let bytes = std::fs::read(&full).with_context(|| format!("reading {}", full.display()))?;
@@ -149,7 +171,7 @@ pub fn cargo_files(
         &target.join("package").join(format!("{stem}.crate")),
         &unpacked,
     )?;
-    unpacked_surface(&unpacked.join(stem), CARGO_SOURCES)
+    unpacked_surface(&unpacked.join(stem), CARGO_SOURCES, CARGO_DESCRIPTIONS)
 }
 
 /// The non-source files of the tarball `npm pack` builds from the package's
@@ -171,7 +193,7 @@ pub fn npm_files(pkg: &Package, work: &Path) -> anyhow::Result<Surface> {
         .with_context(|| format!("npm pack --json named no tarball: {packed}"))?;
     let unpacked = package_dir(work, pkg, "unpacked");
     unpack(&destination.join(filename), &unpacked)?;
-    unpacked_surface(&unpacked.join("package"), NPM_SOURCES)
+    unpacked_surface(&unpacked.join("package"), NPM_SOURCES, NPM_DESCRIPTIONS)
 }
 
 #[cfg(test)]
