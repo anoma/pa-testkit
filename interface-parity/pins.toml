@@ -7,39 +7,39 @@
 name = "pa-evm"
 side = "evm"
 url = "https://github.com/anoma/pa-evm"
-commit = "7deb37d69582fd445c3aa77f000c2be8d322d826"
+commit = "074b5bc1193820dce730484aec18625debde0a32"
 forge = { version = "1.8.5", sha256 = { linux_amd64 = "6c66ffcc55fa4249197721baa3098bc208014ea1d8aa04b2ed50ac6bccffb226", darwin_arm64 = "56049728e25e44a61c7f2e49438023b0890cb45850ffcb7c882f90cd998baf83" } }
 
 [[repository]]
 name = "anomapay-erc20-forwarder"
 side = "evm"
 url = "https://github.com/anoma/anomapay-erc20-forwarder"
-commit = "155bc123078a9975ffba9880b01aa6ed15378d65"
+commit = "2950e87747dd21c9980d12face8acecf031e85ca"
 forge = { version = "1.8.5", sha256 = { linux_amd64 = "6c66ffcc55fa4249197721baa3098bc208014ea1d8aa04b2ed50ac6bccffb226", darwin_arm64 = "56049728e25e44a61c7f2e49438023b0890cb45850ffcb7c882f90cd998baf83" } }
 
 [[repository]]
 name = "forwarder-bases"
 side = "evm"
 url = "https://github.com/anoma/forwarder-bases"
-commit = "08f2f2e8b147fc6c9394031063664a6f3cd6a58c"
+commit = "4e80922f32d424186a7e2748a5d81a7bc2e287f0"
 forge = { version = "1.8.5", sha256 = { linux_amd64 = "6c66ffcc55fa4249197721baa3098bc208014ea1d8aa04b2ed50ac6bccffb226", darwin_arm64 = "56049728e25e44a61c7f2e49438023b0890cb45850ffcb7c882f90cd998baf83" } }
 
 [[repository]]
 name = "anoma-pa-solana-client"
 side = "solana"
 url = "https://github.com/anoma/anoma-pa-solana-client"
-commit = "ea2f70583b414035562affe7e1f92303b102f71f"
+commit = "4f180983f676be92ad5c03010157cba8827c5841"
 
 [[repository]]
 name = "solana-protocol-adapter"
 side = "solana"
 url = "https://github.com/anoma/solana-protocol-adapter"
-commit = "bcc7929e552f39a6aab478370d1b67b1fe68e2d5"
+commit = "4807fd35d082035363aeebe1fa5db27b4f33d90a"
 build_env = "solana-pa-prototype/env/localnet.env"
 
 [[repository]]
 name = "anomapay-spl-token-forwarder"
 side = "solana"
 url = "https://github.com/anoma/anomapay-spl-token-forwarder"
-commit = "ee3aa45d6c50de87b02dfe16f99233ca8a65f592"
+commit = "7cb00db3ff57af8e77c9c8a4e8ebcbd1414d828f"
 build_env = "env/localnet.env"
