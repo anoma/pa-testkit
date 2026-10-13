@@ -42,11 +42,11 @@ pub(super) struct BaseProof {
 }
 
 /// The transaction to aggregate: every action with its base proofs and the
-/// delta proof, plus the kind table commitment its aggregation is checked
+/// delta proof, plus the kind table root its aggregation is checked
 /// against.
 pub(super) struct Assembled {
     pub transaction: ArmTxn,
-    pub kind_table_commitment: Digest,
+    pub kind_table_root: Digest,
 }
 
 /// Assembles each constrained action with its base proofs into an
@@ -109,34 +109,38 @@ pub(super) fn assemble(
         delta_proof::from_bytes_vec(&rcvs)
             .context("failed to construct delta witness from rcv values")?,
     );
-    // `verify` takes the commitment the transaction is checked against. No global kind table is installed here,
-    // so it comes from the compliance instances, which makes the check compare the aggregation against them.
-    let kind_table_commitment = compliance_unit::get_instance(
-        &actions
-            .first()
-            .context("the transaction carries no action")?
-            .compliance_unit,
-    )
-    .map_err(|error| anyhow::anyhow!("failed to read the compliance instance: {error:?}"))?
-    .kind_table_commitment;
+    // `verify` takes the root the transaction is checked against. No global kind table is installed here, so it
+    // comes from the compliance instances, which makes the check compare the aggregation against them.
+    let kind_table_root = super::constrain::aggregated_kind_table_root(
+        actions
+            .iter()
+            .map(|action| {
+                compliance_unit::get_instance(&action.compliance_unit)
+                    .map(|instance| instance.kind_table_root)
+                    .map_err(|error| {
+                        anyhow::anyhow!("failed to read the compliance instance: {error:?}")
+                    })
+            })
+            .collect::<anyhow::Result<Vec<_>>>()?,
+    )?;
 
     let transaction = transaction::generate_delta_proof(ArmTxn::create(actions, delta))
         .context("failed to generate delta proof")?;
 
     Ok(Assembled {
         transaction,
-        kind_table_commitment,
+        kind_table_root,
     })
 }
 
-/// Verifies the aggregated transaction against the kind table commitment of
+/// Verifies the aggregated transaction against the kind table root of
 /// its [`Assembled`] form, its aggregation journal in `encoding`.
 pub(super) fn verify_aggregated(
     aggregated: ArmTxn,
-    kind_table_commitment: Digest,
+    kind_table_root: Digest,
     encoding: JournalEncoding,
 ) -> anyhow::Result<Transaction> {
-    transaction::verify(&aggregated, kind_table_commitment, encoding)
+    transaction::verify(&aggregated, kind_table_root, encoding)
         .context("aggregated transaction failed local verification")?;
 
     Ok(Transaction::from_arm(aggregated))

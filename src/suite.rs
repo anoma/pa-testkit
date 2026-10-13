@@ -115,14 +115,14 @@ const OTHER_KIND_TABLE: Digest = Digest::from_bytes([0x4b; 32]);
 pub async fn settles_a_transaction_proven_against_the_empty_kind_table<Env: Environment>(
     env: &mut Env,
 ) -> anyhow::Result<()> {
-    anyhow::ensure!(
-        anoma_rm_risc0::constants::kind_table().is_empty(),
-        "the fixtures must prove against the empty kind table for this test, but a kind table is \
-         loaded"
-    );
     let tx = prove_actions(env, &[trivial_action(53, trivial::Overrides::default())?]).await?;
+    anyhow::ensure!(
+        tx.aggregation_instance()?.kind_table_root == crate::fixtures::empty_kind_table_root(),
+        "the transaction must be proven against the empty kind table for this test, but the loaded \
+         kind table lists its resources"
+    );
     env.protocol_adapter_mut()
-        .set_kind_table_commitment(OTHER_KIND_TABLE)
+        .set_kind_table_root(OTHER_KIND_TABLE)
         .await
         .context("failed to install another kind table")?;
     settles(env, tx).await
@@ -136,11 +136,11 @@ pub async fn settlement_refuses_a_kind_table_neither_stored_nor_empty<Env: Envir
     env: &mut Env,
 ) -> anyhow::Result<()> {
     let mut tx = prove_actions(env, &[trivial_action(57, trivial::Overrides::default())?]).await?;
-    tx.claim_kind_table_commitment(OTHER_KIND_TABLE)?;
-    refuses(env, tx.clone(), Refusal::UnacceptedKindTableCommitment).await?;
+    tx.claim_kind_table_root(OTHER_KIND_TABLE)?;
+    refuses(env, tx.clone(), Refusal::UnacceptedKindTableRoot).await?;
 
     env.protocol_adapter_mut()
-        .set_kind_table_commitment(OTHER_KIND_TABLE)
+        .set_kind_table_root(OTHER_KIND_TABLE)
         .await
         .context("failed to install the claimed kind table")?;
     refuses(env, tx, Refusal::InvalidAggregationProof).await
@@ -291,7 +291,7 @@ mod tests {
         roots: HashSet<Digest>,
         nullifiers: HashSet<Digest>,
         denied_logic_refs: HashSet<DeniedLogicRef>,
-        kind_table_commitment: Digest,
+        kind_table_root: Digest,
         paused: bool,
         encoding: JournalEncoding,
     }
@@ -306,7 +306,7 @@ mod tests {
                 tree,
                 nullifiers: HashSet::new(),
                 denied_logic_refs: HashSet::new(),
-                kind_table_commitment: crate::fixtures::empty_kind_table_commitment(),
+                kind_table_root: crate::fixtures::empty_kind_table_root(),
                 paused: false,
                 encoding,
             }
@@ -320,12 +320,12 @@ mod tests {
             let aggregation = transaction.aggregation()?;
             let instance = &aggregation.instance;
             if ![
-                self.kind_table_commitment,
-                crate::fixtures::empty_kind_table_commitment(),
+                self.kind_table_root,
+                crate::fixtures::empty_kind_table_root(),
             ]
-            .contains(&instance.kind_table_commitment)
+            .contains(&instance.kind_table_root)
             {
-                return Ok(Some(Refusal::UnacceptedKindTableCommitment));
+                return Ok(Some(Refusal::UnacceptedKindTableRoot));
             }
             let mut refusals = Vec::new();
             let mut refuse = |refusal| {
@@ -483,12 +483,12 @@ mod tests {
 
         // The owner's calls refuse what both chains' adapters refuse.
 
-        async fn set_kind_table_commitment(&mut self, commitment: Digest) -> anyhow::Result<()> {
+        async fn set_kind_table_root(&mut self, root: Digest) -> anyhow::Result<()> {
             anyhow::ensure!(
-                commitment != Digest::ZERO,
-                "the zero kind-table commitment is not allowed"
+                root != Digest::ZERO,
+                "the zero kind-table root is not allowed"
             );
-            self.kind_table_commitment = commitment;
+            self.kind_table_root = root;
             Ok(())
         }
 
@@ -620,11 +620,8 @@ mod tests {
         adapter.pause().await?;
         anyhow::ensure!(adapter.pause().await.is_err(), "paused while paused");
         anyhow::ensure!(
-            adapter
-                .set_kind_table_commitment(Digest::ZERO)
-                .await
-                .is_err(),
-            "installed the zero kind-table commitment"
+            adapter.set_kind_table_root(Digest::ZERO).await.is_err(),
+            "installed the zero kind-table root"
         );
         let deny = |logic_ref, consumed| DeniedLogicRef {
             logic_ref,

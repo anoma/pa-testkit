@@ -69,8 +69,7 @@ pub fn build(
     let compliance_witness = compliance::from_resources(
         vec![ConsumedResourceWitness::from_resource(consumed, nf_key)],
         vec![created],
-        // The loaded kind table, or the empty one if none is loaded.
-        anoma_rm_risc0::constants::kind_table().to_vec(),
+        crate::fixtures::kind_table(),
     );
 
     let root = ActionTree::new(vec![nullifier, commitment])

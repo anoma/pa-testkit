@@ -7,7 +7,11 @@ use anoma_pa_testkit::assert::{Needle, expect_integration_panic};
 use anoma_pa_testkit::environment::Prover;
 use anoma_pa_testkit::fixtures::trivial;
 use anoma_pa_testkit::prover::LocalProver;
+use anoma_rm_risc0::compliance::KindTableEntry;
+use anoma_rm_risc0::kind_table::KindTable;
 use anoma_rm_risc0::proving_system::JournalEncoding;
+use anoma_rm_risc0::resource::kind;
+use k256::elliptic_curve::sec1::ToEncodedPoint;
 
 #[test]
 fn build_trivial_action_defaults_to_one_resource_per_side() {
@@ -82,6 +86,64 @@ async fn local_prover_mock_aggregates_trivial_actions() {
         "the base proofs must be erased like after real aggregation"
     );
     assert_eq!(aggregation.instance.actions.len(), 8);
+}
+
+/// The batch aggregation circuit commits to the kind table of the actions that
+/// use one, and an action whose resources the table does not list (it commits
+/// to the empty table's root) joins them. The local prover replicates that
+/// circuit, so it must aggregate such a pair under the used table's root.
+#[tokio::test]
+async fn local_prover_aggregates_an_action_without_a_kind_table_with_one_using_it() {
+    let mut listed = trivial::build(30, trivial::Overrides::default())
+        .expect("must build a trivial action")
+        .witnesses;
+    let unlisted = trivial::build(31, trivial::Overrides::default())
+        .expect("must build a trivial action")
+        .witnesses;
+
+    // A table listing the first action's kind, assigned its own kind point, so
+    // the action balances as without the table.
+    let resource = listed.compliance_witness.consumed_data[0].resource;
+    let kind_point = kind(&resource)
+        .expect("the trivial resource must have a kind")
+        .to_affine()
+        .to_encoded_point(false)
+        .as_bytes()
+        .to_vec();
+    let table = KindTable::from_entries(vec![KindTableEntry {
+        logic_ref: resource.logic_ref,
+        label_ref: resource.label_ref,
+        kind_point,
+    }])
+    .expect("the table must build");
+    let witness = &mut listed.compliance_witness;
+    witness.kind_paths = table.kind_paths_for(&witness.consumed_data, &witness.created_resources);
+    assert!(
+        witness.kind_paths.iter().all(Option::is_some),
+        "the table must list every resource of the first action"
+    );
+    assert!(
+        unlisted
+            .compliance_witness
+            .kind_paths
+            .iter()
+            .all(Option::is_none),
+        "no kind table is loaded, so the second action must use none"
+    );
+
+    let txn = LocalProver::new(JournalEncoding::Risc0Serde)
+        .prove(&[listed, unlisted])
+        .await
+        .expect("the local prover must aggregate actions with and without a kind table");
+
+    let instance = txn
+        .aggregation_instance()
+        .expect("the transaction must carry an aggregation");
+    assert_eq!(
+        instance.kind_table_root,
+        table.root(),
+        "the aggregation must commit to the kind table the first action uses"
+    );
 }
 
 #[tokio::test]

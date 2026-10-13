@@ -65,8 +65,7 @@ pub fn build(seed: u8, overrides: Overrides) -> anyhow::Result<ActionData> {
         overrides
             .ephemeral_root
             .unwrap_or(anoma_rm_risc0::compliance::INITIAL_ROOT),
-        // The loaded kind table, or the empty one if none is loaded.
-        anoma_rm_risc0::constants::kind_table().to_vec(),
+        crate::fixtures::kind_table(),
     );
 
     let tags: Vec<Digest> = consumed_nullifiers

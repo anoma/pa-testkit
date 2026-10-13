@@ -10,7 +10,7 @@ pub const PASSTHROUGH_LOGIC_PK: &[u8] = include_bytes!("../../../elfs/passthroug
 
 /// The image id of [`PASSTHROUGH_LOGIC_PK`].
 pub const PASSTHROUGH_LOGIC_VK: Digest = Digest::new([
-    0x01350b7e, 0xf42c1ae7, 0x64b0e602, 0x7ec4b184, 0xce8ed9f8, 0xa7b9745a, 0xeda9724a, 0xee776089,
+    0x777b3887, 0x8fc62951, 0x7a31cbf1, 0xe85c61ed, 0xfd532e28, 0x41089b30, 0x1720dd4e, 0xcd2315ae,
 ]);
 
 /// The pass-through logic's witness: the logic instance itself, which the

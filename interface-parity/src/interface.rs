@@ -378,11 +378,11 @@ mod tests {
     #[test]
     fn names_compare_in_snake_case() {
         for (name, snake) in [
-            ("setKindTableCommitment", "set_kind_table_commitment"),
+            ("setKindTableRoot", "set_kind_table_root"),
             ("RISC_ZERO_VERIFIER_ROUTER", "risc_zero_verifier_router"),
             ("upgradeToAndCall", "upgrade_to_and_call"),
             ("isERC1967Proxy", "is_erc1967_proxy"),
-            ("set_kind_table_commitment", "set_kind_table_commitment"),
+            ("set_kind_table_root", "set_kind_table_root"),
         ] {
             assert_eq!(snake_case(name), snake, "{name}");
         }
