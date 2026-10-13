@@ -109,16 +109,21 @@ pub(super) fn assemble(
         delta_proof::from_bytes_vec(&rcvs)
             .context("failed to construct delta witness from rcv values")?,
     );
-    // `verify` takes the commitment the transaction is checked against. No global kind table is installed here,
-    // so it comes from the compliance instances, which makes the check compare the aggregation against them.
-    let kind_table_root = compliance_unit::get_instance(
-        &actions
-            .first()
-            .context("the transaction carries no action")?
-            .compliance_unit,
-    )
-    .map_err(|error| anyhow::anyhow!("failed to read the compliance instance: {error:?}"))?
-    .kind_table_root;
+    // `verify` takes the root the transaction is checked against. No global kind table is installed here, so it
+    // comes from the compliance instances, which makes the check compare the aggregation against them.
+    anyhow::ensure!(!actions.is_empty(), "the transaction carries no action");
+    let kind_table_root = super::constrain::aggregated_kind_table_root(
+        actions
+            .iter()
+            .map(|action| {
+                compliance_unit::get_instance(&action.compliance_unit)
+                    .map(|instance| instance.kind_table_root)
+                    .map_err(|error| {
+                        anyhow::anyhow!("failed to read the compliance instance: {error:?}")
+                    })
+            })
+            .collect::<anyhow::Result<Vec<_>>>()?,
+    )?;
 
     let transaction = transaction::generate_delta_proof(ArmTxn::create(actions, delta))
         .context("failed to generate delta proof")?;

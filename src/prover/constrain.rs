@@ -9,6 +9,7 @@ use std::panic::AssertUnwindSafe;
 use anoma_rm_risc0::Digest;
 use anoma_rm_risc0::compliance::{self, ComplianceInstance};
 use anoma_rm_risc0::logic_instance::LogicInstance;
+use anoma_rm_risc0::merkle_path::PADDING_LEAF;
 use anyhow::Context;
 
 use crate::witness::{ActionWitnesses, LogicWitness};
@@ -52,6 +53,28 @@ pub(super) fn catching_panics<T>(f: impl FnOnce() -> anyhow::Result<T>) -> anyho
         }
         std::panic::resume_unwind(cause)
     })
+}
+
+/// The kind table root the batch aggregation circuit commits to for actions
+/// whose compliance instances commit to `roots`: the one root every action
+/// using a kind table commits to, or the empty table's root (the padding leaf)
+/// when none uses one. An action whose resources no table lists commits to
+/// the empty table's root and joins any.
+pub(super) fn aggregated_kind_table_root(
+    roots: impl IntoIterator<Item = Digest>,
+) -> anyhow::Result<Digest> {
+    let mut used: Option<Digest> = None;
+    for (action_idx, root) in roots.into_iter().enumerate() {
+        if root == PADDING_LEAF {
+            continue;
+        }
+        let shared = *used.get_or_insert(root);
+        anyhow::ensure!(
+            root == shared,
+            "action {action_idx} uses a different kind table than the transaction"
+        );
+    }
+    Ok(used.unwrap_or(PADDING_LEAF))
 }
 
 /// Constrains every action of a transaction (see [`action`]).
@@ -184,4 +207,40 @@ fn take_validated_logic(
         "action {action_idx} {role} logic verifying key mismatch for tag {tag}"
     );
     Ok(logic)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const TABLE: Digest = Digest::new([7; 8]);
+    const OTHER_TABLE: Digest = Digest::new([9; 8]);
+
+    #[test]
+    fn actions_without_a_kind_table_aggregate_under_the_empty_tables_root() {
+        assert_eq!(
+            aggregated_kind_table_root([PADDING_LEAF, PADDING_LEAF]).unwrap(),
+            PADDING_LEAF
+        );
+    }
+
+    #[test]
+    fn an_action_without_a_kind_table_joins_the_table_the_others_use() {
+        assert_eq!(
+            aggregated_kind_table_root([PADDING_LEAF, TABLE, PADDING_LEAF, TABLE]).unwrap(),
+            TABLE
+        );
+    }
+
+    #[test]
+    fn actions_using_two_kind_tables_do_not_aggregate() {
+        let error = aggregated_kind_table_root([TABLE, PADDING_LEAF, OTHER_TABLE])
+            .expect_err("two kind tables must not aggregate");
+        assert!(
+            error
+                .to_string()
+                .contains("action 2 uses a different kind table"),
+            "the error must name the action: {error}"
+        );
+    }
 }

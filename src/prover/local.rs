@@ -86,24 +86,24 @@ fn journal_digest(journal: &[u8]) -> Digest {
 /// Constrains every action and builds the aggregation instance the way the
 /// batch aggregation guest does: the action tree roots are recomputed from the
 /// compliance tags, the per-resource app data is merged in canonical tag order,
-/// and all actions must share one kind table root.
+/// and the actions using a kind table must share it.
 fn constrain_txn(
     action_witnesses: &[ActionWitnesses],
     encoding: JournalEncoding,
 ) -> anyhow::Result<Transaction> {
+    anyhow::ensure!(
+        !action_witnesses.is_empty(),
+        "cannot aggregate a transaction without actions"
+    );
     let mut actions = Vec::with_capacity(action_witnesses.len());
     let mut rcvs = Vec::new();
-    let mut kind_table_root: Option<Digest> = None;
+    let mut kind_table_roots = Vec::with_capacity(action_witnesses.len());
 
     for (action_idx, witnesses) in action_witnesses.iter().enumerate() {
         let constrained = constrain::action(witnesses, action_idx)?;
         let instance = &constrained.compliance_instance;
 
-        let shared = *kind_table_root.get_or_insert(instance.kind_table_root);
-        anyhow::ensure!(
-            instance.kind_table_root == shared,
-            "action {action_idx} commits to a different kind table than the transaction"
-        );
+        kind_table_roots.push(instance.kind_table_root);
 
         let tags: Vec<Digest> = instance.tags().collect();
         let action_tree_root = ActionTree::new(tags).root().with_context(|| {
@@ -146,8 +146,7 @@ fn constrain_txn(
 
     let instance = AggregationInstance {
         compliance_key: anoma_rm_risc0::constants::COMPLIANCE_VK,
-        kind_table_root: kind_table_root
-            .context("cannot aggregate a transaction without actions")?,
+        kind_table_root: constrain::aggregated_kind_table_root(kind_table_roots)?,
         actions,
     };
 
