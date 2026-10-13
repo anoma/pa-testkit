@@ -70,10 +70,10 @@ impl Transaction {
     }
 
     /// Make the transaction claim it was proven against the kind table
-    /// `commitment`, which its aggregation proof does not prove: used by
+    /// with root `root`, which its aggregation proof does not prove: used by
     /// negative tests of an adapter's kind-table check.
-    pub fn claim_kind_table_commitment(&mut self, commitment: Digest) -> anyhow::Result<()> {
-        self.aggregation_mut()?.instance.kind_table_root = commitment;
+    pub fn claim_kind_table_root(&mut self, root: Digest) -> anyhow::Result<()> {
+        self.aggregation_mut()?.instance.kind_table_root = root;
         Ok(())
     }
 

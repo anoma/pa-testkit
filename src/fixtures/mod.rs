@@ -19,14 +19,14 @@ pub(crate) fn consumed_nonce(seed: u8, index: u8) -> [u8; 32] {
     nonce
 }
 
-/// The commitment to the kind table the fixtures prove against: the loaded
+/// The root of the kind table the fixtures prove against: the loaded
 /// table, or the empty one when none is loaded.
-pub fn kind_table_commitment() -> Digest {
-    anoma_rm_risc0::constants::kind_table_root().unwrap_or_else(empty_kind_table_commitment)
+pub fn kind_table_root() -> Digest {
+    anoma_rm_risc0::constants::kind_table_root().unwrap_or_else(empty_kind_table_root)
 }
 
-/// The commitment to the empty kind table, which every protocol adapter
+/// The root of the empty kind table, which every protocol adapter
 /// accepts whatever table it stores.
-pub fn empty_kind_table_commitment() -> Digest {
+pub fn empty_kind_table_root() -> Digest {
     anoma_rm_risc0::kind_table::KindTable::empty().root()
 }

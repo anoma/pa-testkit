@@ -182,7 +182,7 @@ mod tests {
             "the aggregation proof must be a Groth16 receipt"
         );
 
-        transaction::verify(arm_txn, crate::fixtures::kind_table_commitment(), encoding)
+        transaction::verify(arm_txn, crate::fixtures::kind_table_root(), encoding)
             .expect("the aggregated transaction must verify");
     }
 }
