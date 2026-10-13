@@ -25,6 +25,10 @@ pub struct Overrides {
     /// ([`DELETION_CRITERION_NEVER`]) and emits each as a payload event,
     /// instead of deleting them once the calls are made.
     pub keep_calls: bool,
+    /// Blobs the consumed resource carries as its application payload, which
+    /// the adapter emits as payload events: bytes a settlement carries
+    /// without the external calls they would otherwise take.
+    pub application_payload: Vec<Vec<u32>>,
 }
 
 /// Build a pass-through action whose consumed resource makes `external_calls`,
@@ -87,6 +91,14 @@ pub fn build(
                         } else {
                             0
                         },
+                    })
+                    .collect(),
+                application_payload: overrides
+                    .application_payload
+                    .into_iter()
+                    .map(|blob| ExpirableBlob {
+                        blob,
+                        deletion_criterion: 0,
                     })
                     .collect(),
                 ..AppData::default()

@@ -60,3 +60,43 @@ async fn the_proven_action_carries_the_external_calls_under_the_consumed_tag() {
     );
     assert_eq!(action.created_publics[0].app_data, AppData::default());
 }
+
+#[tokio::test]
+async fn the_proven_action_carries_the_application_payload_under_the_consumed_tag() {
+    let payload = vec![vec![7, 8, 9], vec![10]];
+    let built = passthrough::build(
+        3,
+        vec![],
+        passthrough::Overrides {
+            application_payload: payload.clone(),
+            ..passthrough::Overrides::default()
+        },
+    )
+    .expect("a pass-through action must build");
+
+    let tx = LocalProver::new(JournalEncoding::Risc0Serde)
+        .prove(&[built.witnesses])
+        .await
+        .expect("the local prover must constrain a pass-through action");
+    let action = &tx
+        .as_arm()
+        .aggregation
+        .as_ref()
+        .expect("the transaction must carry an aggregation")
+        .instance
+        .actions[0];
+    assert_eq!(
+        action.consumed_publics[0].app_data,
+        AppData {
+            application_payload: payload
+                .into_iter()
+                .map(|blob| ExpirableBlob {
+                    blob,
+                    deletion_criterion: 0,
+                })
+                .collect(),
+            ..AppData::default()
+        }
+    );
+    assert_eq!(action.created_publics[0].app_data, AppData::default());
+}

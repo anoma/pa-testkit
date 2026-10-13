@@ -238,7 +238,10 @@ pub async fn settles_an_external_call_kept_as_a_payload<Env: Environment>(
         env,
         63,
         block_time_call(TimeComparison::Before),
-        passthrough::Overrides { keep_calls: true },
+        passthrough::Overrides {
+            keep_calls: true,
+            ..passthrough::Overrides::default()
+        },
     )
     .await?;
     settles(env, tx).await
