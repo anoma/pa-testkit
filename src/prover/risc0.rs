@@ -82,7 +82,7 @@ impl Prover for Risc0Prover {
         })
         .await
         .context("failed to aggregate the transaction")?;
-        assemble::verify_aggregated(aggregated, assembled.kind_table_commitment, encoding)
+        assemble::verify_aggregated(aggregated, assembled.kind_table_root, encoding)
     }
 }
 

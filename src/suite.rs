@@ -323,7 +323,7 @@ mod tests {
                 self.kind_table_commitment,
                 crate::fixtures::empty_kind_table_commitment(),
             ]
-            .contains(&instance.kind_table_commitment)
+            .contains(&instance.kind_table_root)
             {
                 return Ok(Some(Refusal::UnacceptedKindTableCommitment));
             }

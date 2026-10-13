@@ -153,7 +153,7 @@ async fn prove_via_queue(
     let aggregated: ArmTxn = bincode::deserialize(&agg_result.transaction)
         .context("failed to decode aggregated transaction")?;
 
-    assemble::verify_aggregated(aggregated, assembled.kind_table_commitment, encoding)
+    assemble::verify_aggregated(aggregated, assembled.kind_table_root, encoding)
 }
 
 fn build_base_job_specs(action_witnesses: &[ActionWitnesses]) -> anyhow::Result<Vec<BaseJobSpec>> {

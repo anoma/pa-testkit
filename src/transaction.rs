@@ -73,7 +73,7 @@ impl Transaction {
     /// `commitment`, which its aggregation proof does not prove: used by
     /// negative tests of an adapter's kind-table check.
     pub fn claim_kind_table_commitment(&mut self, commitment: Digest) -> anyhow::Result<()> {
-        self.aggregation_mut()?.instance.kind_table_commitment = commitment;
+        self.aggregation_mut()?.instance.kind_table_root = commitment;
         Ok(())
     }
 

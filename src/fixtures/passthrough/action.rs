@@ -1,5 +1,6 @@
 use anoma_rm_risc0::action_tree::ActionTree;
 use anoma_rm_risc0::compliance;
+use anoma_rm_risc0::kind_table::KindTable;
 use anoma_rm_risc0::logic_instance::{AppData, ExpirableBlob, LogicInstance};
 use anoma_rm_risc0::nullifier_key::NullifierKey;
 use anoma_rm_risc0::resource::{ConsumedResourceWitness, Resource};
@@ -70,7 +71,7 @@ pub fn build(
         vec![ConsumedResourceWitness::from_resource(consumed, nf_key)],
         vec![created],
         // The loaded kind table, or the empty one if none is loaded.
-        anoma_rm_risc0::constants::kind_table().to_vec(),
+        anoma_rm_risc0::constants::global_kind_table().unwrap_or(&KindTable::empty()),
     );
 
     let root = ActionTree::new(vec![nullifier, commitment])
