@@ -59,12 +59,18 @@ pub(super) fn catching_panics<T>(f: impl FnOnce() -> anyhow::Result<T>) -> anyho
 /// whose compliance instances commit to `roots`: the one root every action
 /// using a kind table commits to, or the empty table's root (the padding leaf)
 /// when none uses one. An action whose resources no table lists commits to
-/// the empty table's root and joins any.
+/// the empty table's root and joins any. A transaction without actions does
+/// not aggregate.
 pub(super) fn aggregated_kind_table_root(
     roots: impl IntoIterator<Item = Digest>,
 ) -> anyhow::Result<Digest> {
+    let mut roots = roots.into_iter().peekable();
+    anyhow::ensure!(
+        roots.peek().is_some(),
+        "cannot aggregate a transaction without actions"
+    );
     let mut used: Option<Digest> = None;
-    for (action_idx, root) in roots.into_iter().enumerate() {
+    for (action_idx, root) in roots.enumerate() {
         if root == PADDING_LEAF {
             continue;
         }
@@ -229,6 +235,16 @@ mod tests {
         assert_eq!(
             aggregated_kind_table_root([PADDING_LEAF, TABLE, PADDING_LEAF, TABLE]).unwrap(),
             TABLE
+        );
+    }
+
+    #[test]
+    fn a_transaction_without_actions_does_not_aggregate() {
+        let error = aggregated_kind_table_root([])
+            .expect_err("a transaction without actions must not aggregate");
+        assert!(
+            error.to_string().contains("without actions"),
+            "the error must say why: {error}"
         );
     }
 

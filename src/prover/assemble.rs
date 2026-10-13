@@ -111,7 +111,6 @@ pub(super) fn assemble(
     );
     // `verify` takes the root the transaction is checked against. No global kind table is installed here, so it
     // comes from the compliance instances, which makes the check compare the aggregation against them.
-    anyhow::ensure!(!actions.is_empty(), "the transaction carries no action");
     let kind_table_root = super::constrain::aggregated_kind_table_root(
         actions
             .iter()

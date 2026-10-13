@@ -91,10 +91,6 @@ fn constrain_txn(
     action_witnesses: &[ActionWitnesses],
     encoding: JournalEncoding,
 ) -> anyhow::Result<Transaction> {
-    anyhow::ensure!(
-        !action_witnesses.is_empty(),
-        "cannot aggregate a transaction without actions"
-    );
     let mut actions = Vec::with_capacity(action_witnesses.len());
     let mut rcvs = Vec::new();
     let mut kind_table_roots = Vec::with_capacity(action_witnesses.len());

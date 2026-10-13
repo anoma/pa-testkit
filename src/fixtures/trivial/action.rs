@@ -1,6 +1,5 @@
 use anoma_rm_risc0::action_tree::ActionTree;
 use anoma_rm_risc0::compliance;
-use anoma_rm_risc0::kind_table::KindTable;
 use anoma_rm_risc0::resource::{ConsumedResourceWitness, Resource};
 use anoma_rm_risc0::resource_logic::TrivialLogicWitness;
 use anyhow::Context;
@@ -66,8 +65,7 @@ pub fn build(seed: u8, overrides: Overrides) -> anyhow::Result<ActionData> {
         overrides
             .ephemeral_root
             .unwrap_or(anoma_rm_risc0::compliance::INITIAL_ROOT),
-        // The loaded kind table, or the empty one if none is loaded.
-        anoma_rm_risc0::constants::global_kind_table().unwrap_or(&KindTable::empty()),
+        crate::fixtures::kind_table(),
     );
 
     let tags: Vec<Digest> = consumed_nullifiers
