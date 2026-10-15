@@ -14,7 +14,7 @@ forge = { version = "1.8.5", sha256 = { linux_amd64 = "6c66ffcc55fa4249197721baa
 name = "anomapay-erc20-forwarder"
 side = "evm"
 url = "https://github.com/anoma/anomapay-erc20-forwarder"
-commit = "2950e87747dd21c9980d12face8acecf031e85ca"
+commit = "301bcb5133b4b2368fc521f64794614fa86b401c"
 forge = { version = "1.8.5", sha256 = { linux_amd64 = "6c66ffcc55fa4249197721baa3098bc208014ea1d8aa04b2ed50ac6bccffb226", darwin_arm64 = "56049728e25e44a61c7f2e49438023b0890cb45850ffcb7c882f90cd998baf83" } }
 
 [[repository]]
