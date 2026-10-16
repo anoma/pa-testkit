@@ -39,7 +39,7 @@ elfs:
     ./scripts/update_elfs.sh
 
 # The toolchain whose rustdoc JSON interface-parity reads (rust_api::NIGHTLY)
-nightly := "nightly-2026-02-08"
+nightly := "nightly-2026-07-01"
 
 # Install the toolchain interface-parity runs rustdoc with
 install-nightly:
