@@ -26,3 +26,7 @@ idl = { repository = "anoma-pa-solana-client", path = "idl/protocol_adapter.json
 [[interface]]
 abi = { repository = "anomapay-erc20-forwarder", path = "crates/bindings/src/generated/erc20_forwarder.rs" }
 idl = { repository = "anomapay-spl-token-forwarder", path = "crates/client/idl/spl_token_forwarder.json" }
+
+[[interface]]
+abi = { repository = "anomapay-erc20-forwarder", path = "crates/bindings/src/generated/emergency_migrating_erc20_forwarder.rs" }
+idl = { repository = "anomapay-spl-token-forwarder", path = "crates/client/idl/emergency_migrating_spl_token_forwarder.json" }

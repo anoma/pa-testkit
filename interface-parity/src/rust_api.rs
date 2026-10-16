@@ -9,9 +9,11 @@ use crate::cmd;
 use crate::compare::Surface;
 use crate::packages::lib_target;
 
-/// The toolchain whose rustdoc JSON `public-api` 0.52.2 reads. The justfile's
-/// `nightly` variable names the same toolchain for `just install-nightly`.
-pub(crate) const NIGHTLY: &str = "nightly-2026-02-08";
+/// The toolchain whose rustdoc JSON the pinned `public-api` reads, and no
+/// older than the `rust-version` the pinned repositories' locked crates
+/// require. The justfile's `nightly` variable names the same toolchain for
+/// `just install-nightly`.
+pub(crate) const NIGHTLY: &str = "nightly-2026-07-01";
 
 /// rustup installs a toolchain it is asked for unless told not to, and
 /// concurrent installs of one toolchain fail; a missing toolchain is an error.
