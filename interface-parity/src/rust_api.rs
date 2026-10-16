@@ -9,10 +9,10 @@ use crate::cmd;
 use crate::compare::Surface;
 use crate::packages::lib_target;
 
-/// The toolchain whose rustdoc JSON (format 60) `public-api` 0.52.2 reads, a
-/// 1.98 nightly: the Solana 4.3 crates the clients lock require rustc 1.97.1,
-/// which no 1.97 nightly is. The justfile's `nightly` variable names the same
-/// toolchain for `just install-nightly`.
+/// The toolchain whose rustdoc JSON the pinned `public-api` reads, and no
+/// older than the `rust-version` the pinned repositories' locked crates
+/// require. The justfile's `nightly` variable names the same toolchain for
+/// `just install-nightly`.
 pub(crate) const NIGHTLY: &str = "nightly-2026-07-01";
 
 /// rustup installs a toolchain it is asked for unless told not to, and
