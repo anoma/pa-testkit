@@ -155,17 +155,11 @@ async fn prove_via_queue(
             instance: compliance_result.instance,
         };
 
-        // The logic verifier inputs must be in the canonical tag order
-        // (consumed nullifiers, then created commitments) — `constrain`
-        // returns them reordered, and `witness_index` correlates each with
-        // its proving job.
-        let logic_count = action.consumed_logics.len() + action.created_logics.len();
-        let mut logic_verifier_inputs = Vec::with_capacity(logic_count);
-        for logic in action
-            .consumed_logics
-            .into_iter()
-            .chain(action.created_logics)
-        {
+        // The logic verifier inputs must be in the order of the unit's
+        // resources — `constrain` returns them reordered, and
+        // `witness_index` correlates each with its proving job.
+        let mut logic_verifier_inputs = Vec::with_capacity(action.resource_logics.len());
+        for logic in action.resource_logics {
             let result = take_base_result(
                 &mut base_results_by_key,
                 action_idx,

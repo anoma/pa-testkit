@@ -19,9 +19,8 @@ pub(super) struct ConstrainedLogic {
     /// The logic's verifying key.
     pub verifying_key: Digest,
     /// Position of the originating witness in
-    /// [`ActionWitnesses::logic_witnesses`], correlating canonical-order
-    /// logics with their per-witness proving jobs.
-    #[cfg_attr(not(feature = "e2e"), allow(dead_code))]
+    /// [`ActionWitnesses::logic_witnesses`], correlating each logic with its
+    /// per-witness proving job.
     pub witness_index: usize,
 }
 
@@ -30,17 +29,14 @@ pub(super) struct ConstrainedLogic {
 pub(super) struct ConstrainedAction {
     /// The action's compliance instance.
     pub compliance_instance: ComplianceInstance,
-    /// Logic inputs for the consumed resources, in `consumed_publics` order.
-    pub consumed_logics: Vec<ConstrainedLogic>,
-    /// Logic inputs for the created resources, in `created_publics` order.
-    pub created_logics: Vec<ConstrainedLogic>,
+    /// Logic inputs for the resources, in `resource_publics` order.
+    pub resource_logics: Vec<ConstrainedLogic>,
 }
 
 /// Constrains every witness of an action and checks that each of the compliance
 /// unit's consumed and created resources has a matching logic witness — by tag,
 /// role, and verifying key — mirroring [`anoma_rm_risc0::action::Action`]. The
-/// returned logics are reordered into the canonical tag order (consumed
-/// nullifiers, then created commitments).
+/// returned logics are reordered into the order of the unit's resources.
 pub(super) fn action(
     witnesses: &ActionWitnesses,
     action_idx: usize,
@@ -50,8 +46,7 @@ pub(super) fn action(
             format!("failed to constrain the compliance unit of action {action_idx}")
         })?;
 
-    let resource_count =
-        compliance_instance.consumed_publics.len() + compliance_instance.created_publics.len();
+    let resource_count = compliance_instance.resource_publics.len();
     anyhow::ensure!(
         witnesses.logic_witnesses.len() == resource_count,
         "action {action_idx} must have exactly one logic witness per resource: \
@@ -84,31 +79,16 @@ pub(super) fn action(
         );
     }
 
-    let consumed_logics = compliance_instance
-        .consumed_publics
+    let resource_logics = compliance_instance
+        .resource_publics
         .iter()
-        .map(|consumed| {
+        .map(|resource| {
             take_validated_logic(
                 &mut logics,
                 &logic_index_by_tag,
-                consumed.resource_nullifier,
-                true,
-                consumed.resource_logic_ref,
-                action_idx,
-            )
-        })
-        .collect::<anyhow::Result<Vec<_>>>()?;
-
-    let created_logics = compliance_instance
-        .created_publics
-        .iter()
-        .map(|created| {
-            take_validated_logic(
-                &mut logics,
-                &logic_index_by_tag,
-                created.resource_commitment,
-                false,
-                created.resource_logic_ref,
+                resource.resource_tag,
+                resource.is_consumed(),
+                resource.resource_logic_ref,
                 action_idx,
             )
         })
@@ -116,8 +96,7 @@ pub(super) fn action(
 
     Ok(ConstrainedAction {
         compliance_instance,
-        consumed_logics,
-        created_logics,
+        resource_logics,
     })
 }
 

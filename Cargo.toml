@@ -54,3 +54,8 @@ tokio = { version = "1.48", features = ["time"], optional = true }
 # For the chain-free trivial-action / local-prover tests under `tests/`
 # (run with `--features local,fixtures`).
 tokio = { version = "1.48", features = ["macros", "rt-multi-thread"] }
+
+[patch.crates-io]
+anoma-rm-core = { git = "https://github.com/anoma/arm-risc0", rev = "ba22c6bd2ab101832e02fd71fd09a68bb350f3b4" }
+anoma-rm-risc0 = { git = "https://github.com/anoma/arm-risc0", rev = "ba22c6bd2ab101832e02fd71fd09a68bb350f3b4" }
+anoma-rm-risc0-gadgets = { git = "https://github.com/anoma/arm-risc0", rev = "ba22c6bd2ab101832e02fd71fd09a68bb350f3b4" }
