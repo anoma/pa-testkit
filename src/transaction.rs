@@ -88,9 +88,10 @@ impl CoreTransaction for Transaction {
                 .iter()
                 .flat_map(|action| {
                     action
-                        .created_publics
+                        .resource_publics
                         .iter()
-                        .map(|created| created.resource_commitment)
+                        .filter(|resource| !resource.is_consumed())
+                        .map(|created| created.resource_tag)
                 })
                 .collect()
         } else {
@@ -102,9 +103,10 @@ impl CoreTransaction for Transaction {
                 .map(|action| {
                     compliance_unit::get_instance(&action.compliance_unit).map(|instance| {
                         instance
-                            .created_publics
+                            .resource_publics
                             .iter()
-                            .map(|created| created.resource_commitment)
+                            .filter(|resource| !resource.is_consumed())
+                            .map(|created| created.resource_tag)
                             .collect::<Vec<_>>()
                     })
                 })
