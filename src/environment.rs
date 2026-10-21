@@ -80,11 +80,11 @@ pub enum Refusal {
     UnknownRoot,
     /// A consumed resource's nullifier is already spent.
     NullifierSpent,
-    /// The transaction's kind-table root is neither the one the adapter
+    /// The transaction's kind tree root is neither the one the adapter
     /// stores nor the empty table's.
-    UnacceptedKindTableRoot,
+    UnacceptedKindTreeRoot,
     /// The aggregation proof does not prove the transaction's actions under
-    /// the adapter's compliance key and the transaction's kind-table root.
+    /// the adapter's compliance key and the transaction's kind tree root.
     InvalidAggregationProof,
     /// An external call returned other than the output its proof expects.
     ExternalCallOutputMismatch,
@@ -160,10 +160,10 @@ pub trait ProtocolAdapter {
     /// chain.
     async fn latest_root(&self) -> anyhow::Result<Digest>;
 
-    /// As the adapter's owner, makes `root` the kind-table root
+    /// As the adapter's owner, makes `root` the kind tree root
     /// it stores: from then on a transaction settles when proven against that
     /// table or against the empty one.
-    async fn set_kind_table_root(&mut self, root: Digest) -> anyhow::Result<()>;
+    async fn set_kind_tree_root(&mut self, root: Digest) -> anyhow::Result<()>;
 
     /// As the adapter's owner, pauses settlement.
     async fn pause(&mut self) -> anyhow::Result<()>;
