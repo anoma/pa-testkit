@@ -291,7 +291,7 @@ mod tests {
         roots: HashSet<Digest>,
         nullifiers: HashSet<Digest>,
         denied_logic_refs: HashSet<DeniedLogicRef>,
-        kind_table_root: Digest,
+        kind_tree_root: Digest,
         paused: bool,
         encoding: JournalEncoding,
     }
@@ -306,7 +306,7 @@ mod tests {
                 tree,
                 nullifiers: HashSet::new(),
                 denied_logic_refs: HashSet::new(),
-                kind_table_root: crate::fixtures::empty_kind_table_root(),
+                kind_tree_root: crate::fixtures::empty_kind_table_root(),
                 paused: false,
                 encoding,
             }
@@ -320,7 +320,7 @@ mod tests {
             let aggregation = transaction.aggregation()?;
             let instance = &aggregation.instance;
             if ![
-                self.kind_table_root,
+                self.kind_tree_root,
                 crate::fixtures::empty_kind_table_root(),
             ]
             .contains(&instance.kind_table_root)
@@ -488,7 +488,7 @@ mod tests {
                 root != Digest::ZERO,
                 "the zero kind tree root is not allowed"
             );
-            self.kind_table_root = root;
+            self.kind_tree_root = root;
             Ok(())
         }
 
