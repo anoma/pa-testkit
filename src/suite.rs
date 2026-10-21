@@ -122,7 +122,7 @@ pub async fn settles_a_transaction_proven_against_the_empty_kind_table<Env: Envi
          kind table lists its resources"
     );
     env.protocol_adapter_mut()
-        .set_kind_table_root(OTHER_KIND_TABLE)
+        .set_kind_tree_root(OTHER_KIND_TABLE)
         .await
         .context("failed to install another kind table")?;
     settles(env, tx).await
@@ -137,10 +137,10 @@ pub async fn settlement_refuses_a_kind_table_neither_stored_nor_empty<Env: Envir
 ) -> anyhow::Result<()> {
     let mut tx = prove_actions(env, &[trivial_action(57, trivial::Overrides::default())?]).await?;
     tx.claim_kind_table_root(OTHER_KIND_TABLE)?;
-    refuses(env, tx.clone(), Refusal::UnacceptedKindTableRoot).await?;
+    refuses(env, tx.clone(), Refusal::UnacceptedKindTreeRoot).await?;
 
     env.protocol_adapter_mut()
-        .set_kind_table_root(OTHER_KIND_TABLE)
+        .set_kind_tree_root(OTHER_KIND_TABLE)
         .await
         .context("failed to install the claimed kind table")?;
     refuses(env, tx, Refusal::InvalidAggregationProof).await
@@ -291,7 +291,7 @@ mod tests {
         roots: HashSet<Digest>,
         nullifiers: HashSet<Digest>,
         denied_logic_refs: HashSet<DeniedLogicRef>,
-        kind_table_root: Digest,
+        kind_tree_root: Digest,
         paused: bool,
         encoding: JournalEncoding,
     }
@@ -306,7 +306,7 @@ mod tests {
                 tree,
                 nullifiers: HashSet::new(),
                 denied_logic_refs: HashSet::new(),
-                kind_table_root: crate::fixtures::empty_kind_table_root(),
+                kind_tree_root: crate::fixtures::empty_kind_table_root(),
                 paused: false,
                 encoding,
             }
@@ -320,12 +320,12 @@ mod tests {
             let aggregation = transaction.aggregation()?;
             let instance = &aggregation.instance;
             if ![
-                self.kind_table_root,
+                self.kind_tree_root,
                 crate::fixtures::empty_kind_table_root(),
             ]
             .contains(&instance.kind_table_root)
             {
-                return Ok(Some(Refusal::UnacceptedKindTableRoot));
+                return Ok(Some(Refusal::UnacceptedKindTreeRoot));
             }
             let mut refusals = Vec::new();
             let mut refuse = |refusal| {
@@ -483,12 +483,12 @@ mod tests {
 
         // The owner's calls refuse what both chains' adapters refuse.
 
-        async fn set_kind_table_root(&mut self, root: Digest) -> anyhow::Result<()> {
+        async fn set_kind_tree_root(&mut self, root: Digest) -> anyhow::Result<()> {
             anyhow::ensure!(
                 root != Digest::ZERO,
-                "the zero kind-table root is not allowed"
+                "the zero kind tree root is not allowed"
             );
-            self.kind_table_root = root;
+            self.kind_tree_root = root;
             Ok(())
         }
 
@@ -620,8 +620,8 @@ mod tests {
         adapter.pause().await?;
         anyhow::ensure!(adapter.pause().await.is_err(), "paused while paused");
         anyhow::ensure!(
-            adapter.set_kind_table_root(Digest::ZERO).await.is_err(),
-            "installed the zero kind-table root"
+            adapter.set_kind_tree_root(Digest::ZERO).await.is_err(),
+            "installed the zero kind tree root"
         );
         let deny = |logic_ref, consumed| DeniedLogicRef {
             logic_ref,
