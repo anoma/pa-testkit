@@ -79,15 +79,15 @@ fn journal_digest(journal: &[u8]) -> Digest {
 fn constrain_txn(action_witnesses: &[ActionWitnesses]) -> anyhow::Result<Transaction> {
     let mut actions = Vec::with_capacity(action_witnesses.len());
     let mut rcvs = Vec::new();
-    let mut kind_table_root: Option<Digest> = None;
+    let mut kind_tree_root: Option<Digest> = None;
 
     for (action_idx, witnesses) in action_witnesses.iter().enumerate() {
         let constrained = constrain::action(witnesses, action_idx)?;
         let instance = &constrained.compliance_instance;
 
-        let shared = *kind_table_root.get_or_insert(instance.kind_table_root);
+        let shared = *kind_tree_root.get_or_insert(instance.kind_tree_root);
         anyhow::ensure!(
-            instance.kind_table_root == shared,
+            instance.kind_tree_root == shared,
             "action {action_idx} commits to a different kind table than the transaction"
         );
 
@@ -132,8 +132,7 @@ fn constrain_txn(action_witnesses: &[ActionWitnesses]) -> anyhow::Result<Transac
 
     let instance = AggregationInstance {
         compliance_key: anoma_rm_risc0::constants::COMPLIANCE_VK,
-        kind_table_root: kind_table_root
-            .context("cannot aggregate a transaction without actions")?,
+        kind_tree_root: kind_tree_root.context("cannot aggregate a transaction without actions")?,
         actions,
     };
 
