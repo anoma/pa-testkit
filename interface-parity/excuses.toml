@@ -1,2 +1,18 @@
 # Each [[excuse]] covers one exact difference: id, pair, key, the exact evm
 # and solana values, and the reason it is accepted.
+
+[[excuse]]
+id = "no-migrational-adapter"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "forge bind crate::generated::migrational_protocol_adapter module"
+evm = ["MigrationalProtocolAdapter"]
+solana = []
+reason = "anoma/dos-pm#156: the EVM migrational adapter takes over a stopped V1 adapter's state once and is then deleted; no Solana adapter holds state to take over."
+
+[[excuse]]
+id = "no-migrational-interface"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "forge bind crate::generated::i_migrational module"
+evm = ["IMigrational"]
+solana = []
+reason = "anoma/dos-pm#156: the interface of the EVM migrational adapter, which Solana has no counterpart of."
