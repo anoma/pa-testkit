@@ -94,19 +94,22 @@ pub(crate) fn walk(
 /// The non-source files of a package, each given by its path in the package
 /// and the file to read it from: those describing it ([`description_key`],
 /// with cargo's `descriptions`) by presence, other JSON files key by key, any
-/// other file by its SHA-256.
+/// other file by its SHA-256. A description present under two names (a
+/// readme cargo lists twice on a case-insensitive file system) is present
+/// once.
 fn files_surface(
     files: impl IntoIterator<Item = (String, PathBuf)>,
     sources: &[&str],
     descriptions: &[&str],
 ) -> anyhow::Result<Surface> {
     let mut s = Surface::default();
+    let mut described = std::collections::BTreeSet::new();
     for (path, full) in files {
         if sources.iter().any(|ext| path.ends_with(ext)) {
             continue;
         }
         if let Some(key) = description_key(&path, descriptions) {
-            s.insert(key, "present");
+            described.insert(key);
             continue;
         }
         let bytes = std::fs::read(&full).with_context(|| format!("reading {}", full.display()))?;
@@ -120,6 +123,9 @@ fn files_surface(
                 format!("sha256 {}", hex::encode(Sha256::digest(&bytes))),
             );
         }
+    }
+    for key in described {
+        s.insert(key, "present");
     }
     Ok(s)
 }
@@ -199,6 +205,18 @@ pub fn npm_files(pkg: &Package, work: &Path) -> anyhow::Result<Surface> {
 mod tests {
     use super::*;
     use crate::compare::compare;
+
+    /// Cargo on a case-insensitive file system names one readme twice
+    /// (`readme.txt` and the `README.txt` it detects); presence is one fact.
+    #[test]
+    fn two_names_of_a_description_are_one_presence() {
+        let files = ["readme.txt", "README.txt"].map(|p| (p.to_owned(), PathBuf::from(p)));
+        let s = files_surface(files, CARGO_SOURCES, CARGO_DESCRIPTIONS).unwrap();
+        let lines = compare("p", &s, &Surface::default());
+        assert_eq!(lines.len(), 1, "{lines:#?}");
+        assert_eq!(lines[0].key, "file README", "{lines:#?}");
+        assert_eq!(lines[0].evm, vec!["present"], "{lines:#?}");
+    }
 
     #[test]
     fn json_flattens_to_the_file_and_one_key_per_scalar_and_empty_container_in_it() {
