@@ -192,14 +192,14 @@ async fn prove_via_queue(
     );
     // `verify` takes the kind table root the transaction is checked against. No global kind table is installed here,
     // so it comes from the compliance instances, which makes the check compare the aggregation against them.
-    let kind_table_root = compliance_unit::get_instance(
+    let kind_tree_root = compliance_unit::get_instance(
         &actions
             .first()
             .context("the transaction carries no action")?
             .compliance_unit,
     )
     .map_err(|error| anyhow::anyhow!("failed to read the compliance instance: {error:?}"))?
-    .kind_table_root;
+    .kind_tree_root;
 
     let arm_txn = transaction::generate_delta_proof(ArmTxn::create(actions, delta))
         .context("failed to generate delta proof")?;
@@ -231,7 +231,7 @@ async fn prove_via_queue(
     let aggregated: ArmTxn = bincode::deserialize(&agg_result.transaction)
         .context("failed to decode aggregated transaction")?;
 
-    transaction::verify(&aggregated, kind_table_root, JOURNAL_ENCODING)
+    transaction::verify(&aggregated, kind_tree_root, JOURNAL_ENCODING)
         .context("aggregated transaction failed local verification")?;
 
     Ok(Transaction::from_arm(aggregated))
