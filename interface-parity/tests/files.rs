@@ -7,20 +7,15 @@ use interface_parity::files::cargo_files;
 use interface_parity::packages::{Kind, discover};
 
 #[test]
-fn cargo_shipped_files_are_read_from_the_package_archive() {
+fn cargo_shipped_files_are_the_files_cargo_packages() {
     let surfaces: Vec<_> = [("evm-repo", "evm"), ("solana-repo", "solana")]
         .into_iter()
         .map(|(fixture, repo)| {
             let (packages, _) = discover(repo, &checkout(fixture));
-            let Kind::Cargo(meta) = &packages[0].kind else {
+            let Kind::Cargo(_) = &packages[0].kind else {
                 panic!("{:?} is not a Cargo package", packages[0].id);
             };
-            cargo_files(
-                &packages[0],
-                meta,
-                &common::scratch(&format!("files-{repo}")),
-            )
-            .unwrap()
+            cargo_files(&packages[0]).unwrap()
         })
         .collect();
     let lines = compare("p", &surfaces[0], &surfaces[1]);
@@ -48,7 +43,7 @@ fn cargo_shipped_files_are_read_from_the_package_archive() {
         Outcome::Differs
     );
     // The files that describe the package compare by presence (files.rs,
-    // `is_description`): the EVM fixture's readme is README.md, the Solana
+    // `description_key`): the EVM fixture's readme is README.md, the Solana
     // one's readme.txt.
     for key in [
         "file Cargo.toml",
@@ -71,21 +66,28 @@ fn cargo_shipped_files_are_read_from_the_package_archive() {
 }
 
 /// A crate with a dependency that names no version is one a registry cannot
-/// take, so it is consumed from git: it ships no archive, and so no files,
-/// and the rest of what it publishes (its metadata and API) is still read.
+/// take, so it is consumed from git. Cargo gives a git consumer the same
+/// files it would package, so those files, and its metadata and API, are
+/// read as for any crate.
 #[test]
-fn a_crate_a_registry_cannot_take_ships_no_files_but_still_has_its_api() {
+fn a_crate_a_registry_cannot_take_still_has_its_files_and_api() {
     let (packages, _) = discover("unversioned", &checkout("unversioned-repo"));
     let [pkg] = &packages[..] else {
         panic!("the publish = false core is not published: {packages:#?}");
     };
-    let Kind::Cargo(meta) = &pkg.kind else {
+    let Kind::Cargo(_) = &pkg.kind else {
         panic!("{:?} is not a Cargo package", pkg.id);
     };
     let work = common::scratch("files-unversioned");
-    let files = cargo_files(pkg, meta, &work).expect("a git-consumed crate has no archive");
+    let files = cargo_files(pkg).unwrap();
     let lines = compare("p", &files, &Default::default());
-    assert!(lines.is_empty(), "{lines:#?}");
+    for key in [
+        "file Cargo.toml",
+        "file deployments.json",
+        "file deployments.json#/staging",
+    ] {
+        assert!(lines.iter().any(|l| l.key == key), "no {key} in {lines:#?}");
+    }
 
     let surface = interface_parity::run::package_surface(pkg, &work, &[], None)
         .unwrap()

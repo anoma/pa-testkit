@@ -39,7 +39,7 @@ pub fn package_surface(
             };
             let mut s = cargo_metadata_surface(meta);
             s.extend(api.surface);
-            s.extend(files::cargo_files(pkg, meta, work)?);
+            s.extend(files::cargo_files(pkg)?);
             Ok((s, notes))
         }
         Kind::Npm(manifest) => {

@@ -91,24 +91,17 @@ pub(crate) fn walk(
     Ok(())
 }
 
-/// The non-source files of an unpacked package: those describing it
-/// ([`description_key`], with cargo's `descriptions`) by presence, other JSON
-/// files key by key, any other file by its SHA-256.
-fn unpacked_surface(
-    root: &Path,
+/// The non-source files of a package, each given by its path in the package
+/// and the file to read it from: those describing it ([`description_key`],
+/// with cargo's `descriptions`) by presence, other JSON files key by key, any
+/// other file by its SHA-256.
+fn files_surface(
+    files: impl IntoIterator<Item = (String, PathBuf)>,
     sources: &[&str],
     descriptions: &[&str],
 ) -> anyhow::Result<Surface> {
-    let mut paths = vec![];
-    walk(root, &|_| false, &mut paths)?;
     let mut s = Surface::default();
-    for full in paths {
-        let path = full
-            .strip_prefix(root)?
-            .components()
-            .map(|c| c.as_os_str().to_string_lossy())
-            .collect::<Vec<_>>()
-            .join("/");
+    for (path, full) in files {
         if sources.iter().any(|ext| path.ends_with(ext)) {
             continue;
         }
@@ -131,7 +124,7 @@ fn unpacked_surface(
     Ok(s)
 }
 
-/// Unpacks a `.crate` or `.tgz` archive into a fresh `dir`.
+/// Unpacks a `.tgz` archive into a fresh `dir`.
 fn unpack(archive: &Path, dir: &Path) -> anyhow::Result<()> {
     cmd::fresh_dir(dir)?;
     cmd::stdout(
@@ -149,46 +142,20 @@ fn package_dir(work: &Path, pkg: &Package, what: &str) -> PathBuf {
     work.join(what).join(pkg.id.replace(['/', ':', '@'], "_"))
 }
 
-/// Whether a registry can take the crate: cargo packages a crate only when
-/// every dependency it keeps names a version, and a git or path dependency
-/// without one leaves the crate to consumers who take it from git, with no
-/// archive. Development dependencies do not count; packaging drops those
-/// without a version.
-fn registry_can_take(meta: &cargo_metadata::Package) -> bool {
-    meta.dependencies.iter().all(|dep| {
-        dep.kind == cargo_metadata::DependencyKind::Development
-            || dep.req != semver::VersionReq::STAR
-            || dep.source.as_ref().is_some_and(|source| {
-                source.repr.starts_with("registry+") || source.repr.starts_with("sparse+")
-            })
-    })
-}
-
-/// The non-source files of the `.crate` archive `cargo package` builds; none
-/// for a crate a registry cannot take ([`registry_can_take`]).
-pub fn cargo_files(
-    pkg: &Package,
-    meta: &cargo_metadata::Package,
-    work: &Path,
-) -> anyhow::Result<Surface> {
-    if !registry_can_take(meta) {
-        return Ok(Surface::default());
-    }
-    let target = package_dir(work, pkg, "cargo-package");
-    cmd::stdout(
+/// The non-source files of a crate: those `cargo package --list` names,
+/// which is what a consumer gets from a registry and from git alike, read
+/// from the package directory. The files cargo generates when packaging are
+/// descriptions, compared by presence, so they are never read.
+pub fn cargo_files(pkg: &Package) -> anyhow::Result<Surface> {
+    let listed = cmd::stdout(
         Command::new("cargo")
-            .args(["package", "--no-verify", "--allow-dirty", "--manifest-path"])
-            .arg(&pkg.manifest)
-            .arg("--target-dir")
-            .arg(&target),
+            .args(["package", "--list", "--allow-dirty", "--manifest-path"])
+            .arg(&pkg.manifest),
     )?;
-    let stem = format!("{}-{}", meta.name, meta.version);
-    let unpacked = package_dir(work, pkg, "unpacked");
-    unpack(
-        &target.join("package").join(format!("{stem}.crate")),
-        &unpacked,
-    )?;
-    unpacked_surface(&unpacked.join(stem), CARGO_SOURCES, CARGO_DESCRIPTIONS)
+    let files = listed
+        .lines()
+        .map(|path| (path.to_owned(), pkg.dir().join(path)));
+    files_surface(files, CARGO_SOURCES, CARGO_DESCRIPTIONS)
 }
 
 /// The non-source files of the tarball `npm pack` builds from the package's
@@ -210,7 +177,22 @@ pub fn npm_files(pkg: &Package, work: &Path) -> anyhow::Result<Surface> {
         .with_context(|| format!("npm pack --json named no tarball: {packed}"))?;
     let unpacked = package_dir(work, pkg, "unpacked");
     unpack(&destination.join(filename), &unpacked)?;
-    unpacked_surface(&unpacked.join("package"), NPM_SOURCES, &[])
+    let root = unpacked.join("package");
+    let mut paths = vec![];
+    walk(&root, &|_| false, &mut paths)?;
+    let files = paths
+        .into_iter()
+        .map(|full| {
+            let path = full
+                .strip_prefix(&root)?
+                .components()
+                .map(|c| c.as_os_str().to_string_lossy())
+                .collect::<Vec<_>>()
+                .join("/");
+            Ok((path, full))
+        })
+        .collect::<anyhow::Result<Vec<_>>>()?;
+    files_surface(files, NPM_SOURCES, &[])
 }
 
 #[cfg(test)]
