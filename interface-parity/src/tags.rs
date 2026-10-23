@@ -1,5 +1,3 @@
-use std::collections::BTreeSet;
-
 use crate::compare::Surface;
 
 /// The part of a tag before its semver version: `bindings/v3.0.0` gives
@@ -12,8 +10,8 @@ fn prefix(tag: &str) -> &str {
 
 pub fn surface(tags: &[String]) -> Surface {
     let mut s = Surface::default();
-    for p in tags.iter().map(|t| prefix(t)).collect::<BTreeSet<_>>() {
-        s.insert(format!("tag-prefix {p}"), "present");
+    for tag in tags {
+        s.insert_present(format!("tag-prefix {}", prefix(tag)));
     }
     s
 }

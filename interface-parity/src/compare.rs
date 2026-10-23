@@ -19,6 +19,14 @@ impl Surface {
         values.sort();
     }
 
+    /// Records the item under `key` as present: its one value is its
+    /// presence, so recording it again changes nothing.
+    pub fn insert_present(&mut self, key: impl Into<String>) {
+        self.items
+            .entry(key.into())
+            .or_insert_with(|| vec!["present".to_owned()]);
+    }
+
     /// Records that the item under `key` belongs to the one under `parent`.
     pub fn set_parent(&mut self, key: impl Into<String>, parent: impl Into<String>) {
         self.parents.insert(key.into(), parent.into());

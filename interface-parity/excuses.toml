@@ -1,2 +1,34 @@
 # Each [[excuse]] covers one exact difference: id, pair, key, the exact evm
 # and solana values, and the reason it is accepted.
+
+[[excuse]]
+id = "no-migrational-adapter"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "forge bind crate::generated::migrational_protocol_adapter module"
+evm = ["MigrationalProtocolAdapter"]
+solana = []
+reason = "anoma/dos-pm#156: the EVM migrational adapter takes over a stopped V1 adapter's state once and is then deleted; no Solana adapter holds state to take over."
+
+[[excuse]]
+id = "no-migrational-interface"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "forge bind crate::generated::i_migrational module"
+evm = ["IMigrational"]
+solana = []
+reason = "anoma/dos-pm#156: the interface of the EVM migrational adapter, which Solana has no counterpart of."
+
+[[excuse]]
+id = "adapter-program-crate"
+pair = "solana-protocol-adapter/cargo:protocol-adapter (unpaired)"
+key = "package"
+evm = []
+solana = ["published"]
+reason = "The program's source, the counterpart of pa-evm's soldeer package anoma-pa-evm, which is Solidity and has no Rust API to compare; the program's interface is compared ABI against IDL. Its registry release is anoma/dos-pm#161."
+
+[[excuse]]
+id = "forwarder-program-crate"
+pair = "anomapay-spl-token-forwarder/cargo:spl-token-forwarder (unpaired)"
+key = "package"
+evm = []
+solana = ["published"]
+reason = "The program's source, the counterpart of the soldeer package anomapay-erc20-forwarder, which is Solidity and has no Rust API to compare; the program's interface is compared ABI against IDL. Its registry release is anoma/dos-pm#161."

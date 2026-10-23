@@ -13,8 +13,9 @@ use crate::packages::Package;
 const CARGO_SOURCES: &[&str] = &[".rs"];
 const NPM_SOURCES: &[&str] = &[".ts", ".js", ".mjs", ".cjs", ".map"];
 
-/// The files cargo writes into a package archive to describe it: its record
-/// of the manifest, the commit and the lock.
+/// The files `cargo package --list` names that describe the crate, written
+/// only when cargo packages it: its record of the manifest, the commit and
+/// the lock.
 const CARGO_DESCRIPTIONS: &[&str] = &[
     ".cargo_vcs_info.json",
     "Cargo.lock",
@@ -41,7 +42,7 @@ fn description_key(path: &str, descriptions: &[&str]) -> Option<String> {
 /// JSON scalar and per empty array or object, keyed by its JSON pointer
 /// (RFC 6901), so a difference names the exact place in the file.
 fn flatten_json(prefix: &str, value: &serde_json::Value, s: &mut Surface) {
-    s.insert(prefix, "present");
+    s.insert_present(prefix);
     fn walk(prefix: &str, pointer: String, value: &serde_json::Value, s: &mut Surface) {
         match value {
             serde_json::Value::Object(map) if !map.is_empty() => {
@@ -91,31 +92,26 @@ pub(crate) fn walk(
     Ok(())
 }
 
-/// The non-source files of an unpacked package: those describing it
-/// ([`description_key`], with cargo's `descriptions`) by presence, other JSON
-/// files key by key, any other file by its SHA-256.
-fn unpacked_surface(
+/// The non-source files of the package under `root`, given by their paths in
+/// it: those describing it ([`description_key`], with cargo's
+/// `descriptions`) by presence, other JSON files key by key, any other file
+/// by its SHA-256.
+fn files_surface(
     root: &Path,
+    paths: impl IntoIterator<Item = String>,
     sources: &[&str],
     descriptions: &[&str],
 ) -> anyhow::Result<Surface> {
-    let mut paths = vec![];
-    walk(root, &|_| false, &mut paths)?;
     let mut s = Surface::default();
-    for full in paths {
-        let path = full
-            .strip_prefix(root)?
-            .components()
-            .map(|c| c.as_os_str().to_string_lossy())
-            .collect::<Vec<_>>()
-            .join("/");
+    for path in paths {
         if sources.iter().any(|ext| path.ends_with(ext)) {
             continue;
         }
         if let Some(key) = description_key(&path, descriptions) {
-            s.insert(key, "present");
+            s.insert_present(key);
             continue;
         }
+        let full = root.join(&path);
         let bytes = std::fs::read(&full).with_context(|| format!("reading {}", full.display()))?;
         if path.ends_with(".json") {
             let value: serde_json::Value = serde_json::from_slice(&bytes)
@@ -131,7 +127,7 @@ fn unpacked_surface(
     Ok(s)
 }
 
-/// Unpacks a `.crate` or `.tgz` archive into a fresh `dir`.
+/// Unpacks a `.tgz` archive into a fresh `dir`.
 fn unpack(archive: &Path, dir: &Path) -> anyhow::Result<()> {
     cmd::fresh_dir(dir)?;
     cmd::stdout(
@@ -149,46 +145,24 @@ fn package_dir(work: &Path, pkg: &Package, what: &str) -> PathBuf {
     work.join(what).join(pkg.id.replace(['/', ':', '@'], "_"))
 }
 
-/// Whether a registry can take the crate: cargo packages a crate only when
-/// every dependency it keeps names a version, and a git or path dependency
-/// without one leaves the crate to consumers who take it from git, with no
-/// archive. Development dependencies do not count; packaging drops those
-/// without a version.
-fn registry_can_take(meta: &cargo_metadata::Package) -> bool {
-    meta.dependencies.iter().all(|dep| {
-        dep.kind == cargo_metadata::DependencyKind::Development
-            || dep.req != semver::VersionReq::STAR
-            || dep.source.as_ref().is_some_and(|source| {
-                source.repr.starts_with("registry+") || source.repr.starts_with("sparse+")
-            })
-    })
-}
-
-/// The non-source files of the `.crate` archive `cargo package` builds; none
-/// for a crate a registry cannot take ([`registry_can_take`]).
-pub fn cargo_files(
-    pkg: &Package,
-    meta: &cargo_metadata::Package,
-    work: &Path,
-) -> anyhow::Result<Surface> {
-    if !registry_can_take(meta) {
-        return Ok(Surface::default());
-    }
-    let target = package_dir(work, pkg, "cargo-package");
-    cmd::stdout(
+/// The non-source files of a crate: those `cargo package --list` names, the
+/// files cargo counts as the crate's whether a registry archive or a git
+/// checkout delivers it, read from the package directory. A crate with a
+/// dependency that names no version has no registry archive, and still has
+/// these files. The files cargo generates when packaging are descriptions,
+/// compared by presence, so they are never read.
+pub fn cargo_files(pkg: &Package) -> anyhow::Result<Surface> {
+    let listed = cmd::stdout(
         Command::new("cargo")
-            .args(["package", "--no-verify", "--allow-dirty", "--manifest-path"])
-            .arg(&pkg.manifest)
-            .arg("--target-dir")
-            .arg(&target),
+            .args(["package", "--list", "--allow-dirty", "--manifest-path"])
+            .arg(&pkg.manifest),
     )?;
-    let stem = format!("{}-{}", meta.name, meta.version);
-    let unpacked = package_dir(work, pkg, "unpacked");
-    unpack(
-        &target.join("package").join(format!("{stem}.crate")),
-        &unpacked,
-    )?;
-    unpacked_surface(&unpacked.join(stem), CARGO_SOURCES, CARGO_DESCRIPTIONS)
+    files_surface(
+        pkg.dir(),
+        listed.lines().map(str::to_owned),
+        CARGO_SOURCES,
+        CARGO_DESCRIPTIONS,
+    )
 }
 
 /// The non-source files of the tarball `npm pack` builds from the package's
@@ -210,13 +184,39 @@ pub fn npm_files(pkg: &Package, work: &Path) -> anyhow::Result<Surface> {
         .with_context(|| format!("npm pack --json named no tarball: {packed}"))?;
     let unpacked = package_dir(work, pkg, "unpacked");
     unpack(&destination.join(filename), &unpacked)?;
-    unpacked_surface(&unpacked.join("package"), NPM_SOURCES, &[])
+    let root = unpacked.join("package");
+    let mut paths = vec![];
+    walk(&root, &|_| false, &mut paths)?;
+    let paths = paths
+        .iter()
+        .map(|full| {
+            Ok(full
+                .strip_prefix(&root)?
+                .components()
+                .map(|c| c.as_os_str().to_string_lossy())
+                .collect::<Vec<_>>()
+                .join("/"))
+        })
+        .collect::<anyhow::Result<Vec<_>>>()?;
+    files_surface(&root, paths, NPM_SOURCES, &[])
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::compare::compare;
+
+    /// Cargo on a case-insensitive file system names one readme twice
+    /// (`readme.txt` and the `README.txt` it detects); presence is one fact.
+    #[test]
+    fn two_names_of_a_description_are_one_presence() {
+        let paths = ["readme.txt", "README.txt"].map(str::to_owned);
+        let s = files_surface(Path::new("."), paths, CARGO_SOURCES, CARGO_DESCRIPTIONS).unwrap();
+        let lines = compare("p", &s, &Surface::default());
+        assert_eq!(lines.len(), 1, "{lines:#?}");
+        assert_eq!(lines[0].key, "file README", "{lines:#?}");
+        assert_eq!(lines[0].evm, vec!["present"], "{lines:#?}");
+    }
 
     #[test]
     fn json_flattens_to_the_file_and_one_key_per_scalar_and_empty_container_in_it() {
