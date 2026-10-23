@@ -13,8 +13,9 @@ use crate::packages::Package;
 const CARGO_SOURCES: &[&str] = &[".rs"];
 const NPM_SOURCES: &[&str] = &[".ts", ".js", ".mjs", ".cjs", ".map"];
 
-/// The files cargo writes into a package archive to describe it: its record
-/// of the manifest, the commit and the lock.
+/// The files `cargo package --list` names that describe the crate, written
+/// only when cargo packages it: its record of the manifest, the commit and
+/// the lock.
 const CARGO_DESCRIPTIONS: &[&str] = &[
     ".cargo_vcs_info.json",
     "Cargo.lock",
@@ -41,7 +42,7 @@ fn description_key(path: &str, descriptions: &[&str]) -> Option<String> {
 /// JSON scalar and per empty array or object, keyed by its JSON pointer
 /// (RFC 6901), so a difference names the exact place in the file.
 fn flatten_json(prefix: &str, value: &serde_json::Value, s: &mut Surface) {
-    s.insert(prefix, "present");
+    s.insert_present(prefix);
     fn walk(prefix: &str, pointer: String, value: &serde_json::Value, s: &mut Surface) {
         match value {
             serde_json::Value::Object(map) if !map.is_empty() => {
@@ -91,27 +92,26 @@ pub(crate) fn walk(
     Ok(())
 }
 
-/// The non-source files of a package, each given by its path in the package
-/// and the file to read it from: those describing it ([`description_key`],
-/// with cargo's `descriptions`) by presence, other JSON files key by key, any
-/// other file by its SHA-256. A description present under two names (a
-/// readme cargo lists twice on a case-insensitive file system) is present
-/// once.
+/// The non-source files of the package under `root`, given by their paths in
+/// it: those describing it ([`description_key`], with cargo's
+/// `descriptions`) by presence, other JSON files key by key, any other file
+/// by its SHA-256.
 fn files_surface(
-    files: impl IntoIterator<Item = (String, PathBuf)>,
+    root: &Path,
+    paths: impl IntoIterator<Item = String>,
     sources: &[&str],
     descriptions: &[&str],
 ) -> anyhow::Result<Surface> {
     let mut s = Surface::default();
-    let mut described = std::collections::BTreeSet::new();
-    for (path, full) in files {
+    for path in paths {
         if sources.iter().any(|ext| path.ends_with(ext)) {
             continue;
         }
         if let Some(key) = description_key(&path, descriptions) {
-            described.insert(key);
+            s.insert_present(key);
             continue;
         }
+        let full = root.join(&path);
         let bytes = std::fs::read(&full).with_context(|| format!("reading {}", full.display()))?;
         if path.ends_with(".json") {
             let value: serde_json::Value = serde_json::from_slice(&bytes)
@@ -123,9 +123,6 @@ fn files_surface(
                 format!("sha256 {}", hex::encode(Sha256::digest(&bytes))),
             );
         }
-    }
-    for key in described {
-        s.insert(key, "present");
     }
     Ok(s)
 }
@@ -148,20 +145,24 @@ fn package_dir(work: &Path, pkg: &Package, what: &str) -> PathBuf {
     work.join(what).join(pkg.id.replace(['/', ':', '@'], "_"))
 }
 
-/// The non-source files of a crate: those `cargo package --list` names,
-/// which is what a consumer gets from a registry and from git alike, read
-/// from the package directory. The files cargo generates when packaging are
-/// descriptions, compared by presence, so they are never read.
+/// The non-source files of a crate: those `cargo package --list` names, the
+/// files cargo counts as the crate's whether a registry archive or a git
+/// checkout delivers it, read from the package directory. A crate with a
+/// dependency that names no version has no registry archive, and still has
+/// these files. The files cargo generates when packaging are descriptions,
+/// compared by presence, so they are never read.
 pub fn cargo_files(pkg: &Package) -> anyhow::Result<Surface> {
     let listed = cmd::stdout(
         Command::new("cargo")
             .args(["package", "--list", "--allow-dirty", "--manifest-path"])
             .arg(&pkg.manifest),
     )?;
-    let files = listed
-        .lines()
-        .map(|path| (path.to_owned(), pkg.dir().join(path)));
-    files_surface(files, CARGO_SOURCES, CARGO_DESCRIPTIONS)
+    files_surface(
+        pkg.dir(),
+        listed.lines().map(str::to_owned),
+        CARGO_SOURCES,
+        CARGO_DESCRIPTIONS,
+    )
 }
 
 /// The non-source files of the tarball `npm pack` builds from the package's
@@ -186,19 +187,18 @@ pub fn npm_files(pkg: &Package, work: &Path) -> anyhow::Result<Surface> {
     let root = unpacked.join("package");
     let mut paths = vec![];
     walk(&root, &|_| false, &mut paths)?;
-    let files = paths
-        .into_iter()
+    let paths = paths
+        .iter()
         .map(|full| {
-            let path = full
+            Ok(full
                 .strip_prefix(&root)?
                 .components()
                 .map(|c| c.as_os_str().to_string_lossy())
                 .collect::<Vec<_>>()
-                .join("/");
-            Ok((path, full))
+                .join("/"))
         })
         .collect::<anyhow::Result<Vec<_>>>()?;
-    files_surface(files, NPM_SOURCES, &[])
+    files_surface(&root, paths, NPM_SOURCES, &[])
 }
 
 #[cfg(test)]
@@ -210,8 +210,8 @@ mod tests {
     /// (`readme.txt` and the `README.txt` it detects); presence is one fact.
     #[test]
     fn two_names_of_a_description_are_one_presence() {
-        let files = ["readme.txt", "README.txt"].map(|p| (p.to_owned(), PathBuf::from(p)));
-        let s = files_surface(files, CARGO_SOURCES, CARGO_DESCRIPTIONS).unwrap();
+        let paths = ["readme.txt", "README.txt"].map(str::to_owned);
+        let s = files_surface(Path::new("."), paths, CARGO_SOURCES, CARGO_DESCRIPTIONS).unwrap();
         let lines = compare("p", &s, &Surface::default());
         assert_eq!(lines.len(), 1, "{lines:#?}");
         assert_eq!(lines[0].key, "file README", "{lines:#?}");

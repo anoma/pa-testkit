@@ -4,7 +4,7 @@ mod common;
 use checkout::checkout;
 use interface_parity::compare::{Outcome, compare};
 use interface_parity::files::cargo_files;
-use interface_parity::packages::{Kind, discover};
+use interface_parity::packages::discover;
 
 #[test]
 fn cargo_shipped_files_are_the_files_cargo_packages() {
@@ -12,9 +12,6 @@ fn cargo_shipped_files_are_the_files_cargo_packages() {
         .into_iter()
         .map(|(fixture, repo)| {
             let (packages, _) = discover(repo, &checkout(fixture));
-            let Kind::Cargo(_) = &packages[0].kind else {
-                panic!("{:?} is not a Cargo package", packages[0].id);
-            };
             cargo_files(&packages[0]).unwrap()
         })
         .collect();
@@ -66,21 +63,20 @@ fn cargo_shipped_files_are_the_files_cargo_packages() {
 }
 
 /// A crate with a dependency that names no version is one a registry cannot
-/// take, so it is consumed from git. Cargo gives a git consumer the same
-/// files it would package, so those files, and its metadata and API, are
-/// read as for any crate.
+/// take, so it is consumed from git. Its files are still those cargo counts
+/// as the crate's, so they, its metadata and its API are read as for any
+/// crate.
 #[test]
 fn a_crate_a_registry_cannot_take_still_has_its_files_and_api() {
     let (packages, _) = discover("unversioned", &checkout("unversioned-repo"));
     let [pkg] = &packages[..] else {
         panic!("the publish = false core is not published: {packages:#?}");
     };
-    let Kind::Cargo(_) = &pkg.kind else {
-        panic!("{:?} is not a Cargo package", pkg.id);
-    };
     let work = common::scratch("files-unversioned");
-    let files = cargo_files(pkg).unwrap();
-    let lines = compare("p", &files, &Default::default());
+    let surface = interface_parity::run::package_surface(pkg, &work, &[], None)
+        .unwrap()
+        .0;
+    let lines = compare("p", &surface, &Default::default());
     for key in [
         "file Cargo.toml",
         "file deployments.json",
@@ -88,11 +84,6 @@ fn a_crate_a_registry_cannot_take_still_has_its_files_and_api() {
     ] {
         assert!(lines.iter().any(|l| l.key == key), "no {key} in {lines:#?}");
     }
-
-    let surface = interface_parity::run::package_surface(pkg, &work, &[], None)
-        .unwrap()
-        .0;
-    let lines = compare("p", &surface, &Default::default());
     assert!(
         lines
             .iter()
