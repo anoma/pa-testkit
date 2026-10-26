@@ -77,7 +77,7 @@ pub trait Prover {
     ///
     /// Invalid witnesses will result in an error.
     #[allow(async_fn_in_trait)]
-    async fn prove(&self, actions: &[ActionWitnesses]) -> anyhow::Result<Self::Transaction>;
+    async fn prove(&self, actions: &[&ActionWitnesses]) -> anyhow::Result<Self::Transaction>;
 }
 
 /// Builder of a [`State`] instance.

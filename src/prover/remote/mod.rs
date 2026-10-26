@@ -55,7 +55,7 @@ impl QueueProver {
 impl Prover for QueueProver {
     type Transaction = Transaction;
 
-    async fn prove(&self, actions: &[ActionWitnesses]) -> anyhow::Result<Self::Transaction> {
+    async fn prove(&self, actions: &[&ActionWitnesses]) -> anyhow::Result<Self::Transaction> {
         prove_via_queue(&self.queue, actions).await
     }
 }
@@ -101,7 +101,7 @@ struct FetchedBaseJob {
 
 async fn prove_via_queue(
     queue: &QueueClient,
-    action_witnesses: &[ActionWitnesses],
+    action_witnesses: &[&ActionWitnesses],
 ) -> anyhow::Result<Transaction> {
     let constrained =
         std::panic::catch_unwind(AssertUnwindSafe(|| constrain_actions(action_witnesses)))
@@ -234,7 +234,7 @@ async fn prove_via_queue(
 /// Constrains and validates every action, panicking on invalid witnesses (the
 /// caller catches the panic).
 fn constrain_actions(
-    action_witnesses: &[ActionWitnesses],
+    action_witnesses: &[&ActionWitnesses],
 ) -> anyhow::Result<Vec<ConstrainedAction>> {
     action_witnesses
         .iter()
@@ -266,7 +266,7 @@ fn take_base_result(
 }
 
 fn build_base_job_specs(
-    action_witnesses: &[ActionWitnesses],
+    action_witnesses: &[&ActionWitnesses],
 ) -> anyhow::Result<(Vec<BaseJobSpec>, Vec<Vec<u8>>)> {
     let mut specs = Vec::new();
     let mut rcvs = Vec::new();

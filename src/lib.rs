@@ -15,12 +15,13 @@ use anyhow::Context;
 use self::environment::{CommitmentTree, Environment, ProtocolAdapter, Prover};
 use self::witness::ActionWitnesses;
 
-pub async fn prove_actions<Env: Environment>(
+pub async fn prove_actions<'a, Env: Environment>(
     env: &Env,
-    actions: &[ActionWitnesses],
+    actions: impl IntoIterator<Item = &'a ActionWitnesses>,
 ) -> anyhow::Result<Env::Transaction> {
+    let actions: Vec<&ActionWitnesses> = actions.into_iter().collect();
     env.prover()
-        .prove(actions)
+        .prove(&actions)
         .await
         .context("failed to prove action witnesses")
 }

@@ -3,12 +3,14 @@ use anoma_rm_risc0::nullifier_key::NullifierKeyCommitment;
 use anoma_rm_risc0::resource::Resource;
 use risc0_zkvm::Digest;
 
+use crate::fixtures::action::ResourceToCreate;
+
 /// Overrides for the consumed/created trivial resources, used to size the
 /// action and to build deliberately-invalid variants for negative tests.
 ///
-/// The per-side overrides apply uniformly to every resource on that side; the
-/// nonce overrides only make sense with the default counts of one resource per
-/// side (identical nonces on one side would collide).
+/// The per-side overrides apply uniformly to every resource on that side.
+/// `consumed_nonce` gives all consumed resources one nullifier, so it needs a
+/// consumed count of one.
 #[derive(Clone, Debug, Default)]
 pub struct Overrides {
     pub consumed_count: Option<usize>,
@@ -18,10 +20,6 @@ pub struct Overrides {
     pub consumed_is_ephemeral: Option<bool>,
     pub created_is_ephemeral: Option<bool>,
     pub consumed_nonce: Option<[u8; 32]>,
-    pub created_nonce: Option<[u8; 32]>,
-    /// The order of the resources in the compliance witness, as positions in the consumed resources
-    /// followed by the created resources. `None` keeps that order.
-    pub resource_order: Option<Vec<usize>>,
 }
 
 impl Overrides {
@@ -72,17 +70,15 @@ pub(super) fn consumed(
 
 pub(super) fn created(
     seed: u8,
-    derived_nonce: [u8; 32],
     nk_commitment: NullifierKeyCommitment,
     overrides: &Overrides,
-) -> Resource {
-    Resource {
+) -> ResourceToCreate {
+    ResourceToCreate {
         logic_ref: anoma_rm_risc0::constants::PADDING_LOGIC_VK,
         label_ref: Digest::default(),
         quantity: overrides.created_quantity.unwrap_or(0),
         value_ref: Digest::default(),
         is_ephemeral: overrides.created_is_ephemeral.unwrap_or(true),
-        nonce: overrides.created_nonce.unwrap_or(derived_nonce),
         nk_commitment,
         rand_seed: [seed.wrapping_add(33); 32],
     }

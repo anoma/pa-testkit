@@ -25,8 +25,7 @@ nesting.
 - `environment` — backend-agnostic traits: `Environment`, `Prover`,
   `ProtocolAdapter`, `Transaction`, `CommitmentTree`, plus the typed `State` /
   `StateBuilder` container.
-- `witness` — `ActionWitnesses`, `LogicWitness`, and `constrain_action` (native
-  constraint checking, no zkVM).
+- `witness` — `ActionWitnesses` (the compliance witness and one logic witness per resource) and `LogicWitness`.
 - `transaction` — the risc0 `Transaction` newtype over `arm::Transaction`, the
   orphan-rule seam that lets the testkit implement the `Transaction` trait.
 - `prover` — the two chain-agnostic provers:
@@ -34,13 +33,8 @@ nesting.
     seals. No real proving — fast and offline.
   - `QueueProver` (`feature = "e2e"`): submits to the real remote proving queue.
     Built from typed params (`new(base_url, auth_token)`); reads no environment.
-- `assert` — negative-test assertion helpers (`Needle`,
-  `expect_integration_panic`), shared by every integration-test crate. The
-  proof-tamper counterpart lives on `Transaction` (`tamper_first_logic_seal`).
-- `fixtures` (`feature = "fixtures"`): the trivial action kind — one `build`
-  (plus batch `build_many`) returning `ActionData`, with `Overrides` for negative
-  tests (ADR-0003). App- and chain-agnostic, exposed for reuse by every
-  integration-test crate.
+- `assert` — negative-test assertion helpers (`Needle`, `expect_integration_panic`), shared by every integration-test crate. The proof-tamper counterpart lives on `Transaction` (`tamper_aggregation_seal`).
+- `fixtures` (`feature = "fixtures"`): the action builder `action::build`, which builds the `ActionWitnesses` of one action from a list of `ActionResource`s, and the trivial action kind, whose `resources` gives its action resources, with `Overrides` for negative tests (ADR-0004). App- and chain-agnostic, exposed for reuse by every integration-test crate.
 - `identities` — well-known test signing keys.
 - `mocks` (`feature = "mocks"`): `mockall` doubles of the core traits.
 
@@ -58,16 +52,15 @@ contracts:
   (local) / lookup-from-bindings per chain (e2e), mock verifier bindings.
 - `anomapay-erc20-forwarder` → `anomapay-erc20-forwarder-integration-test`:
   ERC20/Permit2/forwarder deploy + state helpers and the AnomaPay ERC20
-  wrap/transfer/unwrap action builders.
+  wrap/transfer/unwrap action kinds.
 - `anoma-generic-call-forwarder` →
   `anoma-generic-call-forwarder-integration-test`: generic-call deploy + state
-  and action builders; composes the AnomaPay ERC20 app in its setups.
+  and action kind; composes the AnomaPay ERC20 app in its setups.
 
 ## Data flow
 
 1. A chain harness constructs an `Environment` and populates backend state.
-2. Tests build action witnesses (trivial fixtures here, or app-specific builders
-   downstream).
+2. Tests take their action resources from the action kinds (trivial here, app-specific kinds downstream) and build the action witnesses with `fixtures::action::build`.
 3. `prove_actions` delegates to the backend `Prover`, yielding an
    `arm::Transaction`.
 4. `execute_tx` delegates to the chain `ProtocolAdapter`, which converts the ARM

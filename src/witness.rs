@@ -2,6 +2,7 @@ use anoma_rm_risc0::Digest;
 use anoma_rm_risc0::compliance::ComplianceWitness;
 use anoma_rm_risc0::logic_instance::LogicInstance;
 use anoma_rm_risc0::logic_proof::LogicProver;
+use anoma_rm_risc0::resource::Resource;
 use anoma_rm_risc0::resource_logic::LogicCircuit;
 use anyhow::Context;
 
@@ -20,10 +21,21 @@ pub struct ActionWitnesses {
     /// The action's compliance witness constraining its consumed and created
     /// resources. Their order sets the order of the resources in the
     /// aggregation instance.
-    pub compliance_witness: Box<ComplianceWitness>,
+    pub compliance_witness: ComplianceWitness,
     /// One logic witness per resource in the action, matched to the compliance
     /// witness by the tag it produces when constrained.
     pub logic_witnesses: Vec<Box<dyn LogicWitness>>,
+}
+
+impl ActionWitnesses {
+    /// The resources in their order, with the derived nonces of the created resources.
+    pub fn resources(&self) -> Vec<Resource> {
+        self.compliance_witness
+            .resource_instances
+            .iter()
+            .map(|witness| *witness.resource())
+            .collect()
+    }
 }
 
 /// Witness of a logic proof.
