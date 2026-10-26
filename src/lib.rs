@@ -10,6 +10,7 @@ pub mod transaction;
 pub mod witness;
 
 use anoma_rm_risc0::Digest;
+use anoma_rm_risc0::merkle_path::MerklePath;
 use anyhow::Context;
 
 use self::environment::{CommitmentTree, Environment, ProtocolAdapter, Prover};
@@ -41,4 +42,15 @@ pub fn commitment_root<Env: Environment>(env: &Env) -> anyhow::Result<Digest> {
         .commitment_tree()
         .root()
         .context("failed to compute commitment tree root")
+}
+
+/// The path of `commitment` in the commitment tree of the protocol adapter.
+pub fn commitment_path<Env: Environment>(
+    env: &Env,
+    commitment: Digest,
+) -> anyhow::Result<MerklePath> {
+    env.protocol_adapter()
+        .commitment_tree()
+        .path_to(commitment)
+        .with_context(|| format!("failed to compute the path of commitment {commitment}"))
 }

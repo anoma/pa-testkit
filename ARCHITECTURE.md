@@ -38,8 +38,7 @@ nesting.
 - `identities` — well-known test signing keys.
 - `mocks` (`feature = "mocks"`): `mockall` doubles of the core traits.
 
-Generic helpers `prove_actions`, `execute_tx`, `commitment_root` live at the
-crate root.
+Generic helpers `prove_actions`, `execute_tx`, `commitment_root` and `commitment_path` live at the crate root.
 
 ## Downstream layout
 
