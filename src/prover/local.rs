@@ -5,10 +5,11 @@ use std::panic::AssertUnwindSafe;
 
 use anoma_rm_risc0::action_tree::ActionTree;
 use anoma_rm_risc0::aggregation_instance::{
-    ActionAggregated, AggregationInstance, ConsumedResourceAggregated, CreatedResourceAggregated,
+    ActionAggregated, AggregationInstance, AggregationResourceInstance,
 };
 use anoma_rm_risc0::delta_proof;
 use anoma_rm_risc0::proving_system::JournalEncoding;
+use anoma_rm_risc0::resource::ComplianceResourceInstance;
 use anoma_rm_risc0::transaction::{self, Aggregation, Delta, Transaction as ArmTxn};
 use anyhow::Context;
 use risc0_zkvm::sha::Digestible;
@@ -74,8 +75,8 @@ fn journal_digest(journal: &[u8]) -> Digest {
 
 /// Constrains every action and builds the aggregation instance the way the
 /// batch aggregation guest does: the action tree roots are recomputed from the
-/// compliance tags, the per-resource app data is merged in canonical tag order,
-/// and all actions must share one kind table root.
+/// compliance tags, the per-resource app data is merged in the order of the
+/// compliance unit's resources, and all actions must share one kind table root.
 fn constrain_txn(action_witnesses: &[ActionWitnesses]) -> anyhow::Result<Transaction> {
     let mut actions = Vec::with_capacity(action_witnesses.len());
     let mut rcvs = Vec::new();
@@ -96,32 +97,42 @@ fn constrain_txn(action_witnesses: &[ActionWitnesses]) -> anyhow::Result<Transac
             format!("failed to compute the action tree root of action {action_idx}")
         })?;
 
-        let consumed_publics = instance
-            .consumed_publics
+        let mut resource_instances = Vec::with_capacity(instance.resource_instances.len());
+        for (resource, logic) in instance
+            .resource_instances
             .iter()
-            .zip(constrained.consumed_logics)
-            .map(|(consumed, logic)| ConsumedResourceAggregated {
-                resource_nullifier: consumed.resource_nullifier,
-                resource_logic_ref: consumed.resource_logic_ref,
-                commitment_tree_root: consumed.commitment_tree_root,
-                app_data: logic.instance.app_data,
-            })
-            .collect();
-
-        let created_publics = instance
-            .created_publics
-            .iter()
-            .zip(constrained.created_logics)
-            .map(|(created, logic)| CreatedResourceAggregated {
-                resource_commitment: created.resource_commitment,
-                resource_logic_ref: created.resource_logic_ref,
-                app_data: logic.instance.app_data,
-            })
-            .collect();
+            .zip(constrained.resource_logics)
+        {
+            anyhow::ensure!(
+                logic.instance.root == action_tree_root,
+                "logic witness {} of action {action_idx} proves against another action tree root",
+                logic.witness_index
+            );
+            let app_data = logic.instance.app_data;
+            resource_instances.push(match *resource {
+                ComplianceResourceInstance::Consumed {
+                    nullifier,
+                    logic_ref,
+                    commitment_tree_root,
+                } => AggregationResourceInstance::Consumed {
+                    nullifier,
+                    logic_ref,
+                    commitment_tree_root,
+                    app_data,
+                },
+                ComplianceResourceInstance::Created {
+                    commitment,
+                    logic_ref,
+                } => AggregationResourceInstance::Created {
+                    commitment,
+                    logic_ref,
+                    app_data,
+                },
+            });
+        }
 
         actions.push(ActionAggregated {
-            consumed_publics,
-            created_publics,
+            resource_instances,
             delta_x: instance.delta_x,
             delta_y: instance.delta_y,
             action_tree_root,

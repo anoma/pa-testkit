@@ -6,6 +6,10 @@
 use anoma_pa_testkit::environment::Prover;
 use anoma_pa_testkit::fixtures::trivial;
 use anoma_pa_testkit::prover::LocalProver;
+use anoma_pa_testkit::witness::ActionWitnesses;
+use anoma_rm_risc0::Digest;
+use anoma_rm_risc0::action_tree::ActionTree;
+use anoma_rm_risc0::compliance;
 
 #[test]
 fn build_trivial_action_defaults_to_one_resource_per_side() {
@@ -104,8 +108,94 @@ async fn local_prover_mock_aggregates_an_n_to_m_action() {
         .aggregation
         .as_ref()
         .expect("the transaction must carry an aggregation");
-    assert_eq!(aggregation.instance.actions[0].consumed_publics.len(), 2);
-    assert_eq!(aggregation.instance.actions[0].created_publics.len(), 3);
+    let is_consumed: Vec<bool> = aggregation.instance.actions[0]
+        .resource_instances
+        .iter()
+        .map(|resource| resource.is_consumed())
+        .collect();
+    assert_eq!(is_consumed, [true, true, false, false, false]);
+}
+
+#[tokio::test]
+async fn local_prover_keeps_the_order_of_the_compliance_unit() {
+    let built = trivial::build(
+        10,
+        trivial::Overrides {
+            consumed_count: Some(2),
+            created_count: Some(2),
+            // The second created resource first, the consumed ones swapped, the first created
+            // resource last.
+            resource_order: Some(vec![3, 1, 0, 2]),
+            ..trivial::Overrides::default()
+        },
+    )
+    .expect("an ordered trivial action must build");
+    let tags: Vec<Digest> = compliance::constrain(&built.witnesses.compliance_witness)
+        .expect("the ordered compliance witness must constrain")
+        .tags()
+        .collect();
+
+    let txn = LocalProver
+        .prove(&[built.witnesses])
+        .await
+        .expect("local prover must constrain an ordered trivial action");
+
+    let action = &txn
+        .as_arm()
+        .aggregation
+        .as_ref()
+        .expect("the transaction must carry an aggregation")
+        .instance
+        .actions[0];
+    let aggregated_tags: Vec<Digest> = action
+        .resource_instances
+        .iter()
+        .map(|resource| resource.tag())
+        .collect();
+    assert_eq!(aggregated_tags, tags);
+    assert_eq!(aggregated_tags[0], built.created_ephemerals[1].commitment());
+    assert_eq!(aggregated_tags[3], built.created_ephemerals[0].commitment());
+    let is_consumed: Vec<bool> = action
+        .resource_instances
+        .iter()
+        .map(|resource| resource.is_consumed())
+        .collect();
+    assert_eq!(is_consumed, [false, true, true, false]);
+    assert_eq!(
+        action.action_tree_root,
+        ActionTree::new(tags).root().expect("the tags have a root")
+    );
+}
+
+#[tokio::test]
+async fn local_prover_rejects_logic_witnesses_for_another_order_than_the_compliance_unit() {
+    let overrides = |resource_order: Vec<usize>| trivial::Overrides {
+        consumed_count: Some(2),
+        created_count: Some(1),
+        resource_order: Some(resource_order),
+        ..trivial::Overrides::default()
+    };
+    let in_order = trivial::build(11, overrides(vec![0, 1, 2])).expect("must build");
+    // The created resource moves ahead of the consumed ones.
+    let reordered = trivial::build(11, overrides(vec![2, 0, 1])).expect("must build");
+    assert_eq!(
+        in_order.created_ephemerals, reordered.created_ephemerals,
+        "both orders give the created resource the same nonce"
+    );
+
+    let witnesses = ActionWitnesses {
+        compliance_witness: in_order.witnesses.compliance_witness,
+        logic_witnesses: reordered.witnesses.logic_witnesses,
+    };
+    let err = LocalProver
+        .prove(&[witnesses])
+        .await
+        .err()
+        .expect("local prover must reject the logic witnesses of the other order");
+    assert!(
+        err.to_string().contains("another action tree root"),
+        "{err:#}"
+    );
 }
 
 #[tokio::test]
@@ -130,6 +220,11 @@ async fn local_prover_mock_aggregates_a_consume_only_action() {
         .aggregation
         .as_ref()
         .expect("the transaction must carry an aggregation");
-    assert_eq!(aggregation.instance.actions[0].consumed_publics.len(), 2);
-    assert!(aggregation.instance.actions[0].created_publics.is_empty());
+    let resource_instances = &aggregation.instance.actions[0].resource_instances;
+    assert_eq!(resource_instances.len(), 2);
+    assert!(
+        resource_instances
+            .iter()
+            .all(|resource| resource.is_consumed())
+    );
 }

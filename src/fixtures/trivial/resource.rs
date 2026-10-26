@@ -19,6 +19,9 @@ pub struct Overrides {
     pub created_is_ephemeral: Option<bool>,
     pub consumed_nonce: Option<[u8; 32]>,
     pub created_nonce: Option<[u8; 32]>,
+    /// The order of the resources in the compliance witness, as positions in the consumed resources
+    /// followed by the created resources. `None` keeps that order.
+    pub resource_order: Option<Vec<usize>>,
 }
 
 impl Overrides {

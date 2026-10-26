@@ -1,7 +1,7 @@
 use anoma_rm_risc0::action_tree::ActionTree;
 use anoma_rm_risc0::compliance;
 use anoma_rm_risc0::kind_tree::KindTree;
-use anoma_rm_risc0::resource::{ConsumedResourceWitness, Resource};
+use anoma_rm_risc0::resource::{Resource, ResourceWitness, ResourceWitnessConsumed};
 use anoma_rm_risc0::resource_logic::TrivialLogicWitness;
 use anyhow::Context;
 use risc0_zkvm::Digest;
@@ -27,6 +27,18 @@ pub struct ActionData {
 pub fn build(seed: u8, overrides: Overrides) -> anyhow::Result<ActionData> {
     let consumed_count = overrides.consumed_count.unwrap_or(1);
     let created_count = overrides.created_count.unwrap_or(1);
+    let resource_count = consumed_count + created_count;
+
+    let order = overrides
+        .resource_order
+        .clone()
+        .unwrap_or_else(|| (0..resource_count).collect());
+    let mut positions = order.clone();
+    positions.sort_unstable();
+    anyhow::ensure!(
+        positions.into_iter().eq(0..resource_count),
+        "the resource order {order:?} is not an order of the {resource_count} resources"
+    );
 
     let nf_key = resource::nullifier_key(seed);
     let nk_commitment = nf_key.commit();
@@ -35,69 +47,76 @@ pub fn build(seed: u8, overrides: Overrides) -> anyhow::Result<ActionData> {
         .map(|index| resource::consumed(seed, index, nk_commitment, &overrides))
         .collect();
 
-    let consumed_nullifiers: Vec<Digest> = consumed_ephemerals
+    let consumed_nullifiers: Vec<Digest> = order
         .iter()
+        .filter_map(|&position| consumed_ephemerals.get(position))
         .map(|consumed| consumed.nullifier(&nf_key))
         .collect::<Result<_, _>>()
         .context("failed to compute consumed nullifiers")?;
 
-    let created_ephemerals: Vec<Resource> = (0..created_count)
-        .map(|index| {
-            // Created nonces derive from the consumed nullifiers; the
-            // compliance circuit rejects any other nonce.
-            let derived_nonce =
-                Resource::derive_nonce_from_nullifiers(index as u32, &consumed_nullifiers)
-                    .context("failed to derive the created resource nonce")?;
-            Ok(resource::created(
-                seed,
-                derived_nonce,
-                nk_commitment,
-                &overrides,
-            ))
+    // Created nonces derive from the index among the created resources and from the consumed
+    // nullifiers, both in the order of the resources; the compliance circuit rejects any other
+    // nonce.
+    let mut created_nonces = vec![[0u8; 32]; created_count];
+    for (index, created_position) in order
+        .iter()
+        .filter_map(|&position| position.checked_sub(consumed_count))
+        .enumerate()
+    {
+        created_nonces[created_position] =
+            Resource::derive_nonce_from_nullifiers(index as u32, &consumed_nullifiers)
+                .context("failed to derive the created resource nonce")?;
+    }
+    let created_ephemerals: Vec<Resource> = created_nonces
+        .into_iter()
+        .map(|derived_nonce| resource::created(seed, derived_nonce, nk_commitment, &overrides))
+        .collect();
+
+    let ordered: Vec<(Resource, bool)> = order
+        .iter()
+        .map(|&position| match consumed_ephemerals.get(position) {
+            Some(consumed) => (*consumed, true),
+            None => (created_ephemerals[position - consumed_count], false),
         })
-        .collect::<anyhow::Result<_>>()?;
+        .collect();
 
     let compliance_witness = compliance::from_resources(
-        consumed_ephemerals
+        ordered
             .iter()
-            .map(|consumed| ConsumedResourceWitness::from_resource(*consumed, nf_key.clone()))
-            .collect::<Vec<_>>(),
-        created_ephemerals.clone(),
+            .map(|&(resource, is_consumed)| {
+                if is_consumed {
+                    ResourceWitness::Consumed(ResourceWitnessConsumed::from_resource(
+                        resource,
+                        nf_key.clone(),
+                    ))
+                } else {
+                    ResourceWitness::Created(resource)
+                }
+            })
+            .collect(),
         // The loaded kind table, or the empty one if none is loaded.
         anoma_rm_risc0::constants::global_kind_tree().unwrap_or(&KindTree::empty()),
     );
 
-    let tags: Vec<Digest> = consumed_nullifiers
+    let tags: Vec<Digest> = ordered
         .iter()
-        .copied()
-        .chain(
-            created_ephemerals
-                .iter()
-                .map(|created| created.commitment()),
-        )
-        .collect();
+        .map(|(resource, is_consumed)| resource.tag(*is_consumed, &nf_key))
+        .collect::<Result<_, _>>()
+        .context("failed to compute the resource tags")?;
     let action_tree_root = ActionTree::new(tags)
         .root()
         .context("failed to compute action tree root")?;
 
-    let logic_witnesses: Vec<Box<dyn LogicWitness>> = consumed_ephemerals
-        .iter()
-        .map(|consumed| {
+    let logic_witnesses: Vec<Box<dyn LogicWitness>> = ordered
+        .into_iter()
+        .map(|(resource, is_consumed)| {
             Box::new(TrivialLogicWitness {
-                resource: *consumed,
+                resource,
                 action_tree_root,
-                is_consumed: true,
+                is_consumed,
                 nf_key: nf_key.clone(),
             }) as Box<dyn LogicWitness>
         })
-        .chain(created_ephemerals.iter().map(|created| {
-            Box::new(TrivialLogicWitness {
-                resource: *created,
-                action_tree_root,
-                is_consumed: false,
-                nf_key: nf_key.clone(),
-            }) as Box<dyn LogicWitness>
-        }))
         .collect();
 
     let witnesses = ActionWitnesses {
