@@ -1,8 +1,8 @@
 use anoma_rm_risc0::action_tree::ActionTree;
 use anoma_rm_risc0::compliance;
 use anoma_rm_risc0::kind_tree::KindTree;
+use anoma_rm_risc0::logic_proof::PaddingResourceLogic;
 use anoma_rm_risc0::resource::{Resource, ResourceWitness, ResourceWitnessConsumed};
-use anoma_rm_risc0::resource_logic::TrivialLogicWitness;
 use anyhow::Context;
 use risc0_zkvm::Digest;
 
@@ -110,12 +110,12 @@ pub fn build(seed: u8, overrides: Overrides) -> anyhow::Result<ActionData> {
     let logic_witnesses: Vec<Box<dyn LogicWitness>> = ordered
         .into_iter()
         .map(|(resource, is_consumed)| {
-            Box::new(TrivialLogicWitness {
+            Box::new(PaddingResourceLogic::new(
                 resource,
                 action_tree_root,
+                nf_key.clone(),
                 is_consumed,
-                nf_key: nf_key.clone(),
-            }) as Box<dyn LogicWitness>
+            )) as Box<dyn LogicWitness>
         })
         .collect();
 

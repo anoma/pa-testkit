@@ -63,33 +63,34 @@ impl LogicWitness for Box<dyn LogicWitness> {
     }
 }
 
-impl<W> LogicWitness for W
+impl<L> LogicWitness for L
 where
-    W: LogicProver + LogicCircuit,
+    L: LogicProver,
+    L::Witness: LogicCircuit,
 {
     #[inline]
     fn verifying_key(&self) -> Digest {
-        <W as LogicProver>::verifying_key()
+        <L as LogicProver>::verifying_key()
     }
 
     #[inline]
     fn constrain(&self) -> anyhow::Result<LogicInstance> {
-        <W as LogicCircuit>::constrain(self)
-            .with_context(|| format!("invalid proof of {} witness", std::any::type_name::<W>()))
+        LogicCircuit::constrain(<L as LogicProver>::witness(self))
+            .with_context(|| format!("invalid proof of {} witness", std::any::type_name::<L>()))
     }
 
     #[inline]
     fn witness_to_vec(&self) -> anyhow::Result<Vec<u32>> {
-        risc0_zkvm::serde::to_vec(<W as LogicProver>::witness(self)).with_context(|| {
+        risc0_zkvm::serde::to_vec(<L as LogicProver>::witness(self)).with_context(|| {
             format!(
                 "failed to serialize {} witness to risc0 words",
-                std::any::type_name::<W>()
+                std::any::type_name::<L>()
             )
         })
     }
 
     #[inline]
     fn proving_key(&self) -> Vec<u8> {
-        <W as LogicProver>::proving_key().to_vec()
+        <L as LogicProver>::proving_key().to_vec()
     }
 }
