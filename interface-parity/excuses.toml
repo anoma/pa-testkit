@@ -32,3 +32,107 @@ key = "package"
 evm = []
 solana = ["published"]
 reason = "The program's source, the counterpart of the soldeer package anomapay-erc20-forwarder, which is Solidity and has no Rust API to compare; the program's interface is compared ABI against IDL. Its registry release is anoma/dos-pm#161."
+
+[[excuse]]
+id = "adapter-state-account"
+pair = "pa-evm/crates/bindings/src/generated/protocol_adapter.rs ↔ anoma-pa-solana-client/idl/protocol_adapter.json"
+key = "account PAStateAccount"
+evm = []
+solana = ["(schema_version: u8, bump: u8, owner: address, verifier_router: address, proof_selector: bytes4, kind_tree_root: bytes32, paused: bool, root: bytes32, next_index: u64, current_depth: u8, frontier: vec<bytes32>, min_expiry_slots: u64, max_expiry_slots: u64, denied_consumed_logic_refs: vec<bytes32>, denied_created_logic_refs: vec<bytes32>)"]
+reason = "anoma/dos-pm#157: a Solana program keeps its state in accounts, and the IDL lists the type of each account its instructions take. The EVM adapter keeps the same values in its proxy's storage, and its verifier router and selector in its code as immutables; an ABI describes neither."
+
+[[excuse]]
+id = "forwarder-config-account"
+pair = "anomapay-erc20-forwarder/crates/bindings/src/generated/erc20_forwarder.rs ↔ anomapay-spl-token-forwarder/crates/client/idl/spl_token_forwarder.json"
+key = "account Config"
+evm = []
+solana = ["(protocol_adapter: address, logic_ref: bytes32, version: u64, owner: address)"]
+reason = "anoma/dos-pm#157: a Solana program keeps its state in accounts, and the IDL lists the type of each account its instructions take. The EVM forwarder keeps its adapter, logic ref and owner in its proxy's storage, which an ABI does not describe."
+
+[[excuse]]
+id = "forwarder-nonce-bitmap-account"
+pair = "anomapay-erc20-forwarder/crates/bindings/src/generated/erc20_forwarder.rs ↔ anomapay-spl-token-forwarder/crates/client/idl/spl_token_forwarder.json"
+key = "account NonceBitmap"
+evm = []
+solana = ["(bits: bytes32, bump: u8)"]
+reason = "anoma/dos-pm#157: the used-nonce bits of 256 of one user's wrap nonces. The EVM forwarder leaves a wrap's nonce to Permit2, which keeps the same 256-bit words in its own storage. Solana has no Permit2, so the forwarder keeps the words in accounts of its own."
+
+[[excuse]]
+id = "forwarder-init-nonce-bitmap"
+pair = "anomapay-erc20-forwarder/crates/bindings/src/generated/erc20_forwarder.rs ↔ anomapay-spl-token-forwarder/crates/client/idl/spl_token_forwarder.json"
+key = "fn init_nonce_bitmap"
+evm = []
+solana = ["(_user: address, _word_index: u64)"]
+reason = "anoma/dos-pm#157: creates the nonce bitmap that a wrap records its nonce in. A new Solana account needs its rent paid, and the adapter passes a forwarder no signer, so nothing inside the wrap can pay: an instruction before the settlement must. The submitter sends this one in the settlement's transaction; anyone may send it, and sending it again changes nothing. On EVM, the transaction's gas pays for Permit2's storage write."
+
+[[excuse]]
+id = "forwarder-close-config"
+pair = "anomapay-erc20-forwarder/crates/bindings/src/generated/erc20_forwarder.rs ↔ anomapay-spl-token-forwarder/crates/client/idl/spl_token_forwarder.json"
+key = "fn close_config"
+evm = []
+solana = ["()"]
+reason = "anoma/dos-pm#157: returns the config account's rent deposit to the owner; EVM storage holds no deposit. Only the owner can send it, and only while the adapter is paused. Afterwards the program cannot be upgraded again, because `upgrade` needs the config."
+
+[[excuse]]
+id = "forwarder-close-nonce-bitmaps"
+pair = "anomapay-erc20-forwarder/crates/bindings/src/generated/erc20_forwarder.rs ↔ anomapay-spl-token-forwarder/crates/client/idl/spl_token_forwarder.json"
+key = "fn close_nonce_bitmaps_batch"
+evm = []
+solana = ["()"]
+reason = "anoma/dos-pm#157: returns the nonce bitmaps' rent deposits to the owner; EVM storage holds no deposit. Only the owner can send it, and only while the adapter is paused. The forwarder then no longer knows which nonces were used, but the adapter still refuses a settled wrap that is sent again, as NullifierSpent (anomapay-spl-token-forwarder, tests/teardown.rs)."
+
+[[excuse]]
+id = "forwarder-close-escrow"
+pair = "anomapay-erc20-forwarder/crates/bindings/src/generated/erc20_forwarder.rs ↔ anomapay-spl-token-forwarder/crates/client/idl/spl_token_forwarder.json"
+key = "fn close_escrow"
+evm = []
+solana = ["()"]
+reason = "anoma/dos-pm#157: moves the whole balance of an escrow token account, the wrapped tokens of every user who wrapped into it, to a token account of the mint that the owner picks, then returns the account's rent deposit to the owner. The V2 EVM forwarder has no such function, but the owner gains no power from it: on both chains the owner can replace the code (`upgrade`, `upgradeToAndCall`) with code that moves the tokens. Only the owner can send it, and only while the adapter is paused."
+
+[[excuse]]
+id = "emergency-forwarder-config-account"
+pair = "anomapay-erc20-forwarder/crates/bindings/src/generated/emergency_migrating_erc20_forwarder.rs ↔ anomapay-spl-token-forwarder/crates/client/idl/emergency_migrating_spl_token_forwarder.json"
+key = "account Config"
+evm = []
+solana = ["(protocol_adapter: address, logic_ref: bytes32, version: u64, owner: address)"]
+reason = "anoma/dos-pm#157: a Solana program keeps its state in accounts, and the IDL lists the type of each account its instructions take. The EVM forwarder keeps its adapter, logic ref and owner in its proxy's storage, which an ABI does not describe."
+
+[[excuse]]
+id = "emergency-forwarder-nonce-bitmap-account"
+pair = "anomapay-erc20-forwarder/crates/bindings/src/generated/emergency_migrating_erc20_forwarder.rs ↔ anomapay-spl-token-forwarder/crates/client/idl/emergency_migrating_spl_token_forwarder.json"
+key = "account NonceBitmap"
+evm = []
+solana = ["(bits: bytes32, bump: u8)"]
+reason = "anoma/dos-pm#157: the used-nonce bits of 256 of one user's wrap nonces. The EVM forwarder leaves a wrap's nonce to Permit2, which keeps the same 256-bit words in its own storage. Solana has no Permit2, so the forwarder keeps the words in accounts of its own."
+
+[[excuse]]
+id = "emergency-forwarder-init-nonce-bitmap"
+pair = "anomapay-erc20-forwarder/crates/bindings/src/generated/emergency_migrating_erc20_forwarder.rs ↔ anomapay-spl-token-forwarder/crates/client/idl/emergency_migrating_spl_token_forwarder.json"
+key = "fn init_nonce_bitmap"
+evm = []
+solana = ["(_user: address, _word_index: u64)"]
+reason = "anoma/dos-pm#157: creates the nonce bitmap that a wrap records its nonce in. A new Solana account needs its rent paid, and the adapter passes a forwarder no signer, so nothing inside the wrap can pay: an instruction before the settlement must. The submitter sends this one in the settlement's transaction; anyone may send it, and sending it again changes nothing. On EVM, the transaction's gas pays for Permit2's storage write."
+
+[[excuse]]
+id = "emergency-forwarder-close-config"
+pair = "anomapay-erc20-forwarder/crates/bindings/src/generated/emergency_migrating_erc20_forwarder.rs ↔ anomapay-spl-token-forwarder/crates/client/idl/emergency_migrating_spl_token_forwarder.json"
+key = "fn close_config"
+evm = []
+solana = ["()"]
+reason = "anoma/dos-pm#157: returns the config account's rent deposit to the owner; EVM storage holds no deposit. Only the owner can send it, and only while the adapter is paused. Afterwards the program cannot be upgraded again, because `upgrade` needs the config."
+
+[[excuse]]
+id = "emergency-forwarder-close-nonce-bitmaps"
+pair = "anomapay-erc20-forwarder/crates/bindings/src/generated/emergency_migrating_erc20_forwarder.rs ↔ anomapay-spl-token-forwarder/crates/client/idl/emergency_migrating_spl_token_forwarder.json"
+key = "fn close_nonce_bitmaps_batch"
+evm = []
+solana = ["()"]
+reason = "anoma/dos-pm#157: returns the nonce bitmaps' rent deposits to the owner; EVM storage holds no deposit. Only the owner can send it, and only while the adapter is paused. The forwarder then no longer knows which nonces were used, but the adapter still refuses a settled wrap that is sent again, as NullifierSpent (anomapay-spl-token-forwarder, tests/teardown.rs)."
+
+[[excuse]]
+id = "emergency-forwarder-close-escrow"
+pair = "anomapay-erc20-forwarder/crates/bindings/src/generated/emergency_migrating_erc20_forwarder.rs ↔ anomapay-spl-token-forwarder/crates/client/idl/emergency_migrating_spl_token_forwarder.json"
+key = "fn close_escrow"
+evm = []
+solana = ["()"]
+reason = "anoma/dos-pm#157: moves the whole balance of an escrow token account, the wrapped tokens of every user who wrapped into it, to a token account of the mint that the owner picks, then returns the account's rent deposit to the owner. The V2 EVM forwarder has no such function, but the owner gains no power from it: on both chains the owner can replace the code (`upgrade`, `upgradeToAndCall`) with code that moves the tokens. Only the owner can send it, and only while the adapter is paused."
