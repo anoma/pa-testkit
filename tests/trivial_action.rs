@@ -109,7 +109,7 @@ async fn local_prover_mock_aggregates_an_n_to_m_action() {
         .as_ref()
         .expect("the transaction must carry an aggregation");
     let is_consumed: Vec<bool> = aggregation.instance.actions[0]
-        .resource_publics
+        .resource_instances
         .iter()
         .map(|resource| resource.is_consumed())
         .collect();
@@ -148,15 +148,15 @@ async fn local_prover_keeps_the_order_of_the_compliance_unit() {
         .instance
         .actions[0];
     let aggregated_tags: Vec<Digest> = action
-        .resource_publics
+        .resource_instances
         .iter()
-        .map(|resource| resource.resource_tag)
+        .map(|resource| resource.tag())
         .collect();
     assert_eq!(aggregated_tags, tags);
     assert_eq!(aggregated_tags[0], built.created_ephemerals[1].commitment());
     assert_eq!(aggregated_tags[3], built.created_ephemerals[0].commitment());
     let is_consumed: Vec<bool> = action
-        .resource_publics
+        .resource_instances
         .iter()
         .map(|resource| resource.is_consumed())
         .collect();
@@ -220,10 +220,10 @@ async fn local_prover_mock_aggregates_a_consume_only_action() {
         .aggregation
         .as_ref()
         .expect("the transaction must carry an aggregation");
-    let resource_publics = &aggregation.instance.actions[0].resource_publics;
-    assert_eq!(resource_publics.len(), 2);
+    let resource_instances = &aggregation.instance.actions[0].resource_instances;
+    assert_eq!(resource_instances.len(), 2);
     assert!(
-        resource_publics
+        resource_instances
             .iter()
             .all(|resource| resource.is_consumed())
     );

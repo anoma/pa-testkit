@@ -29,7 +29,7 @@ pub(super) struct ConstrainedLogic {
 pub(super) struct ConstrainedAction {
     /// The action's compliance instance.
     pub compliance_instance: ComplianceInstance,
-    /// Logic inputs for the resources, in `resource_publics` order.
+    /// Logic inputs for the resources, in `resources` order.
     pub resource_logics: Vec<ConstrainedLogic>,
 }
 
@@ -46,7 +46,7 @@ pub(super) fn action(
             format!("failed to constrain the compliance unit of action {action_idx}")
         })?;
 
-    let resource_count = compliance_instance.resource_publics.len();
+    let resource_count = compliance_instance.resource_instances.len();
     anyhow::ensure!(
         witnesses.logic_witnesses.len() == resource_count,
         "action {action_idx} must have exactly one logic witness per resource: \
@@ -80,15 +80,15 @@ pub(super) fn action(
     }
 
     let resource_logics = compliance_instance
-        .resource_publics
+        .resource_instances
         .iter()
         .map(|resource| {
             take_validated_logic(
                 &mut logics,
                 &logic_index_by_tag,
-                resource.resource_tag,
+                resource.tag(),
                 resource.is_consumed(),
-                resource.resource_logic_ref,
+                resource.logic_ref(),
                 action_idx,
             )
         })

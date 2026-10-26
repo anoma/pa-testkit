@@ -5,10 +5,11 @@ use std::panic::AssertUnwindSafe;
 
 use anoma_rm_risc0::action_tree::ActionTree;
 use anoma_rm_risc0::aggregation_instance::{
-    ActionAggregated, AggregationInstance, ResourceAggregated,
+    ActionAggregated, AggregationInstance, AggregationResourceInstance,
 };
 use anoma_rm_risc0::delta_proof;
 use anoma_rm_risc0::proving_system::JournalEncoding;
+use anoma_rm_risc0::resource::ComplianceResourceInstance;
 use anoma_rm_risc0::transaction::{self, Aggregation, Delta, Transaction as ArmTxn};
 use anyhow::Context;
 use risc0_zkvm::sha::Digestible;
@@ -96,9 +97,9 @@ fn constrain_txn(action_witnesses: &[ActionWitnesses]) -> anyhow::Result<Transac
             format!("failed to compute the action tree root of action {action_idx}")
         })?;
 
-        let mut resource_publics = Vec::with_capacity(instance.resource_publics.len());
+        let mut resource_instances = Vec::with_capacity(instance.resource_instances.len());
         for (resource, logic) in instance
-            .resource_publics
+            .resource_instances
             .iter()
             .zip(constrained.resource_logics)
         {
@@ -107,17 +108,31 @@ fn constrain_txn(action_witnesses: &[ActionWitnesses]) -> anyhow::Result<Transac
                 "logic witness {} of action {action_idx} proves against another action tree root",
                 logic.witness_index
             );
-            resource_publics.push(ResourceAggregated {
-                consumed: u32::from(resource.is_consumed()),
-                resource_tag: resource.resource_tag,
-                resource_logic_ref: resource.resource_logic_ref,
-                commitment_tree_root: resource.commitment_tree_root.unwrap_or(Digest::ZERO),
-                app_data: logic.instance.app_data,
+            let app_data = logic.instance.app_data;
+            resource_instances.push(match *resource {
+                ComplianceResourceInstance::Consumed {
+                    nullifier,
+                    logic_ref,
+                    commitment_tree_root,
+                } => AggregationResourceInstance::Consumed {
+                    nullifier,
+                    logic_ref,
+                    commitment_tree_root,
+                    app_data,
+                },
+                ComplianceResourceInstance::Created {
+                    commitment,
+                    logic_ref,
+                } => AggregationResourceInstance::Created {
+                    commitment,
+                    logic_ref,
+                    app_data,
+                },
             });
         }
 
         actions.push(ActionAggregated {
-            resource_publics,
+            resource_instances,
             delta_x: instance.delta_x,
             delta_y: instance.delta_y,
             action_tree_root,

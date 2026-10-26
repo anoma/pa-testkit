@@ -1,7 +1,7 @@
 use anoma_rm_risc0::action_tree::ActionTree;
 use anoma_rm_risc0::compliance;
 use anoma_rm_risc0::kind_tree::KindTree;
-use anoma_rm_risc0::resource::{ConsumedResourceWitness, Resource, ResourceWitness};
+use anoma_rm_risc0::resource::{Resource, ResourceWitness, ResourceWitnessConsumed};
 use anoma_rm_risc0::resource_logic::TrivialLogicWitness;
 use anyhow::Context;
 use risc0_zkvm::Digest;
@@ -85,7 +85,7 @@ pub fn build(seed: u8, overrides: Overrides) -> anyhow::Result<ActionData> {
             .iter()
             .map(|&(resource, is_consumed)| {
                 if is_consumed {
-                    ResourceWitness::Consumed(ConsumedResourceWitness::from_resource(
+                    ResourceWitness::Consumed(ResourceWitnessConsumed::from_resource(
                         resource,
                         nf_key.clone(),
                     ))
