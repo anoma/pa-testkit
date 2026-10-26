@@ -18,7 +18,8 @@ pub use anoma_rm_risc0::logic_instance::{AppData, ExpirableBlob};
 /// belongs to it.
 pub struct ActionWitnesses {
     /// The action's compliance witness constraining its consumed and created
-    /// resources.
+    /// resources. Their order sets the order of the resources in the
+    /// aggregation instance.
     pub compliance_witness: Box<ComplianceWitness>,
     /// One logic witness per resource in the action, matched to the compliance
     /// witness by the tag it produces when constrained.
