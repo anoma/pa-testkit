@@ -5,8 +5,7 @@ Anoma integration testing. It owns the risc0 proving path and the traits that
 each target chain's harness implements. It knows nothing about EVM or Solana —
 all chain-specific testing code lives in the protocol-adapter repos.
 
-See `CONTEXT.md` for the glossary, `docs/adr/` for decisions, and
-`docs/RESTRUCTURE-PLAN.md` for the migration that produced this shape.
+See `CONTEXT.md` for the glossary and `docs/adr/` for decisions.
 
 ## Two axes of variation
 
