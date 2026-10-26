@@ -10,20 +10,14 @@ use anyhow::Context;
 /// stack so witnesses, the prover, and tests all share one definition.
 pub use anoma_rm_risc0::logic_instance::{AppData, ExpirableBlob};
 
-/// Witness data of an individual action, mirroring [`anoma_rm_risc0::action::Action`].
-///
-/// An action corresponds to exactly one compliance unit constraining its n
-/// consumed and m created resources. The per-resource logic witnesses are
-/// correlated to the compliance witness by tag rather than by position: each
-/// consumed nullifier and created commitment identifies the logic witness that
-/// belongs to it.
+/// The witnesses of one action, mirroring [`anoma_rm_risc0::action::Action`]: the compliance
+/// witness and one logic witness per resource. Logic witness `i` belongs to resource `i` of the
+/// compliance witness.
 pub struct ActionWitnesses {
-    /// The action's compliance witness constraining its consumed and created
-    /// resources. Their order sets the order of the resources in the
-    /// aggregation instance.
+    /// The compliance witness. The order of its resources is the order in which the protocol
+    /// adapter processes them.
     pub compliance_witness: ComplianceWitness,
-    /// One logic witness per resource in the action, matched to the compliance
-    /// witness by the tag it produces when constrained.
+    /// One logic witness per resource, in the order of the resources.
     pub logic_witnesses: Vec<Box<dyn LogicWitness>>,
 }
 

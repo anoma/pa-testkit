@@ -7,7 +7,7 @@ use anoma_pa_testkit::environment::Prover;
 use anoma_pa_testkit::fixtures::action::{self, ActionResource};
 use anoma_pa_testkit::fixtures::trivial;
 use anoma_pa_testkit::prover::LocalProver;
-use anoma_pa_testkit::witness::ActionWitnesses;
+use anoma_pa_testkit::witness::{ActionWitnesses, LogicWitness};
 use anoma_rm_risc0::Digest;
 use anoma_rm_risc0::action_tree::ActionTree;
 use anoma_rm_risc0::compliance;
@@ -183,6 +183,31 @@ async fn local_prover_keeps_the_order_of_the_compliance_unit() {
 }
 
 #[tokio::test]
+async fn local_prover_rejects_logic_witnesses_out_of_the_order_of_the_resources() {
+    let built = action::build(trivial::resources(12, counts(2, 1))).expect("must build");
+    let Ok([logic_consumed_0, logic_consumed_1, logic_created]) =
+        <[Box<dyn LogicWitness>; 3]>::try_from(built.logic_witnesses)
+    else {
+        panic!("three logic witnesses");
+    };
+    let witnesses = ActionWitnesses {
+        compliance_witness: built.compliance_witness,
+        logic_witnesses: vec![logic_consumed_1, logic_consumed_0, logic_created],
+    };
+
+    let err = LocalProver
+        .prove(&[&witnesses])
+        .await
+        .err()
+        .expect("local prover must reject logic witnesses out of order");
+    assert!(
+        err.to_string()
+            .contains("logic witness 0 of action 0 has tag"),
+        "{err:#}"
+    );
+}
+
+#[tokio::test]
 async fn local_prover_rejects_logic_witnesses_for_another_order_than_the_compliance_unit() {
     let in_order = action::build(trivial::resources(11, counts(2, 1))).expect("must build");
     let Ok([consumed_0, consumed_1, created]) =
@@ -198,9 +223,15 @@ async fn local_prover_rejects_logic_witnesses_for_another_order_than_the_complia
         "both orders give the created resource the same nonce"
     );
 
+    // The logic witnesses of the other order, put into the order of the compliance unit.
+    let Ok([logic_consumed_0, logic_created, logic_consumed_1]) =
+        <[Box<dyn LogicWitness>; 3]>::try_from(reordered.logic_witnesses)
+    else {
+        panic!("three logic witnesses");
+    };
     let witnesses = ActionWitnesses {
         compliance_witness: in_order.compliance_witness,
-        logic_witnesses: reordered.logic_witnesses,
+        logic_witnesses: vec![logic_consumed_0, logic_consumed_1, logic_created],
     };
     let err = LocalProver
         .prove(&[&witnesses])

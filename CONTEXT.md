@@ -50,7 +50,7 @@ _Avoid_: a resource with a placeholder nonce
 The one function, `fixtures::action::build`, that turns a list of action resources into the action witnesses, in the order of the list. It derives what depends on the whole action: the created nonces and the action tree root.
 
 **Action witnesses**:
-The witnesses of one action, as the provers take them: the compliance witness and one logic witness per resource. The resources with their derived nonces are read from them. They never contain inputs — identities are passed in (or defaulted) via `Overrides`, not returned.
+The witnesses of one action, as the provers take them: the compliance witness and one logic witness per resource, paired by position. The resources with their derived nonces are read from them. They never contain inputs — identities are passed in (or defaulted) via `Overrides`, not returned.
 _Avoid_: ActionData, Built, Parts (older names of the build result)
 
 **Overrides**:

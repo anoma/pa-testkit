@@ -98,17 +98,18 @@ fn constrain_txn(action_witnesses: &[&ActionWitnesses]) -> anyhow::Result<Transa
         })?;
 
         let mut resource_instances = Vec::with_capacity(instance.resource_instances.len());
-        for (resource, logic) in instance
+        for (position, (resource, logic_instance)) in instance
             .resource_instances
             .iter()
-            .zip(constrained.resource_logics)
+            .zip(constrained.logic_instances)
+            .enumerate()
         {
             anyhow::ensure!(
-                logic.instance.root == action_tree_root,
-                "logic witness {} of action {action_idx} proves against another action tree root",
-                logic.witness_index
+                logic_instance.root == action_tree_root,
+                "logic witness {position} of action {action_idx} proves against another action tree \
+                 root"
             );
-            let app_data = logic.instance.app_data;
+            let app_data = logic_instance.app_data;
             resource_instances.push(match *resource {
                 ComplianceResourceInstance::Consumed {
                     nullifier,

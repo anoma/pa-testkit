@@ -25,7 +25,7 @@ nesting.
 - `environment` — backend-agnostic traits: `Environment`, `Prover`,
   `ProtocolAdapter`, `Transaction`, `CommitmentTree`, plus the typed `State` /
   `StateBuilder` container.
-- `witness` — `ActionWitnesses` (the compliance witness and one logic witness per resource) and `LogicWitness`.
+- `witness` — `ActionWitnesses` (the compliance witness and one logic witness per resource, paired by position) and `LogicWitness`.
 - `transaction` — the risc0 `Transaction` newtype over `arm::Transaction`, the
   orphan-rule seam that lets the testkit implement the `Transaction` trait.
 - `prover` — the two chain-agnostic provers:
