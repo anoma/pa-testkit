@@ -32,7 +32,7 @@ pub struct LocalProver;
 impl Prover for LocalProver {
     type Transaction = Transaction;
 
-    async fn prove(&self, actions: &[ActionWitnesses]) -> anyhow::Result<Self::Transaction> {
+    async fn prove(&self, actions: &[&ActionWitnesses]) -> anyhow::Result<Self::Transaction> {
         // NOTE: this may not actually be unwind safe, but we don't care, because
         // we will hardly ever run into unwind safety issues during these tests.
         std::panic::catch_unwind(AssertUnwindSafe(|| constrain_txn(actions))).unwrap_or_else(
@@ -77,7 +77,7 @@ fn journal_digest(journal: &[u8]) -> Digest {
 /// batch aggregation guest does: the action tree roots are recomputed from the
 /// compliance tags, the per-resource app data is merged in the order of the
 /// compliance unit's resources, and all actions must share one kind table root.
-fn constrain_txn(action_witnesses: &[ActionWitnesses]) -> anyhow::Result<Transaction> {
+fn constrain_txn(action_witnesses: &[&ActionWitnesses]) -> anyhow::Result<Transaction> {
     let mut actions = Vec::with_capacity(action_witnesses.len());
     let mut rcvs = Vec::new();
     let mut kind_tree_root: Option<Digest> = None;
@@ -98,17 +98,18 @@ fn constrain_txn(action_witnesses: &[ActionWitnesses]) -> anyhow::Result<Transac
         })?;
 
         let mut resource_instances = Vec::with_capacity(instance.resource_instances.len());
-        for (resource, logic) in instance
+        for (position, (resource, logic_instance)) in instance
             .resource_instances
             .iter()
-            .zip(constrained.resource_logics)
+            .zip(constrained.logic_instances)
+            .enumerate()
         {
             anyhow::ensure!(
-                logic.instance.root == action_tree_root,
-                "logic witness {} of action {action_idx} proves against another action tree root",
-                logic.witness_index
+                logic_instance.root == action_tree_root,
+                "logic witness {position} of action {action_idx} proves against another action tree \
+                 root"
             );
-            let app_data = logic.instance.app_data;
+            let app_data = logic_instance.app_data;
             resource_instances.push(match *resource {
                 ComplianceResourceInstance::Consumed {
                     nullifier,

@@ -77,13 +77,23 @@ pub trait Prover {
     ///
     /// Invalid witnesses will result in an error.
     #[allow(async_fn_in_trait)]
-    async fn prove(&self, actions: &[ActionWitnesses]) -> anyhow::Result<Self::Transaction>;
+    async fn prove(&self, actions: &[&ActionWitnesses]) -> anyhow::Result<Self::Transaction>;
 }
 
 /// Builder of a [`State`] instance.
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct StateBuilder {
-    inner: HashMap<Cow<'static, str>, Box<dyn Any>>,
+    state: State,
+}
+
+impl Default for StateBuilder {
+    fn default() -> Self {
+        Self {
+            state: State {
+                inner: HashMap::new(),
+            },
+        }
+    }
 }
 
 impl StateBuilder {
@@ -100,29 +110,25 @@ impl StateBuilder {
         K: Into<Cow<'static, str>>,
         V: Any,
     {
-        self.inner.insert(key.into(), Box::new(data));
+        self.state.inner.insert(key.into(), Box::new(data));
     }
 
     /// Get a reference to a [`State`].
     #[inline]
     pub fn as_state(&self) -> &State {
-        // SAFETY: `State` and `StateBuilder` are essentially the same type
-        // (same layout and elems)
-        unsafe { &*(self as *const _ as *const _) }
+        &self.state
     }
 
     /// Get a mut reference to a [`State`].
     #[inline]
     pub fn as_state_mut(&mut self) -> &mut State {
-        // SAFETY: `State` and `StateBuilder` are essentially the same type
-        // (same layout and elems)
-        unsafe { &mut *(self as *mut _ as *mut _) }
+        &mut self.state
     }
 
     /// Finalize the [`State`].
     #[inline]
     pub fn finalize(self) -> State {
-        State { inner: self.inner }
+        self.state
     }
 }
 

@@ -2,6 +2,7 @@ use anoma_rm_risc0::Digest;
 use anoma_rm_risc0::compliance::ComplianceWitness;
 use anoma_rm_risc0::logic_instance::LogicInstance;
 use anoma_rm_risc0::logic_proof::LogicProver;
+use anoma_rm_risc0::resource::Resource;
 use anoma_rm_risc0::resource_logic::LogicCircuit;
 use anyhow::Context;
 
@@ -9,21 +10,26 @@ use anyhow::Context;
 /// stack so witnesses, the prover, and tests all share one definition.
 pub use anoma_rm_risc0::logic_instance::{AppData, ExpirableBlob};
 
-/// Witness data of an individual action, mirroring [`anoma_rm_risc0::action::Action`].
-///
-/// An action corresponds to exactly one compliance unit constraining its n
-/// consumed and m created resources. The per-resource logic witnesses are
-/// correlated to the compliance witness by tag rather than by position: each
-/// consumed nullifier and created commitment identifies the logic witness that
-/// belongs to it.
+/// The witnesses of one action, mirroring [`anoma_rm_risc0::action::Action`]: the compliance
+/// witness and one logic witness per resource. Logic witness `i` belongs to resource `i` of the
+/// compliance witness.
 pub struct ActionWitnesses {
-    /// The action's compliance witness constraining its consumed and created
-    /// resources. Their order sets the order of the resources in the
-    /// aggregation instance.
-    pub compliance_witness: Box<ComplianceWitness>,
-    /// One logic witness per resource in the action, matched to the compliance
-    /// witness by the tag it produces when constrained.
+    /// The compliance witness. The order of its resources is the order in which the protocol
+    /// adapter processes them.
+    pub compliance_witness: ComplianceWitness,
+    /// One logic witness per resource, in the order of the resources.
     pub logic_witnesses: Vec<Box<dyn LogicWitness>>,
+}
+
+impl ActionWitnesses {
+    /// The resources in their order, with the derived nonces of the created resources.
+    pub fn resources(&self) -> Vec<Resource> {
+        self.compliance_witness
+            .resource_instances
+            .iter()
+            .map(|witness| *witness.resource())
+            .collect()
+    }
 }
 
 /// Witness of a logic proof.
@@ -63,33 +69,34 @@ impl LogicWitness for Box<dyn LogicWitness> {
     }
 }
 
-impl<W> LogicWitness for W
+impl<L> LogicWitness for L
 where
-    W: LogicProver + LogicCircuit,
+    L: LogicProver,
+    L::Witness: LogicCircuit,
 {
     #[inline]
     fn verifying_key(&self) -> Digest {
-        <W as LogicProver>::verifying_key()
+        <L as LogicProver>::verifying_key()
     }
 
     #[inline]
     fn constrain(&self) -> anyhow::Result<LogicInstance> {
-        <W as LogicCircuit>::constrain(self)
-            .with_context(|| format!("invalid proof of {} witness", std::any::type_name::<W>()))
+        LogicCircuit::constrain(<L as LogicProver>::witness(self))
+            .with_context(|| format!("invalid proof of {} witness", std::any::type_name::<L>()))
     }
 
     #[inline]
     fn witness_to_vec(&self) -> anyhow::Result<Vec<u32>> {
-        risc0_zkvm::serde::to_vec(<W as LogicProver>::witness(self)).with_context(|| {
+        risc0_zkvm::serde::to_vec(<L as LogicProver>::witness(self)).with_context(|| {
             format!(
                 "failed to serialize {} witness to risc0 words",
-                std::any::type_name::<W>()
+                std::any::type_name::<L>()
             )
         })
     }
 
     #[inline]
     fn proving_key(&self) -> Vec<u8> {
-        <W as LogicProver>::proving_key().to_vec()
+        <L as LogicProver>::proving_key().to_vec()
     }
 }

@@ -1,5 +1,7 @@
 # Fixture builders: one `build` per action kind
 
+Status: superseded by [[0004-action-kinds-give-resources-to-one-action-builder]].
+
 ## Context
 
 Each fixture kind (testkit `trivial`; downstream `wrap`/`transfer`/`unwrap`,

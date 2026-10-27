@@ -1,76 +1,101 @@
-//! Chain-free smoke tests for the trivial-action fixtures and the local prover.
+//! Chain-free smoke tests for the action builder with trivial resources and for the local prover.
 //!
 //! Gated on `local` + `fixtures`; run with `cargo test --features local,fixtures`.
 #![cfg(all(feature = "local", feature = "fixtures"))]
 
 use anoma_pa_testkit::environment::Prover;
+use anoma_pa_testkit::fixtures::action::{self, ActionResource};
 use anoma_pa_testkit::fixtures::trivial;
 use anoma_pa_testkit::prover::LocalProver;
-use anoma_pa_testkit::witness::ActionWitnesses;
+use anoma_pa_testkit::witness::{ActionWitnesses, LogicWitness};
 use anoma_rm_risc0::Digest;
 use anoma_rm_risc0::action_tree::ActionTree;
 use anoma_rm_risc0::compliance;
+use anoma_rm_risc0::resource::ResourceWitness;
 
-#[test]
-fn build_trivial_action_defaults_to_one_resource_per_side() {
-    let built =
-        trivial::build(1, trivial::Overrides::default()).expect("valid trivial action must build");
-    assert_eq!(built.consumed_ephemerals.len(), 1);
-    assert_eq!(built.created_ephemerals.len(), 1);
-    assert_eq!(built.witnesses.logic_witnesses.len(), 2);
+fn counts(consumed_count: usize, created_count: usize) -> trivial::Overrides {
+    trivial::Overrides {
+        consumed_count: Some(consumed_count),
+        created_count: Some(created_count),
+        ..trivial::Overrides::default()
+    }
+}
+
+/// Whether each resource of the action is consumed, in the order of the resources.
+fn is_consumed(built: &ActionWitnesses) -> Vec<bool> {
+    built
+        .compliance_witness
+        .resource_instances
+        .iter()
+        .map(|witness| matches!(witness, ResourceWitness::Consumed(_)))
+        .collect()
 }
 
 #[test]
-fn build_trivial_action_sizes_the_action_via_the_count_overrides() {
-    let built = trivial::build(
-        4,
-        trivial::Overrides {
-            consumed_count: Some(2),
-            created_count: Some(3),
-            ..trivial::Overrides::default()
-        },
-    )
-    .expect("an n:m trivial action must build");
-    assert_eq!(built.consumed_ephemerals.len(), 2);
-    assert_eq!(built.created_ephemerals.len(), 3);
-    assert_eq!(built.witnesses.logic_witnesses.len(), 5);
+fn trivial_resources_default_to_one_consumed_and_one_created_resource() {
+    let built = action::build(trivial::resources(1, trivial::Overrides::default()))
+        .expect("a trivial action must build");
+    assert_eq!(is_consumed(&built), [true, false]);
+    assert_eq!(built.logic_witnesses.len(), 2);
 }
 
 #[test]
-fn build_trivial_action_errors_without_consumed_resources() {
-    // Created nonces derive from the consumed nullifiers, so a create-only
-    // action is unbuildable — mirroring the compliance circuit, which rejects
-    // an empty consumed list.
-    let result = trivial::build(
-        5,
-        trivial::Overrides {
-            consumed_count: Some(0),
-            created_count: Some(1),
-            ..trivial::Overrides::default()
-        },
+fn trivial_resources_take_their_counts_from_the_overrides() {
+    let built = action::build(trivial::resources(4, counts(2, 3)))
+        .expect("an n:m trivial action must build");
+    assert_eq!(is_consumed(&built), [true, true, false, false, false]);
+    assert_eq!(built.logic_witnesses.len(), 5);
+}
+
+#[test]
+fn build_errors_on_created_resources_without_consumed_ones() {
+    // Created nonces derive from the consumed nullifiers, as in the compliance circuit, which
+    // rejects an empty consumed list.
+    let err = action::build(trivial::resources(5, counts(0, 1)))
+        .err()
+        .expect("a create-only action must fail to build");
+    assert!(
+        format!("{err:#}").contains("failed to derive the nonce of created resource 0"),
+        "{err:#}"
     );
-    assert!(result.is_err(), "a create-only action must fail to build");
 }
 
 #[test]
-fn build_trivial_action_with_overrides_builds_non_ephemeral_consumed() {
-    let built = trivial::build(2, trivial::Overrides::invalid_consumed_non_ephemeral())
-        .expect("action construction should succeed");
-    assert_eq!(built.consumed_ephemerals.len(), 1);
+fn build_allows_consumed_resources_without_created_ones() {
+    let built = action::build(trivial::resources(6, counts(2, 0)))
+        .expect("a consume-only action must build");
+    assert_eq!(is_consumed(&built), [true, true]);
+    assert_eq!(built.logic_witnesses.len(), 2);
 }
 
 #[test]
-fn build_trivial_action_with_overrides_builds_nonzero_quantity() {
-    let built = trivial::build(3, trivial::Overrides::invalid_nonzero_quantity())
-        .expect("action construction should succeed");
-    assert_eq!(built.consumed_ephemerals.len(), 1);
+fn invalid_consumed_non_ephemeral_makes_the_consumed_resource_persistent() {
+    let built = action::build(trivial::resources(
+        2,
+        trivial::Overrides::invalid_consumed_non_ephemeral(),
+    ))
+    .expect("action construction should succeed");
+    assert!(!built.resources()[0].is_ephemeral);
+}
+
+#[test]
+fn invalid_nonzero_quantity_gives_the_consumed_resource_a_quantity() {
+    let built = action::build(trivial::resources(
+        3,
+        trivial::Overrides::invalid_nonzero_quantity(),
+    ))
+    .expect("action construction should succeed");
+    assert_ne!(built.resources()[0].quantity, 0);
 }
 
 #[tokio::test]
 async fn local_prover_mock_aggregates_trivial_actions() {
-    let actions = trivial::build_many(8, 1).expect("must build trivial action witnesses");
+    let actions = (1..=8)
+        .map(|seed| action::build(trivial::resources(seed, trivial::Overrides::default())))
+        .collect::<anyhow::Result<Vec<ActionWitnesses>>>()
+        .expect("must build trivial action witnesses");
     let txn = LocalProver
-        .prove(&actions)
+        .prove(&actions.iter().collect::<Vec<_>>())
         .await
         .expect("local prover must constrain trivial actions");
 
@@ -83,23 +108,16 @@ async fn local_prover_mock_aggregates_trivial_actions() {
         arm_txn.actions.is_none(),
         "the base proofs must be erased like after real aggregation"
     );
-    assert_eq!(aggregation.instance.actions.len(), 8);
+    assert_eq!(aggregation.instance.actions.len(), actions.len());
 }
 
 #[tokio::test]
 async fn local_prover_mock_aggregates_an_n_to_m_action() {
-    let built = trivial::build(
-        7,
-        trivial::Overrides {
-            consumed_count: Some(2),
-            created_count: Some(3),
-            ..trivial::Overrides::default()
-        },
-    )
-    .expect("an n:m trivial action must build");
+    let built = action::build(trivial::resources(7, counts(2, 3)))
+        .expect("an n:m trivial action must build");
 
     let txn = LocalProver
-        .prove(&[built.witnesses])
+        .prove(&[&built])
         .await
         .expect("local prover must constrain an n:m trivial action");
 
@@ -118,25 +136,21 @@ async fn local_prover_mock_aggregates_an_n_to_m_action() {
 
 #[tokio::test]
 async fn local_prover_keeps_the_order_of_the_compliance_unit() {
-    let built = trivial::build(
-        10,
-        trivial::Overrides {
-            consumed_count: Some(2),
-            created_count: Some(2),
-            // The second created resource first, the consumed ones swapped, the first created
-            // resource last.
-            resource_order: Some(vec![3, 1, 0, 2]),
-            ..trivial::Overrides::default()
-        },
-    )
-    .expect("an ordered trivial action must build");
-    let tags: Vec<Digest> = compliance::constrain(&built.witnesses.compliance_witness)
+    let Ok([consumed_0, consumed_1, created_0, created_1]) =
+        <[ActionResource; 4]>::try_from(trivial::resources(10, counts(2, 2)))
+    else {
+        panic!("two consumed and two created resources");
+    };
+    // Alternating sides and reversed consumed resources: the order of `resources` would hide bugs.
+    let built = action::build([consumed_1, created_0, consumed_0, created_1])
+        .expect("an ordered trivial action must build");
+    let tags: Vec<Digest> = compliance::constrain(&built.compliance_witness)
         .expect("the ordered compliance witness must constrain")
         .tags()
         .collect();
 
     let txn = LocalProver
-        .prove(&[built.witnesses])
+        .prove(&[&built])
         .await
         .expect("local prover must constrain an ordered trivial action");
 
@@ -153,14 +167,15 @@ async fn local_prover_keeps_the_order_of_the_compliance_unit() {
         .map(|resource| resource.tag())
         .collect();
     assert_eq!(aggregated_tags, tags);
-    assert_eq!(aggregated_tags[0], built.created_ephemerals[1].commitment());
-    assert_eq!(aggregated_tags[3], built.created_ephemerals[0].commitment());
+    let resources = built.resources();
+    assert_eq!(aggregated_tags[1], resources[1].commitment());
+    assert_eq!(aggregated_tags[3], resources[3].commitment());
     let is_consumed: Vec<bool> = action
         .resource_instances
         .iter()
         .map(|resource| resource.is_consumed())
         .collect();
-    assert_eq!(is_consumed, [false, true, true, false]);
+    assert_eq!(is_consumed, [true, false, true, false]);
     assert_eq!(
         action.action_tree_root,
         ActionTree::new(tags).root().expect("the tags have a root")
@@ -168,27 +183,58 @@ async fn local_prover_keeps_the_order_of_the_compliance_unit() {
 }
 
 #[tokio::test]
-async fn local_prover_rejects_logic_witnesses_for_another_order_than_the_compliance_unit() {
-    let overrides = |resource_order: Vec<usize>| trivial::Overrides {
-        consumed_count: Some(2),
-        created_count: Some(1),
-        resource_order: Some(resource_order),
-        ..trivial::Overrides::default()
+async fn local_prover_rejects_logic_witnesses_out_of_the_order_of_the_resources() {
+    let built = action::build(trivial::resources(12, counts(2, 1))).expect("must build");
+    let Ok([logic_consumed_0, logic_consumed_1, logic_created]) =
+        <[Box<dyn LogicWitness>; 3]>::try_from(built.logic_witnesses)
+    else {
+        panic!("three logic witnesses");
     };
-    let in_order = trivial::build(11, overrides(vec![0, 1, 2])).expect("must build");
-    // The created resource moves ahead of the consumed ones.
-    let reordered = trivial::build(11, overrides(vec![2, 0, 1])).expect("must build");
+    let witnesses = ActionWitnesses {
+        compliance_witness: built.compliance_witness,
+        logic_witnesses: vec![logic_consumed_1, logic_consumed_0, logic_created],
+    };
+
+    let err = LocalProver
+        .prove(&[&witnesses])
+        .await
+        .err()
+        .expect("local prover must reject logic witnesses out of order");
+    assert!(
+        err.to_string()
+            .contains("logic witness 0 of action 0 has tag"),
+        "{err:#}"
+    );
+}
+
+#[tokio::test]
+async fn local_prover_rejects_logic_witnesses_for_another_order_than_the_compliance_unit() {
+    let in_order = action::build(trivial::resources(11, counts(2, 1))).expect("must build");
+    let Ok([consumed_0, consumed_1, created]) =
+        <[ActionResource; 3]>::try_from(trivial::resources(11, counts(2, 1)))
+    else {
+        panic!("two consumed resources and one created resource");
+    };
+    // Moving the created resource between the consumed ones changes only the action tree root.
+    let reordered = action::build([consumed_0, created, consumed_1]).expect("must build");
     assert_eq!(
-        in_order.created_ephemerals, reordered.created_ephemerals,
+        in_order.resources()[2],
+        reordered.resources()[1],
         "both orders give the created resource the same nonce"
     );
 
+    // The logic witnesses of the other order, put into the order of the compliance unit.
+    let Ok([logic_consumed_0, logic_created, logic_consumed_1]) =
+        <[Box<dyn LogicWitness>; 3]>::try_from(reordered.logic_witnesses)
+    else {
+        panic!("three logic witnesses");
+    };
     let witnesses = ActionWitnesses {
-        compliance_witness: in_order.witnesses.compliance_witness,
-        logic_witnesses: reordered.witnesses.logic_witnesses,
+        compliance_witness: in_order.compliance_witness,
+        logic_witnesses: vec![logic_consumed_0, logic_consumed_1, logic_created],
     };
     let err = LocalProver
-        .prove(&[witnesses])
+        .prove(&[&witnesses])
         .await
         .err()
         .expect("local prover must reject the logic witnesses of the other order");
@@ -200,18 +246,11 @@ async fn local_prover_rejects_logic_witnesses_for_another_order_than_the_complia
 
 #[tokio::test]
 async fn local_prover_mock_aggregates_a_consume_only_action() {
-    let built = trivial::build(
-        9,
-        trivial::Overrides {
-            consumed_count: Some(2),
-            created_count: Some(0),
-            ..trivial::Overrides::default()
-        },
-    )
-    .expect("a consume-only trivial action must build");
+    let built = action::build(trivial::resources(9, counts(2, 0)))
+        .expect("a consume-only trivial action must build");
 
     let txn = LocalProver
-        .prove(&[built.witnesses])
+        .prove(&[&built])
         .await
         .expect("local prover must constrain a consume-only trivial action");
 
