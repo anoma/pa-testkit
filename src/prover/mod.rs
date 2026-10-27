@@ -4,8 +4,11 @@
 //! Both provers are agnostic to the target chain. The [`LocalProver`] runs
 //! circuits via `constrain` and emits a mock aggregation seal (no real
 //! proving); the [`QueueProver`] submits to the real remote proving queue. The
-//! shared constraining step they both run first lives in [`constrain`].
+//! shared constraining step they both run first lives in `constrain`, and the
+//! check that the transaction balances, which they run after it, in `balance`.
 
+#[cfg(any(feature = "local", feature = "e2e"))]
+mod balance;
 #[cfg(any(feature = "local", feature = "e2e"))]
 mod constrain;
 #[cfg(feature = "local")]

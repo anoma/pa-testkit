@@ -32,6 +32,8 @@ nesting.
     seals. No real proving — fast and offline.
   - `QueueProver` (`feature = "e2e"`): submits to the real remote proving queue.
     Built from typed params (`new(base_url, auth_token)`); reads no environment.
+
+  Both constrain the witnesses first, then check that the transaction balances.
 - `assert` — negative-test assertion helpers (`Needle`, `expect_integration_panic`), shared by every integration-test crate. The proof-tamper counterpart lives on `Transaction` (`tamper_aggregation_seal`).
 - `fixtures` (`feature = "fixtures"`): the action builder `action::build`, which builds the `ActionWitnesses` of one action from a list of `ActionResource`s, and the trivial action kind, whose `resources` gives its action resources, with `Overrides` for negative tests (ADR-0004). App- and chain-agnostic, exposed for reuse by every integration-test crate.
 - `identities` — well-known test signing keys.
@@ -60,7 +62,8 @@ contracts:
 1. A chain harness constructs an `Environment` and populates backend state.
 2. Tests take their action resources from the action kinds (trivial here, app-specific kinds downstream) and build the action witnesses with `fixtures::action::build`.
 3. `prove_actions` delegates to the backend `Prover`, yielding an
-   `arm::Transaction`.
+   `arm::Transaction`. An imbalance fails here, with the kind and both
+   quantities, not later in the delta proof.
 4. `execute_tx` delegates to the chain `ProtocolAdapter`, which converts the ARM
    transaction to chain calldata and executes it.
 5. Successful execution updates the commitment tree; tests assert roots and

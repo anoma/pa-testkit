@@ -42,6 +42,10 @@ _Avoid_: build variants (`build_with_*` suffixes), a `build` per kind
 One resource of an action, consumed or created, with the function that builds its logic witness once the action tree root is known. Action kinds give action resources; the action builder puts them into one action in the order of the list.
 _Avoid_: Part (older name)
 
+**Kind**:
+What the balance of a transaction groups resources by. Two resources have the same kind if they have the same logic ref and label ref, or if the kind tree gives both pairs the same kind base, as for aliases. A transaction balances if, for each kind, its consumed and its created resources hold the same quantity.
+_Avoid_: action kind (a fixture module, not a property of a resource)
+
 **Resource to create**:
 A resource without its nonce: the input of a created action resource. The action builder derives the nonce from the whole action.
 _Avoid_: a resource with a placeholder nonce

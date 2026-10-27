@@ -17,7 +17,7 @@ use risc0_zkvm::{Digest, Groth16Receipt, InnerReceipt, MaybePruned, ReceiptClaim
 use sha2::{Digest as _, Sha256};
 
 use super::JOURNAL_ENCODING;
-use super::constrain;
+use super::{balance, constrain};
 use crate::environment::Prover;
 use crate::transaction::Transaction;
 use crate::witness::ActionWitnesses;
@@ -73,10 +73,11 @@ fn journal_digest(journal: &[u8]) -> Digest {
     raw.into()
 }
 
-/// Constrains every action and builds the aggregation instance the way the
-/// batch aggregation guest does: the action tree roots are recomputed from the
-/// compliance tags, the per-resource app data is merged in the order of the
-/// compliance unit's resources, and all actions must share one kind table root.
+/// Constrains every action, checks that the transaction balances, and builds
+/// the aggregation instance the way the batch aggregation guest does: the
+/// action tree roots are recomputed from the compliance tags, the per-resource
+/// app data is merged in the order of the compliance unit's resources, and all
+/// actions must share one kind table root.
 fn constrain_txn(action_witnesses: &[&ActionWitnesses]) -> anyhow::Result<Transaction> {
     let mut actions = Vec::with_capacity(action_witnesses.len());
     let mut rcvs = Vec::new();
@@ -141,6 +142,7 @@ fn constrain_txn(action_witnesses: &[&ActionWitnesses]) -> anyhow::Result<Transa
 
         rcvs.push(witnesses.compliance_witness.rcv.clone());
     }
+    balance::check(action_witnesses)?;
 
     let instance = AggregationInstance {
         compliance_key: anoma_rm_risc0::constants::COMPLIANCE_VK,
