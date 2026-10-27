@@ -42,7 +42,7 @@ mockall::mock! {
     impl Prover for Prover {
         type Transaction = ();
 
-        async fn prove(&self, actions: &[ActionWitnesses]) -> anyhow::Result<()>;
+        async fn prove<'a>(&self, actions: &[&'a ActionWitnesses]) -> anyhow::Result<()>;
     }
 }
 

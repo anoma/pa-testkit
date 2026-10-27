@@ -24,7 +24,7 @@ use heliax_ap_orchestrator_sdk::{
 mod queue;
 
 use super::JOURNAL_ENCODING;
-use super::constrain::{self, ConstrainedAction, ConstrainedLogic};
+use super::constrain::{self, ConstrainedAction};
 use crate::environment::Prover;
 use crate::transaction::Transaction;
 use crate::witness::{ActionWitnesses, LogicWitness};
@@ -55,14 +55,14 @@ impl QueueProver {
 impl Prover for QueueProver {
     type Transaction = Transaction;
 
-    async fn prove(&self, actions: &[ActionWitnesses]) -> anyhow::Result<Self::Transaction> {
+    async fn prove(&self, actions: &[&ActionWitnesses]) -> anyhow::Result<Self::Transaction> {
         prove_via_queue(&self.queue, actions).await
     }
 }
 
 /// Identifies one base proof within an action: either the logic proof of the
-/// witness at a given index in the action's logic list, or the compliance
-/// proof of the action's single compliance unit.
+/// resource at a given position, or the compliance proof of the action's single
+/// compliance unit.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 enum BaseJobSlot {
     Logic(usize),
@@ -101,7 +101,7 @@ struct FetchedBaseJob {
 
 async fn prove_via_queue(
     queue: &QueueClient,
-    action_witnesses: &[ActionWitnesses],
+    action_witnesses: &[&ActionWitnesses],
 ) -> anyhow::Result<Transaction> {
     let constrained =
         std::panic::catch_unwind(AssertUnwindSafe(|| constrain_actions(action_witnesses)))
@@ -155,17 +155,25 @@ async fn prove_via_queue(
             instance: compliance_result.instance,
         };
 
-        // The logic verifier inputs must be in the order of the unit's
-        // resources — `constrain` returns them reordered, and
-        // `witness_index` correlates each with its proving job.
-        let mut logic_verifier_inputs = Vec::with_capacity(action.resource_logics.len());
-        for logic in action.resource_logics {
+        let mut logic_verifier_inputs = Vec::with_capacity(action.logic_instances.len());
+        for (position, (resource, logic_instance)) in action
+            .compliance_instance
+            .resource_instances
+            .iter()
+            .zip(action.logic_instances)
+            .enumerate()
+        {
             let result = take_base_result(
                 &mut base_results_by_key,
                 action_idx,
-                BaseJobSlot::Logic(logic.witness_index),
+                BaseJobSlot::Logic(position),
             )?;
-            logic_verifier_inputs.push(logic_verifier_inputs_from(logic, result));
+            logic_verifier_inputs.push(LogicVerifierInput {
+                tag: logic_instance.tag,
+                verifying_key: resource.logic_ref(),
+                app_data: logic_instance.app_data,
+                proof: result.receipt,
+            });
         }
 
         actions.push(Action {
@@ -234,25 +242,13 @@ async fn prove_via_queue(
 /// Constrains and validates every action, panicking on invalid witnesses (the
 /// caller catches the panic).
 fn constrain_actions(
-    action_witnesses: &[ActionWitnesses],
+    action_witnesses: &[&ActionWitnesses],
 ) -> anyhow::Result<Vec<ConstrainedAction>> {
     action_witnesses
         .iter()
         .enumerate()
         .map(|(action_idx, witnesses)| constrain::action(witnesses, action_idx))
         .collect()
-}
-
-fn logic_verifier_inputs_from(
-    logic: ConstrainedLogic,
-    result: BaseProofResult,
-) -> LogicVerifierInput {
-    LogicVerifierInput {
-        tag: logic.instance.tag,
-        verifying_key: logic.verifying_key,
-        app_data: logic.instance.app_data,
-        proof: result.receipt,
-    }
 }
 
 fn take_base_result(
@@ -266,17 +262,17 @@ fn take_base_result(
 }
 
 fn build_base_job_specs(
-    action_witnesses: &[ActionWitnesses],
+    action_witnesses: &[&ActionWitnesses],
 ) -> anyhow::Result<(Vec<BaseJobSpec>, Vec<Vec<u8>>)> {
     let mut specs = Vec::new();
     let mut rcvs = Vec::new();
 
     for (action_idx, witnesses) in action_witnesses.iter().enumerate() {
-        for (logic_idx, logic_witness) in witnesses.logic_witnesses.iter().enumerate() {
+        for (position, logic_witness) in witnesses.logic_witnesses.iter().enumerate() {
             specs.push(BaseJobSpec {
                 key: BaseJobKey {
                     action_idx,
-                    slot: BaseJobSlot::Logic(logic_idx),
+                    slot: BaseJobSlot::Logic(position),
                 },
                 payload: BaseJobPayload::Logic(build_logic_proof_payload(logic_witness)?),
             });

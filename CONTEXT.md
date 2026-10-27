@@ -35,12 +35,23 @@ The on-chain contract that verifies and executes ARM transactions on a target ch
 _Avoid_: PA contract (use "protocol adapter"), verifier
 
 **Action kind**:
-A fixture module that builds one kind of action (`trivial` here; `wrap` / `transfer` / `unwrap` and `generic_call` downstream). Its public surface is exactly `build` (plus a batch `build_many` where warranted), `ActionData`, and `Overrides` — one builder per kind, optional knobs as parameters or `Overrides` fields, never new function names (ADR-0003).
-_Avoid_: build variants (`build_with_*` suffixes)
+A fixture module that gives the resources of one kind of action (`trivial` here; `wrap` / `transfer` / `unwrap` and `generic_call` downstream). Its public surface is exactly `resources` and `Overrides` — optional knobs as parameters or `Overrides` fields, never new function names (ADR-0004).
+_Avoid_: build variants (`build_with_*` suffixes), a `build` per kind
 
-**ActionData**:
-The derived data of a build: the action witnesses (`witnesses: ActionWitnesses`) plus the consumed and created resources, resource field names stating ephemerality (`consumed_ephemeral`, `created_persistent`, …). Never contains inputs — identities are passed in (or defaulted) via `Overrides`, not returned.
-_Avoid_: Parts, Built (older names; Parts also leaked input keychains)
+**Action resource**:
+One resource of an action, consumed or created, with the function that builds its logic witness once the action tree root is known. Action kinds give action resources; the action builder puts them into one action in the order of the list.
+_Avoid_: Part (older name)
+
+**Resource to create**:
+A resource without its nonce: the input of a created action resource. The action builder derives the nonce from the whole action.
+_Avoid_: a resource with a placeholder nonce
+
+**Action builder**:
+The one function, `fixtures::action::build`, that turns a list of action resources into the action witnesses, in the order of the list. It derives what depends on the whole action: the created nonces and the action tree root.
+
+**Action witnesses**:
+The witnesses of one action, as the provers take them: the compliance witness and one logic witness per resource, paired by position. The resources with their derived nonces are read from them. They never contain inputs — identities are passed in (or defaulted) via `Overrides`, not returned.
+_Avoid_: ActionData, Built, Parts (older names of the build result)
 
 **Overrides**:
 A kind's optional deviations from its defaults — resource-field and action-derivation knobs alike, including the acting identity. Named `invalid_*` constructors catalog the deliberately-broken variants for negative tests, one per defeated check.

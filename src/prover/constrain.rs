@@ -3,132 +3,72 @@
 //! aggregation seal over the resulting instances, the queue prover assembles
 //! the transaction while submitting the witnesses for real proving.
 
-use std::collections::HashMap;
-
-use anoma_rm_risc0::Digest;
 use anoma_rm_risc0::compliance::{self, ComplianceInstance};
 use anoma_rm_risc0::logic_instance::LogicInstance;
 use anyhow::Context;
 
 use crate::witness::{ActionWitnesses, LogicWitness};
 
-/// A logic witness constrained to its instance and verifying key.
-pub(super) struct ConstrainedLogic {
-    /// The constrained logic instance (carries tag, is_consumed, and app_data).
-    pub instance: LogicInstance,
-    /// The logic's verifying key.
-    pub verifying_key: Digest,
-    /// Position of the originating witness in
-    /// [`ActionWitnesses::logic_witnesses`], correlating each logic with its
-    /// per-witness proving job.
-    pub witness_index: usize,
-}
-
-/// An action's witnesses, constrained and validated against the canonical
-/// tag-correlation rules.
+/// An action's witnesses, constrained and validated.
 pub(super) struct ConstrainedAction {
     /// The action's compliance instance.
     pub compliance_instance: ComplianceInstance,
-    /// Logic inputs for the resources, in `resources` order.
-    pub resource_logics: Vec<ConstrainedLogic>,
+    /// One logic instance per resource, in the order of the resources.
+    pub logic_instances: Vec<LogicInstance>,
 }
 
-/// Constrains every witness of an action and checks that each of the compliance
-/// unit's consumed and created resources has a matching logic witness — by tag,
-/// role, and verifying key — mirroring [`anoma_rm_risc0::action::Action`]. The
-/// returned logics are reordered into the order of the unit's resources.
+/// Constrains every witness of an action and checks, as [`anoma_rm_risc0::action::Action`]
+/// does, that logic witness `i` belongs to resource `i`: the same tag, the same side, and the
+/// verifying key that the resource names as its logic.
 pub(super) fn action(
     witnesses: &ActionWitnesses,
-    action_idx: usize,
+    action_index: usize,
 ) -> anyhow::Result<ConstrainedAction> {
     let compliance_instance =
         compliance::constrain(&witnesses.compliance_witness).with_context(|| {
-            format!("failed to constrain the compliance unit of action {action_idx}")
+            format!("failed to constrain the compliance unit of action {action_index}")
         })?;
 
     let resource_count = compliance_instance.resource_instances.len();
     anyhow::ensure!(
         witnesses.logic_witnesses.len() == resource_count,
-        "action {action_idx} must have exactly one logic witness per resource: \
-         logic={} resources={resource_count}",
+        "action {action_index} has {} logic witnesses for {resource_count} resources",
         witnesses.logic_witnesses.len(),
     );
 
-    let mut logics = witnesses
-        .logic_witnesses
-        .iter()
-        .enumerate()
-        .map(|(logic_idx, logic_witness)| {
-            let instance = logic_witness.constrain().with_context(|| {
-                format!("failed to constrain logic witness {logic_idx} of action {action_idx}")
-            })?;
-            Ok(Some(ConstrainedLogic {
-                verifying_key: logic_witness.verifying_key(),
-                instance,
-                witness_index: logic_idx,
-            }))
-        })
-        .collect::<anyhow::Result<Vec<_>>>()?;
-
-    let mut logic_index_by_tag = HashMap::with_capacity(logics.len());
-    for (logic_idx, logic) in logics.iter().enumerate() {
-        let tag = logic.as_ref().expect("not yet taken").instance.tag;
-        anyhow::ensure!(
-            logic_index_by_tag.insert(tag, logic_idx).is_none(),
-            "action {action_idx} has two logic witnesses sharing tag {tag}",
-        );
-    }
-
-    let resource_logics = compliance_instance
+    let logic_instances = compliance_instance
         .resource_instances
         .iter()
-        .map(|resource| {
-            take_validated_logic(
-                &mut logics,
-                &logic_index_by_tag,
+        .zip(&witnesses.logic_witnesses)
+        .enumerate()
+        .map(|(position, (resource, logic_witness))| {
+            let instance = logic_witness.constrain().with_context(|| {
+                format!("failed to constrain logic witness {position} of action {action_index}")
+            })?;
+            anyhow::ensure!(
+                instance.tag == resource.tag(),
+                "logic witness {position} of action {action_index} has tag {}, but resource \
+                 {position} has tag {}",
+                instance.tag,
                 resource.tag(),
-                resource.is_consumed(),
+            );
+            anyhow::ensure!(
+                instance.is_consumed == resource.is_consumed(),
+                "logic witness {position} of action {action_index} has the wrong is_consumed flag"
+            );
+            let verifying_key = logic_witness.verifying_key();
+            anyhow::ensure!(
+                verifying_key == resource.logic_ref(),
+                "logic witness {position} of action {action_index} has verifying key \
+                 {verifying_key}, but resource {position} has logic ref {}",
                 resource.logic_ref(),
-                action_idx,
-            )
+            );
+            Ok(instance)
         })
         .collect::<anyhow::Result<Vec<_>>>()?;
 
     Ok(ConstrainedAction {
         compliance_instance,
-        resource_logics,
+        logic_instances,
     })
-}
-
-/// Takes the logic witness matching the compliance unit's resource (identified
-/// by `tag`) after checking its consumed/created role and verifying key.
-fn take_validated_logic(
-    logics: &mut [Option<ConstrainedLogic>],
-    logic_index_by_tag: &HashMap<Digest, usize>,
-    tag: Digest,
-    expected_consumed: bool,
-    expected_logic_ref: Digest,
-    action_idx: usize,
-) -> anyhow::Result<ConstrainedLogic> {
-    let role = if expected_consumed {
-        "consumed"
-    } else {
-        "created"
-    };
-    let logic = logic_index_by_tag
-        .get(&tag)
-        .and_then(|&logic_idx| logics[logic_idx].take())
-        .with_context(|| {
-            format!("action {action_idx} has no {role} logic witness for tag {tag}")
-        })?;
-
-    anyhow::ensure!(
-        logic.instance.is_consumed == expected_consumed,
-        "action {action_idx} {role} logic witness for tag {tag} has the wrong is_consumed flag"
-    );
-    anyhow::ensure!(
-        logic.verifying_key == expected_logic_ref,
-        "action {action_idx} {role} logic verifying key mismatch for tag {tag}"
-    );
-    Ok(logic)
 }
