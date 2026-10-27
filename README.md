@@ -2,13 +2,13 @@
 
 The backend-agnostic risc0 test core for Anoma protocol-adapter integration
 testing: the `Environment` / `Prover` / `Transaction` traits, the trivial
-action fixtures, the local mock prover, and the remote-queue prover for e2e
+resource fixtures, the local mock prover, and the remote-queue prover for e2e
 runs. It knows nothing about any target chain — chain-specific harnesses live
 in the protocol-adapter repos and implement the traits from here:
 
 - EVM: [anoma-pa-evm](https://github.com/anoma/pa-evm)
   (`anoma-pa-evm-integration-test`)
-- Forwarder-specific extensions, action kinds, and their test suites:
+- Forwarder-specific extensions, resource constructors, and their test suites:
   [anomapay-erc20-forwarder](https://github.com/anoma/anomapay-erc20-forwarder),
   [generic-call-forwarder](https://github.com/anoma/generic-call-forwarder)
 
@@ -20,7 +20,7 @@ for decisions.
 
 A single flat crate, `anoma-pa-testkit` — no workspace. Feature-gated parts:
 
-- `fixtures` (default) — the action builder, the trivial action kind and the test identities
+- `fixtures` (default) — the action builder, the trivial resource and the test identities
 - `local` (default) — `LocalProver`: native `constrain` plus mock Groth16
   seals, no real proving
 - `e2e` — `QueueProver`: submits witnesses to the remote proving queue
@@ -34,4 +34,4 @@ A single flat crate, `anoma-pa-testkit` — no workspace. Feature-gated parts:
 cargo test
 ```
 
-The smoke tests of the action builder and the trivial action kind live in `tests/trivial_action.rs`. Chain- and forwarder-specific suites live in the repos listed above.
+The smoke tests of the action builder and the trivial resource live in `tests/trivial_action.rs`. Chain- and forwarder-specific suites live in the repos listed above.

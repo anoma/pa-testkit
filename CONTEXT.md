@@ -34,17 +34,21 @@ _Avoid_: tx (in prose), EVM transaction (that is the post-conversion artifact)
 The on-chain contract that verifies and executes ARM transactions on a target chain. Each chain has its own (the EVM PA, the future Solana PA). In tests it is represented by a chain-specific `ProtocolAdapter` trait implementation.
 _Avoid_: PA contract (use "protocol adapter"), verifier
 
-**Action kind**:
-A fixture module that gives the resources of one kind of action (`trivial` here; `wrap` / `transfer` / `unwrap` and `generic_call` downstream). Its public surface is exactly `resources` and `Overrides` — optional knobs as parameters or `Overrides` fields, never new function names (ADR-0004).
-_Avoid_: build variants (`build_with_*` suffixes), a `build` per kind
+**Resource constructor**:
+A fixture function that gives one action resource, consumed or created: `trivial::consumed` and `trivial::created` here, and those of each application downstream, such as `persistent::consumed` of the AnomaPay ERC20 forwarder. A test lists them, so an action can hold any number of resources of each kind (ADR-0004). Optional knobs are parameters or `Overrides` fields, never new function names.
+_Avoid_: action kind (an earlier fixture module that gave the resources of a whole action), build variants (`build_with_*` suffixes)
 
 **Action resource**:
-One resource of an action, consumed or created, with the function that builds its logic witness once the action tree root is known. Action kinds give action resources; the action builder puts them into one action in the order of the list.
+One resource of an action, consumed or created, with the function that builds its logic witness once the action tree root is known. Resource constructors give action resources; the action builder puts them into one action in the order of the list.
 _Avoid_: Part (older name)
 
 **Kind**:
 What the balance of a transaction groups resources by. Two resources have the same kind if they have the same logic ref and label ref, or if the kind tree gives both pairs the same kind base, as for aliases. A transaction balances if, for each kind, its consumed and its created resources hold the same quantity.
-_Avoid_: action kind (a fixture module, not a property of a resource)
+_Avoid_: action kind (an earlier fixture module, not a property of a resource)
+
+**Trivial resource**:
+An ephemeral resource with zero quantity under the trivial logic of arm-risc0. The logic reads only its own resource and rejects it if the quantity is not zero or the resource is persistent. A trivial resource belongs to no application, so tests use it where an action needs resources but no application. Because its quantity is zero, it cannot cause an imbalance.
+_Avoid_: padding resource (arm-risc0 uses the word in identifiers such as `PaddingResourceLogic`)
 
 **Resource to create**:
 A resource without its nonce: the input of a created action resource. The action builder derives the nonce from the whole action.
