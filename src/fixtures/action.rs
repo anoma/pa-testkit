@@ -1,4 +1,4 @@
-//! One action from the resources of any kinds, in the order of a list. The protocol adapter
+//! One action from a list of action resources, in the order of the list. The protocol adapter
 //! processes the resources of an action in this order.
 
 use anoma_rm_risc0::Digest;

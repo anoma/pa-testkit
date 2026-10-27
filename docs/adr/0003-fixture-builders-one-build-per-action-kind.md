@@ -1,6 +1,6 @@
 # Fixture builders: one `build` per action kind
 
-Status: superseded by [[0004-action-kinds-give-resources-to-one-action-builder]].
+Status: superseded by [[0004-resource-constructors-give-resources-to-one-action-builder]].
 
 ## Context
 

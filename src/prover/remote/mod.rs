@@ -24,6 +24,7 @@ use heliax_ap_orchestrator_sdk::{
 mod queue;
 
 use super::JOURNAL_ENCODING;
+use super::balance;
 use super::constrain::{self, ConstrainedAction};
 use crate::environment::Prover;
 use crate::transaction::Transaction;
@@ -114,6 +115,7 @@ async fn prove_via_queue(
                 }
                 std::panic::resume_unwind(cause)
             })?;
+    balance::check(action_witnesses)?;
 
     let (base_job_specs, rcvs) = build_base_job_specs(action_witnesses)?;
 
