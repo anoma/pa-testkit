@@ -22,7 +22,7 @@ fn consumed(seed: u8) -> ActionResource {
 fn is_consumed(built: &ActionWitnesses) -> Vec<bool> {
     built
         .compliance_witness
-        .resource_instances
+        .resource_witnesses
         .iter()
         .map(|witness| matches!(witness, ResourceWitness::Consumed(_)))
         .collect()

@@ -25,7 +25,7 @@ impl ActionWitnesses {
     /// The resources in their order, with the derived nonces of the created resources.
     pub fn resources(&self) -> Vec<Resource> {
         self.compliance_witness
-            .resource_instances
+            .resource_witnesses
             .iter()
             .map(|witness| *witness.resource())
             .collect()

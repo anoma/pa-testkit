@@ -37,7 +37,7 @@ impl LogicWitness for AcceptAll {
         Ok(LogicInstance {
             tag: self.tag,
             is_consumed: self.is_consumed,
-            root: self.action_tree_root,
+            action_tree_root: self.action_tree_root,
             app_data: AppData::default(),
         })
     }
