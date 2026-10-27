@@ -27,7 +27,7 @@ pub(super) fn check(actions: &[&ActionWitnesses]) -> anyhow::Result<()> {
     for (action_index, witnesses) in actions.iter().enumerate() {
         let witness = &witnesses.compliance_witness;
         for (position, (resource_witness, kind_path)) in witness
-            .resource_instances
+            .resource_witnesses
             .iter()
             .zip(&witness.kind_paths)
             .enumerate()

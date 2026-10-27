@@ -106,7 +106,7 @@ fn constrain_txn(action_witnesses: &[&ActionWitnesses]) -> anyhow::Result<Transa
             .enumerate()
         {
             anyhow::ensure!(
-                logic_instance.root == action_tree_root,
+                logic_instance.action_tree_root == action_tree_root,
                 "logic witness {position} of action {action_idx} proves against another action tree \
                  root"
             );
@@ -145,7 +145,7 @@ fn constrain_txn(action_witnesses: &[&ActionWitnesses]) -> anyhow::Result<Transa
     balance::check(action_witnesses)?;
 
     let instance = AggregationInstance {
-        compliance_key: anoma_rm_risc0::constants::COMPLIANCE_VK,
+        compliance_vk: anoma_rm_risc0::constants::COMPLIANCE_VK,
         kind_tree_root: kind_tree_root.context("cannot aggregate a transaction without actions")?,
         actions,
     };
