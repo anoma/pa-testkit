@@ -35,7 +35,7 @@ reason = "The program's source, the counterpart of the soldeer package anomapay-
 
 [[excuse]]
 id = "adapter-state-account"
-pair = "pa-evm/crates/bindings/src/generated/protocol_adapter.rs ↔ anoma-pa-solana-client/idl/protocol_adapter.json"
+pair = "pa-evm/crates/bindings/src/generated/protocol_adapter.rs ↔ solana-protocol-adapter/solana-pa-prototype/idl/protocol_adapter.json"
 key = "account PAStateAccount"
 evm = []
 solana = ["(schema_version: u8, bump: u8, owner: address, verifier_router: address, proof_selector: bytes4, kind_tree_root: bytes32, paused: bool, root: bytes32, next_index: u64, current_depth: u8, frontier: vec<bytes32>, min_expiry_slots: u64, max_expiry_slots: u64, denied_consumed_logic_refs: vec<bytes32>, denied_created_logic_refs: vec<bytes32>)"]
@@ -43,7 +43,7 @@ reason = "anoma/dos-pm#157: a Solana program keeps its state in accounts, and th
 
 [[excuse]]
 id = "forwarder-config-account"
-pair = "anomapay-erc20-forwarder/crates/bindings/src/generated/erc20_forwarder.rs ↔ anomapay-spl-token-forwarder/crates/client/idl/spl_token_forwarder.json"
+pair = "anomapay-erc20-forwarder/crates/bindings/src/generated/erc20_forwarder.rs ↔ anomapay-spl-token-forwarder/crates/client/idls/spl_token_forwarder.json"
 key = "account Config"
 evm = []
 solana = ["(protocol_adapter: address, logic_ref: bytes32, version: u64, owner: address)"]
@@ -51,7 +51,7 @@ reason = "anoma/dos-pm#157: a Solana program keeps its state in accounts, and th
 
 [[excuse]]
 id = "forwarder-nonce-bitmap-account"
-pair = "anomapay-erc20-forwarder/crates/bindings/src/generated/erc20_forwarder.rs ↔ anomapay-spl-token-forwarder/crates/client/idl/spl_token_forwarder.json"
+pair = "anomapay-erc20-forwarder/crates/bindings/src/generated/erc20_forwarder.rs ↔ anomapay-spl-token-forwarder/crates/client/idls/spl_token_forwarder.json"
 key = "account NonceBitmap"
 evm = []
 solana = ["(bits: bytes32, bump: u8)"]
@@ -59,7 +59,7 @@ reason = "anoma/dos-pm#157: the used-nonce bits of 256 of one user's wrap nonces
 
 [[excuse]]
 id = "forwarder-init-nonce-bitmap"
-pair = "anomapay-erc20-forwarder/crates/bindings/src/generated/erc20_forwarder.rs ↔ anomapay-spl-token-forwarder/crates/client/idl/spl_token_forwarder.json"
+pair = "anomapay-erc20-forwarder/crates/bindings/src/generated/erc20_forwarder.rs ↔ anomapay-spl-token-forwarder/crates/client/idls/spl_token_forwarder.json"
 key = "fn init_nonce_bitmap"
 evm = []
 solana = ["(_user: address, _word_index: u64)"]
@@ -67,7 +67,7 @@ reason = "anoma/dos-pm#157: creates the nonce bitmap that a wrap records its non
 
 [[excuse]]
 id = "forwarder-close-config"
-pair = "anomapay-erc20-forwarder/crates/bindings/src/generated/erc20_forwarder.rs ↔ anomapay-spl-token-forwarder/crates/client/idl/spl_token_forwarder.json"
+pair = "anomapay-erc20-forwarder/crates/bindings/src/generated/erc20_forwarder.rs ↔ anomapay-spl-token-forwarder/crates/client/idls/spl_token_forwarder.json"
 key = "fn close_config"
 evm = []
 solana = ["()"]
@@ -75,7 +75,7 @@ reason = "anoma/dos-pm#157: returns the config account's rent deposit to the own
 
 [[excuse]]
 id = "forwarder-close-nonce-bitmaps"
-pair = "anomapay-erc20-forwarder/crates/bindings/src/generated/erc20_forwarder.rs ↔ anomapay-spl-token-forwarder/crates/client/idl/spl_token_forwarder.json"
+pair = "anomapay-erc20-forwarder/crates/bindings/src/generated/erc20_forwarder.rs ↔ anomapay-spl-token-forwarder/crates/client/idls/spl_token_forwarder.json"
 key = "fn close_nonce_bitmaps_batch"
 evm = []
 solana = ["()"]
@@ -83,7 +83,7 @@ reason = "anoma/dos-pm#157: returns the nonce bitmaps' rent deposits to the owne
 
 [[excuse]]
 id = "forwarder-close-escrow"
-pair = "anomapay-erc20-forwarder/crates/bindings/src/generated/erc20_forwarder.rs ↔ anomapay-spl-token-forwarder/crates/client/idl/spl_token_forwarder.json"
+pair = "anomapay-erc20-forwarder/crates/bindings/src/generated/erc20_forwarder.rs ↔ anomapay-spl-token-forwarder/crates/client/idls/spl_token_forwarder.json"
 key = "fn close_escrow"
 evm = []
 solana = ["()"]
@@ -91,7 +91,7 @@ reason = "anoma/dos-pm#157: moves the whole balance of an escrow token account, 
 
 [[excuse]]
 id = "emergency-forwarder-config-account"
-pair = "anomapay-erc20-forwarder/crates/bindings/src/generated/emergency_migrating_erc20_forwarder.rs ↔ anomapay-spl-token-forwarder/crates/client/idl/emergency_migrating_spl_token_forwarder.json"
+pair = "anomapay-erc20-forwarder/crates/bindings/src/generated/emergency_migrating_erc20_forwarder.rs ↔ anomapay-spl-token-forwarder/crates/client/idls/emergency_migrating_spl_token_forwarder.json"
 key = "account Config"
 evm = []
 solana = ["(protocol_adapter: address, logic_ref: bytes32, version: u64, owner: address)"]
@@ -99,7 +99,7 @@ reason = "anoma/dos-pm#157: a Solana program keeps its state in accounts, and th
 
 [[excuse]]
 id = "emergency-forwarder-nonce-bitmap-account"
-pair = "anomapay-erc20-forwarder/crates/bindings/src/generated/emergency_migrating_erc20_forwarder.rs ↔ anomapay-spl-token-forwarder/crates/client/idl/emergency_migrating_spl_token_forwarder.json"
+pair = "anomapay-erc20-forwarder/crates/bindings/src/generated/emergency_migrating_erc20_forwarder.rs ↔ anomapay-spl-token-forwarder/crates/client/idls/emergency_migrating_spl_token_forwarder.json"
 key = "account NonceBitmap"
 evm = []
 solana = ["(bits: bytes32, bump: u8)"]
@@ -107,7 +107,7 @@ reason = "anoma/dos-pm#157: the used-nonce bits of 256 of one user's wrap nonces
 
 [[excuse]]
 id = "emergency-forwarder-init-nonce-bitmap"
-pair = "anomapay-erc20-forwarder/crates/bindings/src/generated/emergency_migrating_erc20_forwarder.rs ↔ anomapay-spl-token-forwarder/crates/client/idl/emergency_migrating_spl_token_forwarder.json"
+pair = "anomapay-erc20-forwarder/crates/bindings/src/generated/emergency_migrating_erc20_forwarder.rs ↔ anomapay-spl-token-forwarder/crates/client/idls/emergency_migrating_spl_token_forwarder.json"
 key = "fn init_nonce_bitmap"
 evm = []
 solana = ["(_user: address, _word_index: u64)"]
@@ -115,7 +115,7 @@ reason = "anoma/dos-pm#157: creates the nonce bitmap that a wrap records its non
 
 [[excuse]]
 id = "emergency-forwarder-close-config"
-pair = "anomapay-erc20-forwarder/crates/bindings/src/generated/emergency_migrating_erc20_forwarder.rs ↔ anomapay-spl-token-forwarder/crates/client/idl/emergency_migrating_spl_token_forwarder.json"
+pair = "anomapay-erc20-forwarder/crates/bindings/src/generated/emergency_migrating_erc20_forwarder.rs ↔ anomapay-spl-token-forwarder/crates/client/idls/emergency_migrating_spl_token_forwarder.json"
 key = "fn close_config"
 evm = []
 solana = ["()"]
@@ -123,7 +123,7 @@ reason = "anoma/dos-pm#157: returns the config account's rent deposit to the own
 
 [[excuse]]
 id = "emergency-forwarder-close-nonce-bitmaps"
-pair = "anomapay-erc20-forwarder/crates/bindings/src/generated/emergency_migrating_erc20_forwarder.rs ↔ anomapay-spl-token-forwarder/crates/client/idl/emergency_migrating_spl_token_forwarder.json"
+pair = "anomapay-erc20-forwarder/crates/bindings/src/generated/emergency_migrating_erc20_forwarder.rs ↔ anomapay-spl-token-forwarder/crates/client/idls/emergency_migrating_spl_token_forwarder.json"
 key = "fn close_nonce_bitmaps_batch"
 evm = []
 solana = ["()"]
@@ -131,8 +131,568 @@ reason = "anoma/dos-pm#157: returns the nonce bitmaps' rent deposits to the owne
 
 [[excuse]]
 id = "emergency-forwarder-close-escrow"
-pair = "anomapay-erc20-forwarder/crates/bindings/src/generated/emergency_migrating_erc20_forwarder.rs ↔ anomapay-spl-token-forwarder/crates/client/idl/emergency_migrating_spl_token_forwarder.json"
+pair = "anomapay-erc20-forwarder/crates/bindings/src/generated/emergency_migrating_erc20_forwarder.rs ↔ anomapay-spl-token-forwarder/crates/client/idls/emergency_migrating_spl_token_forwarder.json"
 key = "fn close_escrow"
 evm = []
 solana = ["()"]
 reason = "anoma/dos-pm#157: moves the whole balance of an escrow token account, the wrapped tokens of every user who wrapped into it, to a token account of the mint that the owner picks, then returns the account's rent deposit to the owner. The V2 EVM forwarder has no such function, but the owner gains no power from it: on both chains the owner can replace the code (`upgrade`, `upgradeToAndCall`) with code that moves the tokens. Only the owner can send it, and only while the adapter is paused."
+
+[[excuse]]
+id = "adapter-client-commitmenttreestate-struct"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::CommitmentTreeState struct"
+evm = []
+solana = ["pub struct crate::CommitmentTreeState"]
+reason = "anoma/dos-pm#158: a Merkle helper, which the client writes by hand: it mirrors the adapter's on-chain commitment tree (its hashing, padding and depth), which no IDL describes, so a client computes roots and paths off chain."
+
+[[excuse]]
+id = "adapter-client-eventdecodeerror-enum"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::EventDecodeError enum"
+evm = []
+solana = ["pub enum crate::EventDecodeError"]
+reason = "anoma/dos-pm#158: CPI event framing, which the client writes by hand: the adapter emits each event as an invocation of itself whose data starts with Anchor's 8-byte event tag, and the IDL describes only the event body after the tag, which the generated event types decode. EVM events are logs that the ABI describes whole."
+
+[[excuse]]
+id = "adapter-client-max-loaded-accounts-data-size-bytes-const"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::MAX_LOADED_ACCOUNTS_DATA_SIZE_BYTES const"
+evm = []
+solana = ["pub const crate::MAX_LOADED_ACCOUNTS_DATA_SIZE_BYTES: u32"]
+reason = "anoma/dos-pm#158: settlement planning, which the client writes by hand: a settlement must fit Solana's transaction size, account and compute limits, and it splits into an upload when it does not fit one transaction. No IDL describes these limits. An EVM settlement is one `execute` call."
+
+[[excuse]]
+id = "adapter-client-max-tree-depth-const"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::MAX_TREE_DEPTH const"
+evm = []
+solana = ["pub const crate::MAX_TREE_DEPTH: usize"]
+reason = "anoma/dos-pm#158: a Merkle helper, which the client writes by hand: it mirrors the adapter's on-chain commitment tree (its hashing, padding and depth), which no IDL describes, so a client computes roots and paths off chain."
+
+[[excuse]]
+id = "adapter-client-merkleerror-enum"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::MerkleError enum"
+evm = []
+solana = ["pub enum crate::MerkleError"]
+reason = "anoma/dos-pm#158: a Merkle helper, which the client writes by hand: it mirrors the adapter's on-chain commitment tree (its hashing, padding and depth), which no IDL describes, so a client computes roots and paths off chain."
+
+[[excuse]]
+id = "adapter-client-outputmode-enum"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::OutputMode enum"
+evm = []
+solana = ["pub enum crate::OutputMode"]
+reason = "anoma/dos-pm#158: a wire format no IDL describes, which the client writes by hand: the external call a resource's proof commits to and the adapter carries out (program, instruction data, expected output, output mode, account count)."
+
+[[excuse]]
+id = "adapter-client-padding-leaf-const"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::PADDING_LEAF const"
+evm = []
+solana = ["pub const crate::PADDING_LEAF: [u8; 32]"]
+reason = "anoma/dos-pm#158: a Merkle helper, which the client writes by hand: it mirrors the adapter's on-chain commitment tree (its hashing, padding and depth), which no IDL describes, so a client computes roots and paths off chain."
+
+[[excuse]]
+id = "adapter-client-planerror-enum"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::PlanError enum"
+evm = []
+solana = ["pub enum crate::PlanError"]
+reason = "anoma/dos-pm#158: settlement planning, which the client writes by hand: a settlement must fit Solana's transaction size, account and compute limits, and it splits into an upload when it does not fit one transaction. No IDL describes these limits. An EVM settlement is one `execute` call."
+
+[[excuse]]
+id = "adapter-client-plannedtransaction-struct"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::PlannedTransaction struct"
+evm = []
+solana = ["pub struct crate::PlannedTransaction"]
+reason = "anoma/dos-pm#158: settlement planning, which the client writes by hand: a settlement must fit Solana's transaction size, account and compute limits, and it splits into an upload when it does not fit one transaction. No IDL describes these limits. An EVM settlement is one `execute` call."
+
+[[excuse]]
+id = "adapter-client-settle-compute-unit-limit-const"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::SETTLE_COMPUTE_UNIT_LIMIT const"
+evm = []
+solana = ["pub const crate::SETTLE_COMPUTE_UNIT_LIMIT: u32"]
+reason = "anoma/dos-pm#158: settlement planning, which the client writes by hand: a settlement must fit Solana's transaction size, account and compute limits, and it splits into an upload when it does not fit one transaction. No IDL describes these limits. An EVM settlement is one `execute` call."
+
+[[excuse]]
+id = "adapter-client-settle-heap-frame-bytes-const"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::SETTLE_HEAP_FRAME_BYTES const"
+evm = []
+solana = ["pub const crate::SETTLE_HEAP_FRAME_BYTES: u32"]
+reason = "anoma/dos-pm#158: settlement planning, which the client writes by hand: a settlement must fit Solana's transaction size, account and compute limits, and it splits into an upload when it does not fit one transaction. No IDL describes these limits. An EVM settlement is one `execute` call."
+
+[[excuse]]
+id = "adapter-client-settlementplan-struct"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::SettlementPlan struct"
+evm = []
+solana = ["pub struct crate::SettlementPlan"]
+reason = "anoma/dos-pm#158: settlement planning, which the client writes by hand: a settlement must fit Solana's transaction size, account and compute limits, and it splits into an upload when it does not fit one transaction. No IDL describes these limits. An EVM settlement is one `execute` call."
+
+[[excuse]]
+id = "adapter-client-settlementrequest-struct"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::SettlementRequest struct"
+evm = []
+solana = ["pub struct crate::SettlementRequest<'a>"]
+reason = "anoma/dos-pm#158: settlement planning, which the client writes by hand: a settlement must fit Solana's transaction size, account and compute limits, and it splits into an upload when it does not fit one transaction. No IDL describes these limits. An EVM settlement is one `execute` call."
+
+[[excuse]]
+id = "adapter-client-solanaexternalcall-struct"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::SolanaExternalCall struct"
+evm = []
+solana = ["pub struct crate::SolanaExternalCall"]
+reason = "anoma/dos-pm#158: a wire format no IDL describes, which the client writes by hand: the external call a resource's proof commits to and the adapter carries out (program, instruction data, expected output, output mode, account count)."
+
+[[excuse]]
+id = "adapter-client-txdata-chunk-size-const"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::TXDATA_CHUNK_SIZE const"
+evm = []
+solana = ["pub const crate::TXDATA_CHUNK_SIZE: usize"]
+reason = "anoma/dos-pm#158: settlement planning, which the client writes by hand: a settlement must fit Solana's transaction size, account and compute limits, and it splits into an upload when it does not fit one transaction. No IDL describes these limits. An EVM settlement is one `execute` call."
+
+[[excuse]]
+id = "adapter-client-txdata-expiry-slots-default-const"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::TXDATA_EXPIRY_SLOTS_DEFAULT const"
+evm = []
+solana = ["pub const crate::TXDATA_EXPIRY_SLOTS_DEFAULT: u64"]
+reason = "anoma/dos-pm#158: settlement planning, which the client writes by hand: a settlement must fit Solana's transaction size, account and compute limits, and it splits into an upload when it does not fit one transaction. No IDL describes these limits. An EVM settlement is one `execute` call."
+
+[[excuse]]
+id = "adapter-client-upload-compute-unit-limit-const"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::UPLOAD_COMPUTE_UNIT_LIMIT const"
+evm = []
+solana = ["pub const crate::UPLOAD_COMPUTE_UNIT_LIMIT: u32"]
+reason = "anoma/dos-pm#158: settlement planning, which the client writes by hand: a settlement must fit Solana's transaction size, account and compute limits, and it splits into an upload when it does not fit one transaction. No IDL describes these limits. An EVM settlement is one `execute` call."
+
+[[excuse]]
+id = "adapter-client-upload-struct"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::Upload struct"
+evm = []
+solana = ["pub struct crate::Upload"]
+reason = "anoma/dos-pm#158: settlement planning, which the client writes by hand: a settlement must fit Solana's transaction size, account and compute limits, and it splits into an upload when it does not fit one transaction. No IDL describes these limits. An EVM settlement is one `execute` call."
+
+[[excuse]]
+id = "adapter-client-cpi-event-discriminator-fn"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::cpi_event_discriminator fn"
+evm = []
+solana = ["pub fn crate::cpi_event_discriminator(data: &[u8]) -> core::result::Result<[u8; 8], crate::events::EventDecodeError>"]
+reason = "anoma/dos-pm#158: CPI event framing, which the client writes by hand: the adapter emits each event as an invocation of itself whose data starts with Anchor's 8-byte event tag, and the IDL describes only the event body after the tag, which the generated event types decode. EVM events are logs that the ABI describes whole."
+
+[[excuse]]
+id = "adapter-client-decode-cpi-event-fn"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::decode_cpi_event fn"
+evm = []
+solana = ["pub fn crate::decode_cpi_event<E: anchor_lang::Discriminator + borsh::de::BorshDeserialize>(data: &[u8]) -> core::result::Result<core::option::Option<E>, crate::events::EventDecodeError>"]
+reason = "anoma/dos-pm#158: CPI event framing, which the client writes by hand: the adapter emits each event as an invocation of itself whose data starts with Anchor's 8-byte event tag, and the IDL describes only the event body after the tag, which the generated event types decode. EVM events are logs that the ABI describes whole."
+
+[[excuse]]
+id = "adapter-client-depth-for-leaves-fn"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::depth_for_leaves fn"
+evm = []
+solana = ["pub fn crate::depth_for_leaves(leaf_count: u64) -> usize"]
+reason = "anoma/dos-pm#158: a Merkle helper, which the client writes by hand: it mirrors the adapter's on-chain commitment tree (its hashing, padding and depth), which no IDL describes, so a client computes roots and paths off chain."
+
+[[excuse]]
+id = "adapter-client-derive-event-authority-pda-fn"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::derive_event_authority_pda fn"
+evm = []
+solana = ["pub fn crate::derive_event_authority_pda(program: &solana_address::Address) -> (solana_address::Address, u8)"]
+reason = "anoma/dos-pm#158: a program address whose seeds the adapter's IDL does not declare (its instructions list `event_authority` without `pda` seeds), so the client derives it by hand: Anchor's `#[event_cpi]` signs each event invocation with the PDA of `[\"__event_authority\"]`."
+
+[[excuse]]
+id = "adapter-client-derive-nullifier-pda-fn"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::derive_nullifier_pda fn"
+evm = []
+solana = ["pub fn crate::derive_nullifier_pda(pa_program: &solana_address::Address, pa_state: &solana_address::Address, nullifier: &[u8; 32]) -> (solana_address::Address, u8)"]
+reason = "anoma/dos-pm#158: a program address whose seeds the IDL does not declare, so the client derives it by hand: a settlement passes the nullifier and root markers as remaining accounts, which no instruction of the IDL lists; the IDL declares only the seed prefix (`NULLIFIER_SEED`, `ROOT_SEED`)."
+
+[[excuse]]
+id = "adapter-client-derive-program-data-address-fn"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::derive_program_data_address fn"
+evm = []
+solana = ["pub fn crate::derive_program_data_address(program: &solana_address::Address) -> solana_address::Address"]
+reason = "anoma/dos-pm#158: a program address whose seeds the adapter's IDL does not declare, so the client derives it by hand: the upgradeable loader's ProgramData account of a program, the PDA of the program's address under the loader. The IDL gives it only as the fixed address of the program id the IDL was built with, and one IDL serves every deployment."
+
+[[excuse]]
+id = "adapter-client-derive-root-marker-pda-fn"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::derive_root_marker_pda fn"
+evm = []
+solana = ["pub fn crate::derive_root_marker_pda(pa_program: &solana_address::Address, pa_state: &solana_address::Address, root: &[u8; 32]) -> (solana_address::Address, u8)"]
+reason = "anoma/dos-pm#158: a program address whose seeds the IDL does not declare, so the client derives it by hand: a settlement passes the nullifier and root markers as remaining accounts, which no instruction of the IDL lists; the IDL declares only the seed prefix (`NULLIFIER_SEED`, `ROOT_SEED`)."
+
+[[excuse]]
+id = "adapter-client-events-mod"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::events mod"
+evm = []
+solana = ["pub mod crate::events"]
+reason = "anoma/dos-pm#158: CPI event framing, which the client writes by hand: the adapter emits each event as an invocation of itself whose data starts with Anchor's 8-byte event tag, and the IDL describes only the event body after the tag, which the generated event types decode. EVM events are logs that the ABI describes whole."
+
+[[excuse]]
+id = "adapter-client-external-call-mod"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::external_call mod"
+evm = []
+solana = ["pub mod crate::external_call"]
+reason = "anoma/dos-pm#158: a wire format no IDL describes, which the client writes by hand: the external call a resource's proof commits to and the adapter carries out (program, instruction data, expected output, output mode, account count)."
+
+[[excuse]]
+id = "adapter-client-forwarders-mod"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::forwarders mod"
+evm = []
+solana = ["pub mod crate::forwarders"]
+reason = "anoma/dos-pm#158: settlement planning, which the client writes by hand: the registry of forwarders a settlement calls, each of which gives its calls' accounts, which the adapter passes as remaining accounts and no IDL lists."
+
+[[excuse]]
+id = "adapter-client-hash-two-fn"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::hash_two fn"
+evm = []
+solana = ["pub fn crate::hash_two(left: &[u8; 32], right: &[u8; 32]) -> [u8; 32]"]
+reason = "anoma/dos-pm#158: a Merkle helper, which the client writes by hand: it mirrors the adapter's on-chain commitment tree (its hashing, padding and depth), which no IDL describes, so a client computes roots and paths off chain."
+
+[[excuse]]
+id = "adapter-client-merkle-mod"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::merkle mod"
+evm = []
+solana = ["pub mod crate::merkle"]
+reason = "anoma/dos-pm#158: a Merkle helper, which the client writes by hand: it mirrors the adapter's on-chain commitment tree (its hashing, padding and depth), which no IDL describes, so a client computes roots and paths off chain."
+
+[[excuse]]
+id = "adapter-client-merkle-path-fn"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::merkle_path fn"
+evm = []
+solana = ["pub fn crate::merkle_path(leaves: &[[u8; 32]], index: usize) -> alloc::vec::Vec<([u8; 32], bool)>"]
+reason = "anoma/dos-pm#158: a Merkle helper, which the client writes by hand: it mirrors the adapter's on-chain commitment tree (its hashing, padding and depth), which no IDL describes, so a client computes roots and paths off chain."
+
+[[excuse]]
+id = "adapter-client-path-root-fn"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::path_root fn"
+evm = []
+solana = ["pub fn crate::path_root(leaf: &[u8; 32], path: &[([u8; 32], bool)]) -> [u8; 32]"]
+reason = "anoma/dos-pm#158: a Merkle helper, which the client writes by hand: it mirrors the adapter's on-chain commitment tree (its hashing, padding and depth), which no IDL describes, so a client computes roots and paths off chain."
+
+[[excuse]]
+id = "adapter-client-plan-settlement-fn"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::plan_settlement fn"
+evm = []
+solana = ["pub fn crate::plan_settlement(request: crate::settlement::SettlementRequest<'_>, upload_id: u64, expires_slot: u64) -> core::result::Result<crate::settlement::SettlementPlan, crate::settlement::PlanError>"]
+reason = "anoma/dos-pm#158: settlement planning, which the client writes by hand: a settlement must fit Solana's transaction size, account and compute limits, and it splits into an upload when it does not fit one transaction. No IDL describes these limits. An EVM settlement is one `execute` call."
+
+[[excuse]]
+id = "adapter-client-plan-simulation-fn"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::plan_simulation fn"
+evm = []
+solana = ["pub fn crate::plan_simulation(request: crate::settlement::SettlementRequest<'_>, skip_risc_zero_proof_verification: bool) -> core::result::Result<crate::settlement::PlannedTransaction, crate::settlement::PlanError>"]
+reason = "anoma/dos-pm#158: settlement planning, which the client writes by hand: a settlement must fit Solana's transaction size, account and compute limits, and it splits into an upload when it does not fit one transaction. No IDL describes these limits. An EVM settlement is one `execute` call."
+
+[[excuse]]
+id = "adapter-client-settlement-mod"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::settlement mod"
+evm = []
+solana = ["pub mod crate::settlement"]
+reason = "anoma/dos-pm#158: settlement planning, which the client writes by hand: a settlement must fit Solana's transaction size, account and compute limits, and it splits into an upload when it does not fit one transaction. No IDL describes these limits. An EVM settlement is one `execute` call."
+
+[[excuse]]
+id = "adapter-client-settlement-input-mod"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::settlement_input mod"
+evm = []
+solana = ["pub mod crate::settlement_input"]
+reason = "anoma/dos-pm#158: `settlement_input`, which the client writes by hand: it turns an ARM `Transaction` into the bytes `settle` takes, as pa-evm's `conversion` module does for `execute`; the IDL declares `settle`'s argument as plain bytes."
+
+[[excuse]]
+id = "adapter-client-submission-mod"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::submission mod"
+evm = []
+solana = ["pub mod crate::submission"]
+reason = "anoma/dos-pm#158: the RPC submission code, which the client writes by hand: it sends a planned settlement's transactions to a cluster and reports their outcome. An EVM consumer sends through alloy's provider."
+
+[[excuse]]
+id = "adapter-client-transaction-size-fn"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::transaction_size fn"
+evm = []
+solana = ["pub fn crate::transaction_size(message: &solana_message::versions::v1::message::Message) -> usize"]
+reason = "anoma/dos-pm#158: settlement planning, which the client writes by hand: a settlement must fit Solana's transaction size, account and compute limits, and it splits into an upload when it does not fit one transaction. No IDL describes these limits. An EVM settlement is one `execute` call."
+
+[[excuse]]
+id = "adapter-client-zero-hashes-fn"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::zero_hashes fn"
+evm = []
+solana = ["pub fn crate::zero_hashes() -> [[u8; 32]; 32]"]
+reason = "anoma/dos-pm#158: a Merkle helper, which the client writes by hand: it mirrors the adapter's on-chain commitment tree (its hashing, padding and depth), which no IDL describes, so a client computes roots and paths off chain."
+
+[[excuse]]
+id = "forwarder-client-accountdecodeerror-enum"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "rust crate::AccountDecodeError enum"
+evm = []
+solana = ["pub enum crate::AccountDecodeError"]
+reason = "anoma/dos-pm#158: an account type the IDL does not declare, which the client decodes by hand: the emergency-migrating build's `VulnerableLogicRefs` is grown in place and read from a raw account, so no instruction takes it as a typed account and Anchor leaves it out of the IDL. A test in the program crate checks that this decoder reads what the program writes."
+
+[[excuse]]
+id = "forwarder-client-callserror-enum"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "rust crate::CallsError enum"
+evm = []
+solana = ["pub enum crate::CallsError"]
+reason = "anoma/dos-pm#158: settlement planning, which the client writes by hand: the forwarder's `settlement_calls` gives the accounts and preceding instructions of a settlement's calls to it, so the settlement fits Solana's transaction limits. No IDL describes them."
+
+[[excuse]]
+id = "forwarder-client-forwarder-segment-head-num-accounts-const"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "rust crate::FORWARDER_SEGMENT_HEAD_NUM_ACCOUNTS const"
+evm = []
+solana = ["pub const crate::FORWARDER_SEGMENT_HEAD_NUM_ACCOUNTS: u8"]
+reason = "anoma/dos-pm#158: forwarder call accounts, which the client writes by hand: the adapter passes the forwarder each call's accounts as remaining accounts, which no IDL lists."
+
+[[excuse]]
+id = "forwarder-client-forwarder-unwrap-num-accounts-const"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "rust crate::FORWARDER_UNWRAP_NUM_ACCOUNTS const"
+evm = []
+solana = ["pub const crate::FORWARDER_UNWRAP_NUM_ACCOUNTS: u8"]
+reason = "anoma/dos-pm#158: forwarder call accounts, which the client writes by hand: the adapter passes the forwarder each call's accounts as remaining accounts, which no IDL lists."
+
+[[excuse]]
+id = "forwarder-client-forwarder-wrap-num-accounts-const"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "rust crate::FORWARDER_WRAP_NUM_ACCOUNTS const"
+evm = []
+solana = ["pub const crate::FORWARDER_WRAP_NUM_ACCOUNTS: u8"]
+reason = "anoma/dos-pm#158: forwarder call accounts, which the client writes by hand: the adapter passes the forwarder each call's accounts as remaining accounts, which no IDL lists."
+
+[[excuse]]
+id = "forwarder-client-forwarderinput-enum"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "rust crate::ForwarderInput enum"
+evm = []
+solana = ["pub enum crate::ForwarderInput"]
+reason = "anoma/dos-pm#158: a wire format no IDL describes, which the client writes by hand: the forwarder input a resource's external call carries as its instruction data (an op byte, then the Borsh encoding of the wrap, unwrap or migrate input). The adapter passes it to the forwarder through `forward_call`, whose IDL argument is plain bytes."
+
+[[excuse]]
+id = "forwarder-client-inputerror-enum"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "rust crate::InputError enum"
+evm = []
+solana = ["pub enum crate::InputError"]
+reason = "anoma/dos-pm#158: a wire format no IDL describes, which the client writes by hand: the forwarder input a resource's external call carries as its instruction data (an op byte, then the Borsh encoding of the wrap, unwrap or migrate input). The adapter passes it to the forwarder through `forward_call`, whose IDL argument is plain bytes."
+
+[[excuse]]
+id = "forwarder-client-migrateentry-struct"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "rust crate::MigrateEntry struct"
+evm = []
+solana = ["pub struct crate::MigrateEntry"]
+reason = "anoma/dos-pm#158: a wire format no IDL describes, which the client writes by hand: the forwarder input a resource's external call carries as its instruction data (an op byte, then the Borsh encoding of the wrap, unwrap or migrate input). The adapter passes it to the forwarder through `forward_call`, whose IDL argument is plain bytes."
+
+[[excuse]]
+id = "forwarder-client-migrateinput-struct"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "rust crate::MigrateInput struct"
+evm = []
+solana = ["pub struct crate::MigrateInput"]
+reason = "anoma/dos-pm#158: a wire format no IDL describes, which the client writes by hand: the forwarder input a resource's external call carries as its instruction data (an op byte, then the Borsh encoding of the wrap, unwrap or migrate input). The adapter passes it to the forwarder through `forward_call`, whose IDL argument is plain bytes."
+
+[[excuse]]
+id = "forwarder-client-nonce-bitmap-account-size-const"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "rust crate::NONCE_BITMAP_ACCOUNT_SIZE const"
+evm = []
+solana = ["pub const crate::NONCE_BITMAP_ACCOUNT_SIZE: usize"]
+reason = "anoma/dos-pm#158: settlement planning, which the client writes by hand: the size of a nonce bitmap account, read from the IDL by `build.rs`, whose rent a settlement's payer funds when a wrap's word has no bitmap yet."
+
+[[excuse]]
+id = "forwarder-client-unwrapinput-struct"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "rust crate::UnwrapInput struct"
+evm = []
+solana = ["pub struct crate::UnwrapInput"]
+reason = "anoma/dos-pm#158: a wire format no IDL describes, which the client writes by hand: the forwarder input a resource's external call carries as its instruction data (an op byte, then the Borsh encoding of the wrap, unwrap or migrate input). The adapter passes it to the forwarder through `forward_call`, whose IDL argument is plain bytes."
+
+[[excuse]]
+id = "forwarder-client-wrap-message-len-const"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "rust crate::WRAP_MESSAGE_LEN const"
+evm = []
+solana = ["pub const crate::WRAP_MESSAGE_LEN: usize"]
+reason = "anoma/dos-pm#158: a wire format no IDL describes, which the client writes by hand: the 120-byte wrap authorization message a user signs with ed25519 (sha256 of the layout, base64-encoded), where the EVM forwarder uses a Permit2 / EIP-712 signature."
+
+[[excuse]]
+id = "forwarder-client-wrapinput-struct"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "rust crate::WrapInput struct"
+evm = []
+solana = ["pub struct crate::WrapInput"]
+reason = "anoma/dos-pm#158: a wire format no IDL describes, which the client writes by hand: the forwarder input a resource's external call carries as its instruction data (an op byte, then the Borsh encoding of the wrap, unwrap or migrate input). The adapter passes it to the forwarder through `forward_call`, whose IDL argument is plain bytes."
+
+[[excuse]]
+id = "forwarder-client-wrapmessage-struct"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "rust crate::WrapMessage struct"
+evm = []
+solana = ["pub struct crate::WrapMessage"]
+reason = "anoma/dos-pm#158: a wire format no IDL describes, which the client writes by hand: the 120-byte wrap authorization message a user signs with ed25519 (sha256 of the layout, base64-encoded), where the EVM forwarder uses a Permit2 / EIP-712 signature."
+
+[[excuse]]
+id = "forwarder-client-accounts-mod"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "rust crate::accounts mod"
+evm = []
+solana = ["pub mod crate::accounts"]
+reason = "anoma/dos-pm#158: an account type the IDL does not declare, which the client decodes by hand: the emergency-migrating build's `VulnerableLogicRefs` is grown in place and read from a raw account, so no instruction takes it as a typed account and Anchor leaves it out of the IDL. A test in the program crate checks that this decoder reads what the program writes."
+
+[[excuse]]
+id = "forwarder-client-build-unwrap-forwarder-accounts-fn"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "rust crate::build_unwrap_forwarder_accounts fn"
+evm = []
+solana = ["pub fn crate::build_unwrap_forwarder_accounts(forwarder_program: &solana_address::Address, recipient: &solana_address::Address, token_mint: &solana_address::Address) -> alloc::vec::Vec<solana_instruction::account_meta::AccountMeta>"]
+reason = "anoma/dos-pm#158: forwarder call accounts, which the client writes by hand: the adapter passes the forwarder each call's accounts as remaining accounts, which no IDL lists."
+
+[[excuse]]
+id = "forwarder-client-build-wrap-forwarder-accounts-fn"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "rust crate::build_wrap_forwarder_accounts fn"
+evm = []
+solana = ["pub fn crate::build_wrap_forwarder_accounts(forwarder_program: &solana_address::Address, user: &solana_address::Address, token_mint: &solana_address::Address, nonce: u64) -> alloc::vec::Vec<solana_instruction::account_meta::AccountMeta>"]
+reason = "anoma/dos-pm#158: forwarder call accounts, which the client writes by hand: the adapter passes the forwarder each call's accounts as remaining accounts, which no IDL lists."
+
+[[excuse]]
+id = "forwarder-client-constants-mod"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "rust crate::constants mod"
+evm = []
+solana = ["pub mod crate::constants"]
+reason = "anoma/dos-pm#158: forwarder call accounts and settlement planning, which the client writes by hand: the number of accounts in each forwarder call segment, which no IDL lists, and the size of a nonce bitmap account (read from the IDL by `build.rs`), whose rent a settlement's payer funds."
+
+[[excuse]]
+id = "forwarder-client-decode-forwarder-input-fn"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "rust crate::decode_forwarder_input fn"
+evm = []
+solana = ["pub fn crate::decode_forwarder_input(data: &[u8]) -> core::result::Result<crate::input::ForwarderInput, crate::input::InputError>"]
+reason = "anoma/dos-pm#158: a wire format no IDL describes, which the client writes by hand: the forwarder input a resource's external call carries as its instruction data (an op byte, then the Borsh encoding of the wrap, unwrap or migrate input). The adapter passes it to the forwarder through `forward_call`, whose IDL argument is plain bytes."
+
+[[excuse]]
+id = "forwarder-client-decode-vulnerable-logic-refs-fn"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "rust crate::decode_vulnerable_logic_refs fn"
+evm = []
+solana = ["pub fn crate::decode_vulnerable_logic_refs(data: &[u8]) -> core::result::Result<alloc::vec::Vec<[u8; 32]>, crate::accounts::AccountDecodeError>"]
+reason = "anoma/dos-pm#158: an account type the IDL does not declare, which the client decodes by hand: the emergency-migrating build's `VulnerableLogicRefs` is grown in place and read from a raw account, so no instruction takes it as a typed account and Anchor leaves it out of the IDL. A test in the program crate checks that this decoder reads what the program writes."
+
+[[excuse]]
+id = "forwarder-client-derive-forwarder-escrow-authority-fn"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "rust crate::derive_forwarder_escrow_authority fn"
+evm = []
+solana = ["pub fn crate::derive_forwarder_escrow_authority(forwarder_program: &solana_address::Address) -> (solana_address::Address, u8)"]
+reason = "anoma/dos-pm#158: a program address whose seeds the forwarder's IDLs do not declare (no instruction lists it with `pda` seeds; the IDLs declare only `ESCROW_SEED`), so the client derives it by hand: the escrow authority, which owns every mint's escrow and is the delegate a user approves before a wrap."
+
+[[excuse]]
+id = "forwarder-client-encode-migrate-forwarder-input-fn"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "rust crate::encode_migrate_forwarder_input fn"
+evm = []
+solana = ["pub fn crate::encode_migrate_forwarder_input(input: &crate::input::MigrateInput) -> alloc::vec::Vec<u8>"]
+reason = "anoma/dos-pm#158: a wire format no IDL describes, which the client writes by hand: the forwarder input a resource's external call carries as its instruction data (an op byte, then the Borsh encoding of the wrap, unwrap or migrate input). The adapter passes it to the forwarder through `forward_call`, whose IDL argument is plain bytes."
+
+[[excuse]]
+id = "forwarder-client-encode-unwrap-forwarder-input-fn"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "rust crate::encode_unwrap_forwarder_input fn"
+evm = []
+solana = ["pub fn crate::encode_unwrap_forwarder_input(token_mint: &[u8; 32], amount: u64, recipient: &[u8; 32]) -> alloc::vec::Vec<u8>"]
+reason = "anoma/dos-pm#158: a wire format no IDL describes, which the client writes by hand: the forwarder input a resource's external call carries as its instruction data (an op byte, then the Borsh encoding of the wrap, unwrap or migrate input). The adapter passes it to the forwarder through `forward_call`, whose IDL argument is plain bytes."
+
+[[excuse]]
+id = "forwarder-client-encode-wrap-forwarder-input-fn"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "rust crate::encode_wrap_forwarder_input fn"
+evm = []
+solana = ["pub fn crate::encode_wrap_forwarder_input(input: &crate::input::WrapInput) -> alloc::vec::Vec<u8>"]
+reason = "anoma/dos-pm#158: a wire format no IDL describes, which the client writes by hand: the forwarder input a resource's external call carries as its instruction data (an op byte, then the Borsh encoding of the wrap, unwrap or migrate input). The adapter passes it to the forwarder through `forward_call`, whose IDL argument is plain bytes."
+
+[[excuse]]
+id = "forwarder-client-forwarder-migrate-num-accounts-fn"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "rust crate::forwarder_migrate_num_accounts fn"
+evm = []
+solana = ["pub fn crate::forwarder_migrate_num_accounts(entries: usize) -> core::option::Option<u8>"]
+reason = "anoma/dos-pm#158: forwarder call accounts, which the client writes by hand: the adapter passes the forwarder each call's accounts as remaining accounts, which no IDL lists."
+
+[[excuse]]
+id = "forwarder-client-nonce-word-index-fn"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "rust crate::nonce_word_index fn"
+evm = []
+solana = ["pub fn crate::nonce_word_index(nonce: u64) -> u64"]
+reason = "anoma/dos-pm#158: forwarder call accounts, which the client writes by hand: the adapter passes the forwarder each call's accounts as remaining accounts, which no IDL lists."
+
+[[excuse]]
+id = "forwarder-client-settlement-mod"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "rust crate::settlement mod"
+evm = []
+solana = ["pub mod crate::settlement"]
+reason = "anoma/dos-pm#158: settlement planning, which the client writes by hand: the forwarder's `settlement_calls` gives the accounts and preceding instructions of a settlement's calls to it, so the settlement fits Solana's transaction limits. No IDL describes them."
+
+[[excuse]]
+id = "forwarder-client-settlement-calls-fn"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "rust crate::settlement_calls fn"
+evm = []
+solana = ["pub fn crate::settlement_calls(forwarder: &solana_address::Address, protocol_adapter: &solana_address::Address, payer: &solana_address::Address, calls: &[anoma_pa_solana_client::external_call::SolanaExternalCall], preceding_start: usize) -> core::result::Result<anoma_pa_solana_client::settlement::CallAccounts, crate::settlement::CallsError>"]
+reason = "anoma/dos-pm#158: settlement planning, which the client writes by hand: the forwarder's `settlement_calls` gives the accounts and preceding instructions of a settlement's calls to it, so the settlement fits Solana's transaction limits. No IDL describes them."
+
+[[excuse]]
+id = "forwarder-client-sha256-fn"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "rust crate::sha256 fn"
+evm = []
+solana = ["pub fn crate::sha256(bytes: &[u8]) -> [u8; 32]"]
+reason = "anoma/dos-pm#158: a wire format no IDL describes, which the client writes by hand: the 120-byte wrap authorization message a user signs with ed25519 (sha256 of the layout, base64-encoded), where the EVM forwarder uses a Permit2 / EIP-712 signature."
+
+[[excuse]]
+id = "forwarder-client-submitter-mod"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "rust crate::submitter mod"
+evm = []
+solana = ["pub mod crate::submitter"]
+reason = "anoma/dos-pm#158: the RPC submission code, which the client writes by hand: it sends a planned settlement's transactions to a cluster and reports their outcome. An EVM consumer sends through alloy's provider."
+
+[[excuse]]
+id = "forwarder-client-wrap-message-mod"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "rust crate::wrap_message mod"
+evm = []
+solana = ["pub mod crate::wrap_message"]
+reason = "anoma/dos-pm#158: a wire format no IDL describes, which the client writes by hand: the 120-byte wrap authorization message a user signs with ed25519 (sha256 of the layout, base64-encoded), where the EVM forwarder uses a Permit2 / EIP-712 signature."
