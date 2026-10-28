@@ -105,44 +105,44 @@ pub async fn settlement_refuses_an_unknown_root<Env: Environment>(
     refuses(env, tx, Refusal::UnknownRoot).await
 }
 
-/// A kind table the suite installs and claims, which no fixture proves
+/// A kind tree root the suite installs and claims, which no fixture proves
 /// against.
-const OTHER_KIND_TABLE: Digest = Digest::from_bytes([0x4b; 32]);
+const OTHER_KIND_TREE_ROOT: Digest = Digest::from_bytes([0x4b; 32]);
 
-/// A transaction proven against the empty kind table settles whatever table
-/// the protocol adapter stores: the empty table merges no kinds, so what
-/// balances under it balances under any table.
-pub async fn settles_a_transaction_proven_against_the_empty_kind_table<Env: Environment>(
+/// A transaction proven against the empty kind tree settles whatever tree
+/// the protocol adapter stores: the empty tree merges no kinds, so what
+/// balances under it balances under any tree.
+pub async fn settles_a_transaction_proven_against_the_empty_kind_tree<Env: Environment>(
     env: &mut Env,
 ) -> anyhow::Result<()> {
     let tx = prove_actions(env, &[trivial_action(53, trivial::Overrides::default())?]).await?;
     anyhow::ensure!(
-        tx.aggregation_instance()?.kind_table_root == crate::fixtures::empty_kind_table_root(),
-        "the transaction must be proven against the empty kind table for this test, but the loaded \
-         kind table lists its resources"
+        tx.aggregation_instance()?.kind_tree_root == crate::fixtures::empty_kind_tree_root(),
+        "the transaction must be proven against the empty kind tree for this test, but the loaded \
+         kind tree lists its resources"
     );
     env.protocol_adapter_mut()
-        .set_kind_tree_root(OTHER_KIND_TABLE)
+        .set_kind_tree_root(OTHER_KIND_TREE_ROOT)
         .await
-        .context("failed to install another kind table")?;
+        .context("failed to install another kind tree root")?;
     settles(env, tx).await
 }
 
-/// The protocol adapter refuses a transaction claiming a kind table it
+/// The protocol adapter refuses a transaction claiming a kind tree it
 /// neither stores nor is the empty one, before verifying its proof; once its
-/// owner installs that table, the claim passes and the proof, which proves
-/// another table, does not.
-pub async fn settlement_refuses_a_kind_table_neither_stored_nor_empty<Env: Environment>(
+/// owner installs that tree's root, the claim passes and the proof, which
+/// proves another tree, does not.
+pub async fn settlement_refuses_a_kind_tree_neither_stored_nor_empty<Env: Environment>(
     env: &mut Env,
 ) -> anyhow::Result<()> {
     let mut tx = prove_actions(env, &[trivial_action(57, trivial::Overrides::default())?]).await?;
-    tx.claim_kind_table_root(OTHER_KIND_TABLE)?;
+    tx.claim_kind_tree_root(OTHER_KIND_TREE_ROOT)?;
     refuses(env, tx.clone(), Refusal::UnacceptedKindTreeRoot).await?;
 
     env.protocol_adapter_mut()
-        .set_kind_tree_root(OTHER_KIND_TABLE)
+        .set_kind_tree_root(OTHER_KIND_TREE_ROOT)
         .await
-        .context("failed to install the claimed kind table")?;
+        .context("failed to install the claimed kind tree root")?;
     refuses(env, tx, Refusal::InvalidAggregationProof).await
 }
 
@@ -275,13 +275,13 @@ mod tests {
     use crate::prover::{LocalProver, mock_aggregation_seal};
 
     /// A protocol adapter in memory that makes the checks the suite expects an
-    /// adapter to make: the pause and then the transaction's kind table,
+    /// adapter to make: the pause and then the transaction's kind tree,
     /// first, as on every chain; each resource's logic ref against the
     /// denylist for its side, and each consumed resource's root and
     /// nullifier; the external calls (whose one forwarder is a block-time
     /// forwarder taking `[time, expected output]`); and the local prover's
     /// seal over the aggregation journal in `encoding`, with the compliance
-    /// key. The chains' adapters make the checks after the kind table's in
+    /// key. The chains' adapters make the checks after the kind tree's in
     /// different orders, so a transaction failing more than one of them would
     /// be refused for a different reason on each: it fails the test instead. It emits its events as it settles,
     /// apart from the suite's `expected_events`, so the suite's check of
@@ -297,7 +297,7 @@ mod tests {
     }
 
     impl InMemoryAdapter {
-        /// An adapter with an empty tree, storing the empty kind table, as
+        /// An adapter with an empty tree, storing the empty kind tree, as
         /// both chains' adapters start.
         fn new(encoding: JournalEncoding) -> Self {
             let tree = FrontierCommitmentTree::new(0, Vec::new()).unwrap();
@@ -306,7 +306,7 @@ mod tests {
                 tree,
                 nullifiers: HashSet::new(),
                 denied_logic_refs: HashSet::new(),
-                kind_tree_root: crate::fixtures::empty_kind_table_root(),
+                kind_tree_root: crate::fixtures::empty_kind_tree_root(),
                 paused: false,
                 encoding,
             }
@@ -319,11 +319,8 @@ mod tests {
             }
             let aggregation = transaction.aggregation()?;
             let instance = &aggregation.instance;
-            if ![
-                self.kind_tree_root,
-                crate::fixtures::empty_kind_table_root(),
-            ]
-            .contains(&instance.kind_table_root)
+            if ![self.kind_tree_root, crate::fixtures::empty_kind_tree_root()]
+                .contains(&instance.kind_tree_root)
             {
                 return Ok(Some(Refusal::UnacceptedKindTreeRoot));
             }
@@ -339,32 +336,22 @@ mod tests {
                 refuse(Refusal::NullifierSpent);
             }
             for action in &instance.actions {
-                for consumed in &action.consumed_publics {
-                    if !self.roots.contains(&consumed.commitment_tree_root) {
-                        refuse(Refusal::UnknownRoot);
+                for resource in &action.resource_instances {
+                    if let Some(root) = resource.commitment_tree_root() {
+                        if !self.roots.contains(&root) {
+                            refuse(Refusal::UnknownRoot);
+                        }
+                        if self.nullifiers.contains(&resource.tag()) {
+                            refuse(Refusal::NullifierSpent);
+                        }
                     }
-                    if self.nullifiers.contains(&consumed.resource_nullifier) {
-                        refuse(Refusal::NullifierSpent);
-                    }
-                }
-                let resources = action
-                    .consumed_publics
-                    .iter()
-                    .map(|c| (c.resource_logic_ref, true, &c.app_data))
-                    .chain(
-                        action
-                            .created_publics
-                            .iter()
-                            .map(|c| (c.resource_logic_ref, false, &c.app_data)),
-                    );
-                for (logic_ref, consumed, app_data) in resources {
                     if self.denied_logic_refs.contains(&DeniedLogicRef {
-                        logic_ref,
-                        consumed,
+                        logic_ref: resource.logic_ref(),
+                        consumed: resource.is_consumed(),
                     }) {
                         refuse(Refusal::DeniedLogicRef);
                     }
-                    for call in &app_data.external_payload {
+                    for call in &resource.app_data().external_payload {
                         if !call_block_time_forwarder(&call.blob)? {
                             refuse(Refusal::ExternalCallOutputMismatch);
                         }
@@ -372,7 +359,7 @@ mod tests {
                 }
             }
             let verified = AggregationInstance {
-                compliance_key: anoma_rm_risc0::constants::COMPLIANCE_VK,
+                compliance_vk: anoma_rm_risc0::constants::COMPLIANCE_VK,
                 ..instance.clone()
             };
             if aggregation.proof != mock_aggregation_seal(&verified, self.encoding) {
@@ -395,36 +382,24 @@ mod tests {
             let before = self.tree.root();
             let mut events = Vec::new();
             for action in &instance.actions {
-                for consumed in &action.consumed_publics {
-                    self.nullifiers.insert(consumed.resource_nullifier);
-                    emit_resource(&mut events, consumed.resource_nullifier, &consumed.app_data);
+                for resource in &action.resource_instances {
+                    if resource.is_consumed() {
+                        self.nullifiers.insert(resource.tag());
+                    } else {
+                        self.tree.add([resource.tag()]);
+                    }
+                    emit_resource(&mut events, resource.tag(), resource.app_data());
                 }
-                for created in &action.created_publics {
-                    self.tree.add([created.resource_commitment]);
-                    emit_resource(&mut events, created.resource_commitment, &created.app_data);
-                }
+                let (consumed, created): (Vec<_>, Vec<_>) = action
+                    .resource_instances
+                    .iter()
+                    .partition(|resource| resource.is_consumed());
                 events.push(Event::ActionExecuted {
                     action_tree_root: action.action_tree_root,
-                    nullifiers: action
-                        .consumed_publics
-                        .iter()
-                        .map(|c| c.resource_nullifier)
-                        .collect(),
-                    consumed_logic_refs: action
-                        .consumed_publics
-                        .iter()
-                        .map(|c| c.resource_logic_ref)
-                        .collect(),
-                    commitments: action
-                        .created_publics
-                        .iter()
-                        .map(|c| c.resource_commitment)
-                        .collect(),
-                    created_logic_refs: action
-                        .created_publics
-                        .iter()
-                        .map(|c| c.resource_logic_ref)
-                        .collect(),
+                    nullifiers: consumed.iter().map(|c| c.tag()).collect(),
+                    consumed_logic_refs: consumed.iter().map(|c| c.logic_ref()).collect(),
+                    commitments: created.iter().map(|c| c.tag()).collect(),
+                    created_logic_refs: created.iter().map(|c| c.logic_ref()).collect(),
                 });
             }
             let root = self.tree.root();
@@ -758,30 +733,29 @@ async fn settles<Env: Environment>(env: &mut Env, tx: Transaction) -> anyhow::Re
 
 /// The events settling `tx` emits, `root` being the tree's root after it, in
 /// pa-evm's order, which the Solana adapter mirrors: per action, for each
-/// resource (consumed ones first) one per external call it makes and then one
-/// per blob it keeps, then the action's; then, if the transaction creates a
+/// resource in the action's order one per external call it makes and then one
+/// per blob it keeps, then the action's (its nullifiers and commitments each
+/// in that order); then, if the transaction creates a
 /// commitment, the new root; then the transaction's.
 fn expected_events(tx: &Transaction, root: Digest) -> anyhow::Result<Vec<Event>> {
     let instance = tx.aggregation_instance()?;
     let mut events = Vec::new();
     for action in &instance.actions {
-        let consumed = &action.consumed_publics;
-        let created = &action.created_publics;
-        let resources = consumed
-            .iter()
-            .map(|c| (c.resource_nullifier, &c.app_data))
-            .chain(created.iter().map(|c| (c.resource_commitment, &c.app_data)));
-        for (tag, app_data) in resources {
-            let calls = app_data.external_payload.len();
+        for resource in &action.resource_instances {
+            let calls = resource.app_data().external_payload.len();
             events.extend(std::iter::repeat_n(Event::ForwarderCallExecuted, calls));
-            events.extend(kept_blobs(tag, app_data));
+            events.extend(kept_blobs(resource.tag(), resource.app_data()));
         }
+        let (consumed, created): (Vec<_>, Vec<_>) = action
+            .resource_instances
+            .iter()
+            .partition(|resource| resource.is_consumed());
         events.push(Event::ActionExecuted {
             action_tree_root: action.action_tree_root,
-            nullifiers: consumed.iter().map(|c| c.resource_nullifier).collect(),
-            consumed_logic_refs: consumed.iter().map(|c| c.resource_logic_ref).collect(),
-            commitments: created.iter().map(|c| c.resource_commitment).collect(),
-            created_logic_refs: created.iter().map(|c| c.resource_logic_ref).collect(),
+            nullifiers: consumed.iter().map(|c| c.tag()).collect(),
+            consumed_logic_refs: consumed.iter().map(|c| c.logic_ref()).collect(),
+            commitments: created.iter().map(|c| c.tag()).collect(),
+            created_logic_refs: created.iter().map(|c| c.logic_ref()).collect(),
         });
     }
     if tx.created_commitments()?.next().is_some() {
@@ -876,8 +850,8 @@ macro_rules! suite_tests {
             settlement_refuses_a_tampered_aggregation_seal,
             settlement_refuses_a_spent_nullifier,
             settlement_refuses_an_unknown_root,
-            settles_a_transaction_proven_against_the_empty_kind_table,
-            settlement_refuses_a_kind_table_neither_stored_nor_empty,
+            settles_a_transaction_proven_against_the_empty_kind_tree,
+            settlement_refuses_a_kind_tree_neither_stored_nor_empty,
             settles_only_while_unpaused,
             settlement_refuses_a_denied_logic_ref,
             settles_consuming_a_deprecated_logic_ref_but_refuses_creating_one,

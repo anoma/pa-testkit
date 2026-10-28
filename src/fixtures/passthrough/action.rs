@@ -2,7 +2,7 @@ use anoma_rm_risc0::action_tree::ActionTree;
 use anoma_rm_risc0::compliance;
 use anoma_rm_risc0::logic_instance::{AppData, ExpirableBlob, LogicInstance};
 use anoma_rm_risc0::nullifier_key::NullifierKey;
-use anoma_rm_risc0::resource::{ConsumedResourceWitness, Resource};
+use anoma_rm_risc0::resource::{Resource, ResourceWitness, ResourceWitnessConsumed};
 use anyhow::Context;
 use risc0_zkvm::Digest;
 
@@ -67,19 +67,21 @@ pub fn build(
     let commitment = created.commitment();
 
     let compliance_witness = compliance::from_resources(
-        vec![ConsumedResourceWitness::from_resource(consumed, nf_key)],
-        vec![created],
-        crate::fixtures::kind_table(),
+        vec![
+            ResourceWitness::Consumed(ResourceWitnessConsumed::from_resource(consumed, nf_key)),
+            ResourceWitness::Created(created),
+        ],
+        crate::fixtures::kind_tree(),
     );
 
-    let root = ActionTree::new(vec![nullifier, commitment])
+    let action_tree_root = ActionTree::new(vec![nullifier, commitment])
         .root()
         .context("failed to compute the action tree root")?;
     let logic_witnesses: Vec<Box<dyn LogicWitness>> = vec![
         Box::new(PassthroughLogicWitness(LogicInstance {
             tag: nullifier,
             is_consumed: true,
-            root,
+            action_tree_root,
             app_data: AppData {
                 external_payload: external_calls
                     .into_iter()
@@ -106,7 +108,7 @@ pub fn build(
         Box::new(PassthroughLogicWitness(LogicInstance {
             tag: commitment,
             is_consumed: false,
-            root,
+            action_tree_root,
             app_data: AppData::default(),
         })),
     ];

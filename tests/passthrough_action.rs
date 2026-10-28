@@ -32,17 +32,15 @@ async fn the_proven_action_carries_the_external_calls_under_the_consumed_tag() {
         .as_ref()
         .expect("the transaction must carry an aggregation")
         .instance;
-    let action = &instance.actions[0];
-    assert_eq!(action.consumed_publics.len(), 1);
-    assert_eq!(action.created_publics.len(), 1);
-    assert_eq!(action.consumed_publics[0].resource_nullifier, nullifier);
+    let [consumed, created] = &instance.actions[0].resource_instances[..] else {
+        panic!("the action must hold one consumed and one created resource");
+    };
+    assert!(consumed.is_consumed(), "the consumed resource comes first");
+    assert_eq!(consumed.tag(), nullifier);
+    assert_eq!(consumed.logic_ref(), PASSTHROUGH_LOGIC_VK);
     assert_eq!(
-        action.consumed_publics[0].resource_logic_ref,
-        PASSTHROUGH_LOGIC_VK
-    );
-    assert_eq!(
-        action.consumed_publics[0].app_data,
-        AppData {
+        consumed.app_data(),
+        &AppData {
             external_payload: calls
                 .into_iter()
                 .map(|blob| ExpirableBlob {
@@ -53,12 +51,10 @@ async fn the_proven_action_carries_the_external_calls_under_the_consumed_tag() {
             ..AppData::default()
         }
     );
-    assert_eq!(action.created_publics[0].resource_commitment, commitment);
-    assert_eq!(
-        action.created_publics[0].resource_logic_ref,
-        PASSTHROUGH_LOGIC_VK
-    );
-    assert_eq!(action.created_publics[0].app_data, AppData::default());
+    assert!(!created.is_consumed(), "the created resource comes second");
+    assert_eq!(created.tag(), commitment);
+    assert_eq!(created.logic_ref(), PASSTHROUGH_LOGIC_VK);
+    assert_eq!(created.app_data(), &AppData::default());
 }
 
 #[tokio::test]
@@ -78,16 +74,21 @@ async fn the_proven_action_carries_the_application_payload_under_the_consumed_ta
         .prove(&[built.witnesses])
         .await
         .expect("the local prover must constrain a pass-through action");
-    let action = &tx
+    let [consumed, created] = &tx
         .as_arm()
         .aggregation
         .as_ref()
         .expect("the transaction must carry an aggregation")
         .instance
-        .actions[0];
+        .actions[0]
+        .resource_instances[..]
+    else {
+        panic!("the action must hold one consumed and one created resource");
+    };
+    assert!(consumed.is_consumed() && !created.is_consumed());
     assert_eq!(
-        action.consumed_publics[0].app_data,
-        AppData {
+        consumed.app_data(),
+        &AppData {
             application_payload: payload
                 .into_iter()
                 .map(|blob| ExpirableBlob {
@@ -98,5 +99,5 @@ async fn the_proven_action_carries_the_application_payload_under_the_consumed_ta
             ..AppData::default()
         }
     );
-    assert_eq!(action.created_publics[0].app_data, AppData::default());
+    assert_eq!(created.app_data(), &AppData::default());
 }

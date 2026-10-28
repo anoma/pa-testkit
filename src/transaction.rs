@@ -69,11 +69,11 @@ impl Transaction {
         Ok(())
     }
 
-    /// Make the transaction claim it was proven against the kind table
+    /// Make the transaction claim it was proven against the kind tree
     /// with root `root`, which its aggregation proof does not prove: used by
-    /// negative tests of an adapter's kind-table check.
-    pub fn claim_kind_table_root(&mut self, root: Digest) -> anyhow::Result<()> {
-        self.aggregation_mut()?.instance.kind_table_root = root;
+    /// negative tests of an adapter's kind tree check.
+    pub fn claim_kind_tree_root(&mut self, root: Digest) -> anyhow::Result<()> {
+        self.aggregation_mut()?.instance.kind_tree_root = root;
         Ok(())
     }
 
@@ -113,9 +113,10 @@ impl Transaction {
                 .iter()
                 .flat_map(|action| {
                     action
-                        .created_publics
+                        .resource_instances
                         .iter()
-                        .map(|created| created.resource_commitment)
+                        .filter(|resource| !resource.is_consumed())
+                        .map(|created| created.tag())
                 })
                 .collect()
         } else {
@@ -127,9 +128,10 @@ impl Transaction {
                 .map(|action| {
                     compliance_unit::get_instance(&action.compliance_unit).map(|instance| {
                         instance
-                            .created_publics
+                            .resource_instances
                             .iter()
-                            .map(|created| created.resource_commitment)
+                            .filter(|resource| !resource.is_consumed())
+                            .map(|created| created.tag())
                             .collect::<Vec<_>>()
                     })
                 })

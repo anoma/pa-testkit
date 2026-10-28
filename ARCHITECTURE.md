@@ -25,7 +25,7 @@ nesting.
 - `environment` — the interface a chain's harness implements: `Environment`,
   `Prover`, `ProtocolAdapter` (which settles a transaction, reads the
   commitment tree and latest root the adapter stores, and makes the owner's
-  calls: kind table, pause, logic-ref denylist); and the vocabulary the suite
+  calls: kind tree root, pause, logic-ref denylist); and the vocabulary the suite
   speaks through it: `Outcome` and `Refusal` (what an adapter did with a
   transaction), `ExternalCall` (a call to an example program, which the
   environment encodes for its chain).
@@ -52,8 +52,8 @@ nesting.
     environment without the queue; minutes per transaction.
 
   The two real provers share `assemble`: the actions built from their base
-  proofs in canonical tag order, the delta proof, and the verification of the
-  aggregated transaction.
+  proofs in the compliance unit's resource order, the delta proof, and the
+  verification of the aggregated transaction.
 - `assert` — negative-test assertion helpers (`Needle`,
   `expect_integration_panic`), shared by every integration-test crate. The
   proof-tamper counterpart lives on `Transaction` (`tamper_aggregation_seal`).
