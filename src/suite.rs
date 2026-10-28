@@ -8,12 +8,11 @@
 
 use anoma_rm_risc0::Digest;
 use anyhow::Context;
-use sha3::{Digest as _, Keccak256};
 
 use crate::commitment_tree::FrontierCommitmentTree;
 use crate::environment::{
     DELETION_CRITERION_NEVER, DeniedLogicRef, Environment, Event, ExternalCall, Outcome,
-    PayloadKind, ProtocolAdapter, Refusal, TimeComparison,
+    PayloadKind, ProtocolAdapter, Refusal, TimeComparison, transaction_id,
 };
 use crate::fixtures::{passthrough, trivial};
 use crate::transaction::Transaction;
@@ -408,7 +407,7 @@ mod tests {
                 events.push(Event::CommitmentTreeRootAdded { root });
             }
             events.push(Event::TransactionExecuted {
-                transaction_id: Digest::from_bytes(Keccak256::digest(instance.delta_msg()).into()),
+                transaction_id: transaction_id(instance),
             });
             Ok(events)
         }
@@ -762,7 +761,7 @@ fn expected_events(tx: &Transaction, root: Digest) -> anyhow::Result<Vec<Event>>
         events.push(Event::CommitmentTreeRootAdded { root });
     }
     events.push(Event::TransactionExecuted {
-        transaction_id: Digest::from_bytes(Keccak256::digest(instance.delta_msg()).into()),
+        transaction_id: transaction_id(instance),
     });
     Ok(events)
 }
