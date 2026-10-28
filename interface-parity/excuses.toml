@@ -1824,3 +1824,35 @@ key = "package"
 evm = []
 solana = ["published"]
 reason = "anoma/dos-pm#158: the TypeScript client for Solana consumers (events decoded by the IDL coder, the deployment record, the instance and the hand-written parts). The pinned EVM repositories publish no npm package to pair it with; pa-evm's only package.json (contracts/package.json) is unnamed and holds its Solidity tooling."
+
+[[excuse]]
+id = "adapter-client-decode-pa-state-fn"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::decode_pa_state fn"
+evm = []
+solana = ["pub fn crate::decode_pa_state(data: &[u8]) -> core::result::Result<crate::generated::protocol_adapter::accounts::PAStateAccount, crate::accounts::StateDecodeError>"]
+reason = "anoma/dos-pm#158: a chain-forced guard: it refuses state written under another schema version, which the generated decoder would read as the current layout (dos-pm#158)."
+
+[[excuse]]
+id = "adapter-client-statedecodeerror-enum"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::StateDecodeError enum"
+evm = []
+solana = ["pub enum crate::StateDecodeError"]
+reason = "anoma/dos-pm#158: a chain-forced guard: it refuses state written under another schema version, which the generated decoder would read as the current layout (dos-pm#158)."
+
+[[excuse]]
+id = "adapter-client-accounts-mod"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::accounts mod"
+evm = []
+solana = ["pub mod crate::accounts"]
+reason = "anoma/dos-pm#158: a chain-forced guard: it refuses state written under another schema version, which the generated decoder would read as the current layout (dos-pm#158)."
+
+[[excuse]]
+id = "forwarder-client-input-mod"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "rust crate::input mod"
+evm = []
+solana = ["pub mod crate::input"]
+reason = "anoma/dos-pm#158: a wire format no IDL describes, which the client writes by hand: the forwarder input a resource's external call carries as its instruction data (an op byte, then the Borsh encoding of the wrap, unwrap or migrate input). The adapter passes it to the forwarder through `forward_call`, whose IDL argument is plain bytes."
