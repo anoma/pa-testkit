@@ -84,7 +84,7 @@ pub enum Refusal {
     /// stores nor the empty table's.
     UnacceptedKindTreeRoot,
     /// The aggregation proof does not prove the transaction's actions under
-    /// the adapter's compliance key and the transaction's kind tree root.
+    /// the adapter's compliance verifying key and the transaction's kind tree root.
     InvalidAggregationProof,
     /// An external call returned other than the output its proof expects.
     ExternalCallOutputMismatch,

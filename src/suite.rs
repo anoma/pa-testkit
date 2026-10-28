@@ -281,7 +281,7 @@ mod tests {
     /// nullifier; the external calls (whose one forwarder is a block-time
     /// forwarder taking `[time, expected output]`); and the local prover's
     /// seal over the aggregation journal in `encoding`, with the compliance
-    /// key. The chains' adapters make the checks after the kind tree's in
+    /// verifying key. The chains' adapters make the checks after the kind tree's in
     /// different orders, so a transaction failing more than one of them would
     /// be refused for a different reason on each: it fails the test instead. It emits its events as it settles,
     /// apart from the suite's `expected_events`, so the suite's check of
