@@ -7,7 +7,7 @@
 name = "pa-evm"
 side = "evm"
 url = "https://github.com/anoma/pa-evm"
-commit = "ebadc2163ba0a70a0a0753beb4c68197800fe4f4"
+commit = "c41e5f1b9f22070fb8f53780da66415039b3beb6"
 forge = { version = "1.8.5", sha256 = { linux_amd64 = "6c66ffcc55fa4249197721baa3098bc208014ea1d8aa04b2ed50ac6bccffb226", darwin_arm64 = "56049728e25e44a61c7f2e49438023b0890cb45850ffcb7c882f90cd998baf83" } }
 
 [[repository]]

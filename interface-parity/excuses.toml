@@ -696,3 +696,1131 @@ key = "rust crate::wrap_message mod"
 evm = []
 solana = ["pub mod crate::wrap_message"]
 reason = "anoma/dos-pm#158: a wire format no IDL describes, which the client writes by hand: the 120-byte wrap authorization message a user signs with ed25519 (sha256 of the layout, base64-encoded), where the EVM forwarder uses a Permit2 / EIP-712 signature."
+
+[[excuse]]
+id = "adapter-client-derive-pa-state-pda-fn"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::derive_pa_state_pda fn"
+evm = []
+solana = ["pub fn crate::derive_pa_state_pda(pa_program: &solana_address::Address) -> (solana_address::Address, u8)"]
+reason = "anoma/dos-pm#158: Rust declare_program! does not resolve PDAs; the helper is built from the generated seed constants and tested against the IDL's pda.seeds."
+
+[[excuse]]
+id = "adapter-client-derive-tx-data-pda-fn"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::derive_tx_data_pda fn"
+evm = []
+solana = ["pub fn crate::derive_tx_data_pda(pa_program: &solana_address::Address, authority: &solana_address::Address, upload_id: u64) -> (solana_address::Address, u8)"]
+reason = "anoma/dos-pm#158: Rust declare_program! does not resolve PDAs; the helper is built from the generated seed constants and tested against the IDL's pda.seeds."
+
+[[excuse]]
+id = "adapter-client-derive-upgrade-authority-pda-fn"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::derive_upgrade_authority_pda fn"
+evm = []
+solana = ["pub fn crate::derive_upgrade_authority_pda(pa_program: &solana_address::Address) -> (solana_address::Address, u8)"]
+reason = "anoma/dos-pm#158: Rust declare_program! does not resolve PDAs; the helper is built from the generated seed constants and tested against the IDL's pda.seeds."
+
+[[excuse]]
+id = "adapter-client-derive-verifier-entry-pda-fn"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::derive_verifier_entry_pda fn"
+evm = []
+solana = ["pub fn crate::derive_verifier_entry_pda(verifier_router_program: &solana_address::Address, selector: [u8; 4]) -> solana_address::Address"]
+reason = "anoma/dos-pm#158: Rust declare_program! does not resolve PDAs; the helper is built from the generated seed constants and tested against the IDL's pda.seeds."
+
+[[excuse]]
+id = "adapter-client-derive-verifier-router-pdas-fn"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::derive_verifier_router_pdas fn"
+evm = []
+solana = ["pub fn crate::derive_verifier_router_pdas(verifier_router_program: &solana_address::Address, selector: [u8; 4]) -> (solana_address::Address, solana_address::Address)"]
+reason = "anoma/dos-pm#158: Rust declare_program! does not resolve PDAs; the helper is built from the generated seed constants and tested against the IDL's pda.seeds."
+
+[[excuse]]
+id = "adapter-client-pda-mod"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::pda mod"
+evm = []
+solana = ["pub mod crate::pda"]
+reason = "anoma/dos-pm#158: the client's program addresses. Rust declare_program! does not resolve PDAs, so each helper is built from the generated seed constants and tested against the IDL's pda.seeds; the rest are addresses whose seeds the IDL does not declare (event authority, nullifier and root markers, the loader's ProgramData, the escrow authority)."
+
+[[excuse]]
+id = "adapter-client-instructions-mod"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::instructions mod"
+evm = []
+solana = ["pub mod crate::instructions"]
+reason = "anoma/dos-pm#158: the instruction builders over the generated `client::accounts` and `client::args`, usable without an RPC connection, beside the same builders on the program instance (the EVM bindings' parallel: forge bind's call structs beside the contract instance), with the account struct they take."
+
+[[excuse]]
+id = "adapter-client-settlementaccounts-struct"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::SettlementAccounts struct"
+evm = []
+solana = ["pub struct crate::SettlementAccounts"]
+reason = "anoma/dos-pm#158: the instruction builders over the generated `client::accounts` and `client::args`, usable without an RPC connection, beside the same builders on the program instance (the EVM bindings' parallel: forge bind's call structs beside the contract instance), with the account struct they take."
+
+[[excuse]]
+id = "adapter-client-generated--protocol-adapter-mod"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::generated::protocol_adapter mod"
+evm = []
+solana = ["pub mod crate::generated::protocol_adapter"]
+reason = "anoma/dos-pm#158: the code declare_program! generates from the program's IDL, the Solana counterpart of forge bind's generated module, laid out as declare_program! lays it out."
+
+[[excuse]]
+id = "adapter-client-generated--verifier-router-mod"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::generated::verifier_router mod"
+evm = []
+solana = ["pub mod crate::generated::verifier_router"]
+reason = "anoma/dos-pm#158: the code declare_program! generates from the program's IDL, the Solana counterpart of forge bind's generated module, laid out as declare_program! lays it out."
+
+[[excuse]]
+id = "adapter-client-generated--u256lebytes-struct"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::generated::U256LeBytes struct"
+evm = []
+solana = ["pub struct crate::generated::U256LeBytes(pub [u8; 32])"]
+reason = "anoma/dos-pm#158: the shim for the IDL's u256, which declare_program! cannot generate until otter-sec/anchor#5224 ships."
+
+[[excuse]]
+id = "adapter-client-deployments-mod"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::deployments mod"
+evm = []
+solana = ["pub mod crate::deployments"]
+reason = "anoma/dos-pm#158: the deployment record's reader, the Solana counterpart of the EVM bindings' `addresses` module: a program id and first-deployment slot per cluster, read from deployments.json."
+
+[[excuse]]
+id = "adapter-client-instance-mod"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::instance mod"
+evm = []
+solana = ["pub mod crate::instance"]
+reason = "anoma/dos-pm#158: the program instance, the Solana counterpart of the EVM bindings' `contract` module: the program at its recorded address, with the reads of its EVM interface and its instruction builders."
+
+[[excuse]]
+id = "adapter-client-addresses-mod"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::addresses mod"
+evm = ["pub mod crate::addresses"]
+solana = []
+reason = "anoma/dos-pm#158: the EVM deployment record's reader; the Solana client's counterpart is its `deployments` module, which reads program ids and slots instead of proxy addresses."
+
+[[excuse]]
+id = "adapter-client-contract-mod"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::contract mod"
+evm = ["pub mod crate::contract"]
+solana = []
+reason = "anoma/dos-pm#158: the EVM contract instance; the Solana client's counterpart is its `instance` module, which answers the same reads from the program's accounts."
+
+[[excuse]]
+id = "adapter-client-mock-selector-const"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::MOCK_SELECTOR const"
+evm = []
+solana = ["pub const crate::MOCK_SELECTOR: [u8; 4]"]
+reason = "anoma/dos-pm#158: part of `settlement_input`: the selector of the mock seal that `simulation_input` builds, risc0's convention for a receipt holding a claim digest instead of a proof, under which the local validator registers the mock verifier."
+
+[[excuse]]
+id = "adapter-client-constants-mod"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::constants mod"
+evm = []
+solana = ["pub mod crate::constants"]
+reason = "anoma/dos-pm#158: the adapter client's hand-written constants: settlement planning's compute, heap, loaded-data and upload limits, the Merkle helpers' tree depth, and `settlement_input`'s mock selector. No IDL describes them."
+
+[[excuse]]
+id = "adapter-client-file-idls-readme-md"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "file idls/README.md"
+evm = []
+solana = ["sha256 ba71bf8e731c280939ed8ae42c7cbdf4bbf37324f3372c20c75b939f3c203f97"]
+reason = "anoma/dos-pm#158: an IDL the client vendors, from which declare_program! generates its code; the Solana counterpart of the ABI that forge bind's generated module embeds."
+
+[[excuse]]
+id = "adapter-client-file-idls-block-time-forwarder-json"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "file idls/block_time_forwarder.json"
+evm = []
+solana = ["present"]
+reason = "anoma/dos-pm#158: an IDL the client vendors, from which declare_program! generates its code; the Solana counterpart of the ABI that forge bind's generated module embeds."
+
+[[excuse]]
+id = "adapter-client-file-idls-protocol-adapter-json"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "file idls/protocol_adapter.json"
+evm = []
+solana = ["present"]
+reason = "anoma/dos-pm#158: an IDL the client vendors, from which declare_program! generates its code; the Solana counterpart of the ABI that forge bind's generated module embeds."
+
+[[excuse]]
+id = "adapter-client-file-idls-test-forwarder-json"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "file idls/test_forwarder.json"
+evm = []
+solana = ["present"]
+reason = "anoma/dos-pm#158: an IDL the client vendors, from which declare_program! generates its code; the Solana counterpart of the ABI that forge bind's generated module embeds."
+
+[[excuse]]
+id = "adapter-client-file-idls-verifier-router-json"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "file idls/verifier_router.json"
+evm = []
+solana = ["present"]
+reason = "anoma/dos-pm#158: an IDL the client vendors, from which declare_program! generates its code; the Solana counterpart of the ABI that forge bind's generated module embeds."
+
+[[excuse]]
+id = "adapter-client-deny-logic-refs-ix-fn"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::deny_logic_refs_ix fn"
+evm = []
+solana = ["pub fn crate::deny_logic_refs_ix(pa_program: &solana_address::Address, authority: &solana_address::Address, logic_refs: &[crate::generated::protocol_adapter::types::DeniedLogicRef]) -> solana_instruction::Instruction"]
+reason = "anoma/dos-pm#158: an instruction builder over the generated `client::accounts` and `client::args`, usable without an RPC connection, beside the same builder on the program instance. This is the EVM bindings' parallel: forge bind's call structs, usable without a provider, beside the contract instance."
+
+[[excuse]]
+id = "adapter-client-initialize-ix-fn"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::initialize_ix fn"
+evm = []
+solana = ["pub fn crate::initialize_ix(pa_program: &solana_address::Address, payer: &solana_address::Address, initial_owner: &solana_address::Address, verifier_router: &solana_address::Address, proof_selector: [u8; 4]) -> solana_instruction::Instruction"]
+reason = "anoma/dos-pm#158: an instruction builder over the generated `client::accounts` and `client::args`, usable without an RPC connection, beside the same builder on the program instance. This is the EVM bindings' parallel: forge bind's call structs, usable without a provider, beside the contract instance."
+
+[[excuse]]
+id = "adapter-client-pause-ix-fn"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::pause_ix fn"
+evm = []
+solana = ["pub fn crate::pause_ix(pa_program: &solana_address::Address, authority: &solana_address::Address) -> solana_instruction::Instruction"]
+reason = "anoma/dos-pm#158: an instruction builder over the generated `client::accounts` and `client::args`, usable without an RPC connection, beside the same builder on the program instance. This is the EVM bindings' parallel: forge bind's call structs, usable without a provider, beside the contract instance."
+
+[[excuse]]
+id = "adapter-client-renounce-ownership-ix-fn"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::renounce_ownership_ix fn"
+evm = []
+solana = ["pub fn crate::renounce_ownership_ix(pa_program: &solana_address::Address, authority: &solana_address::Address) -> solana_instruction::Instruction"]
+reason = "anoma/dos-pm#158: an instruction builder over the generated `client::accounts` and `client::args`, usable without an RPC connection, beside the same builder on the program instance. This is the EVM bindings' parallel: forge bind's call structs, usable without a provider, beside the contract instance."
+
+[[excuse]]
+id = "adapter-client-risc-zero-verifier-paused-ix-fn"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::risc_zero_verifier_paused_ix fn"
+evm = []
+solana = ["pub fn crate::risc_zero_verifier_paused_ix(pa_program: &solana_address::Address, verifier_entry: &solana_address::Address) -> solana_instruction::Instruction"]
+reason = "anoma/dos-pm#158: an instruction builder over the generated `client::accounts` and `client::args`, usable without an RPC connection, beside the same builder on the program instance. This is the EVM bindings' parallel: forge bind's call structs, usable without a provider, beside the contract instance."
+
+[[excuse]]
+id = "adapter-client-set-kind-tree-root-ix-fn"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::set_kind_tree_root_ix fn"
+evm = []
+solana = ["pub fn crate::set_kind_tree_root_ix(pa_program: &solana_address::Address, authority: &solana_address::Address, new_kind_tree_root: [u8; 32]) -> solana_instruction::Instruction"]
+reason = "anoma/dos-pm#158: an instruction builder over the generated `client::accounts` and `client::args`, usable without an RPC connection, beside the same builder on the program instance. This is the EVM bindings' parallel: forge bind's call structs, usable without a provider, beside the contract instance."
+
+[[excuse]]
+id = "adapter-client-settle-from-txdata-ix-fn"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::settle_from_txdata_ix fn"
+evm = []
+solana = ["pub fn crate::settle_from_txdata_ix(pa_program: &solana_address::Address, authority: &solana_address::Address, upload_id: u64, settlement: crate::instructions::SettlementAccounts) -> solana_instruction::Instruction"]
+reason = "anoma/dos-pm#158: an instruction builder over the generated `client::accounts` and `client::args`, usable without an RPC connection, beside the same builder on the program instance. This is the EVM bindings' parallel: forge bind's call structs, usable without a provider, beside the contract instance."
+
+[[excuse]]
+id = "adapter-client-settle-ix-fn"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::settle_ix fn"
+evm = []
+solana = ["pub fn crate::settle_ix(pa_program: &solana_address::Address, payer: &solana_address::Address, input: &[u8], settlement: crate::instructions::SettlementAccounts) -> solana_instruction::Instruction"]
+reason = "anoma/dos-pm#158: an instruction builder over the generated `client::accounts` and `client::args`, usable without an RPC connection, beside the same builder on the program instance. This is the EVM bindings' parallel: forge bind's call structs, usable without a provider, beside the contract instance."
+
+[[excuse]]
+id = "adapter-client-simulate-execute-ix-fn"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::simulate_execute_ix fn"
+evm = []
+solana = ["pub fn crate::simulate_execute_ix(pa_program: &solana_address::Address, payer: &solana_address::Address, input: &[u8], skip_risc_zero_proof_verification: bool, settlement: crate::instructions::SettlementAccounts) -> solana_instruction::Instruction"]
+reason = "anoma/dos-pm#158: an instruction builder over the generated `client::accounts` and `client::args`, usable without an RPC connection, beside the same builder on the program instance. This is the EVM bindings' parallel: forge bind's call structs, usable without a provider, beside the contract instance."
+
+[[excuse]]
+id = "adapter-client-transfer-ownership-ix-fn"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::transfer_ownership_ix fn"
+evm = []
+solana = ["pub fn crate::transfer_ownership_ix(pa_program: &solana_address::Address, authority: &solana_address::Address, new_owner: &solana_address::Address) -> solana_instruction::Instruction"]
+reason = "anoma/dos-pm#158: an instruction builder over the generated `client::accounts` and `client::args`, usable without an RPC connection, beside the same builder on the program instance. This is the EVM bindings' parallel: forge bind's call structs, usable without a provider, beside the contract instance."
+
+[[excuse]]
+id = "adapter-client-txdata-close-expired-ix-fn"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::txdata_close_expired_ix fn"
+evm = []
+solana = ["pub fn crate::txdata_close_expired_ix(pa_program: &solana_address::Address, payer: &solana_address::Address, refund: &solana_address::Address, upload_id: u64, authority: &solana_address::Address) -> solana_instruction::Instruction"]
+reason = "anoma/dos-pm#158: an instruction builder over the generated `client::accounts` and `client::args`, usable without an RPC connection, beside the same builder on the program instance. This is the EVM bindings' parallel: forge bind's call structs, usable without a provider, beside the contract instance."
+
+[[excuse]]
+id = "adapter-client-txdata-close-ix-fn"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::txdata_close_ix fn"
+evm = []
+solana = ["pub fn crate::txdata_close_ix(pa_program: &solana_address::Address, authority: &solana_address::Address, refund: &solana_address::Address, upload_id: u64) -> solana_instruction::Instruction"]
+reason = "anoma/dos-pm#158: an instruction builder over the generated `client::accounts` and `client::args`, usable without an RPC connection, beside the same builder on the program instance. This is the EVM bindings' parallel: forge bind's call structs, usable without a provider, beside the contract instance."
+
+[[excuse]]
+id = "adapter-client-txdata-extend-ix-fn"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::txdata_extend_ix fn"
+evm = []
+solana = ["pub fn crate::txdata_extend_ix(pa_program: &solana_address::Address, authority: &solana_address::Address, upload_id: u64, new_expires_slot: u64) -> solana_instruction::Instruction"]
+reason = "anoma/dos-pm#158: an instruction builder over the generated `client::accounts` and `client::args`, usable without an RPC connection, beside the same builder on the program instance. This is the EVM bindings' parallel: forge bind's call structs, usable without a provider, beside the contract instance."
+
+[[excuse]]
+id = "adapter-client-txdata-init-ix-fn"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::txdata_init_ix fn"
+evm = []
+solana = ["pub fn crate::txdata_init_ix(pa_program: &solana_address::Address, authority: &solana_address::Address, upload_id: u64, capacity: u32, expires_slot: u64) -> solana_instruction::Instruction"]
+reason = "anoma/dos-pm#158: an instruction builder over the generated `client::accounts` and `client::args`, usable without an RPC connection, beside the same builder on the program instance. This is the EVM bindings' parallel: forge bind's call structs, usable without a provider, beside the contract instance."
+
+[[excuse]]
+id = "adapter-client-txdata-write-ix-fn"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::txdata_write_ix fn"
+evm = []
+solana = ["pub fn crate::txdata_write_ix(pa_program: &solana_address::Address, authority: &solana_address::Address, upload_id: u64, offset: u32, chunk: &[u8]) -> solana_instruction::Instruction"]
+reason = "anoma/dos-pm#158: an instruction builder over the generated `client::accounts` and `client::args`, usable without an RPC connection, beside the same builder on the program instance. This is the EVM bindings' parallel: forge bind's call structs, usable without a provider, beside the contract instance."
+
+[[excuse]]
+id = "adapter-client-unpause-ix-fn"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::unpause_ix fn"
+evm = []
+solana = ["pub fn crate::unpause_ix(pa_program: &solana_address::Address, authority: &solana_address::Address) -> solana_instruction::Instruction"]
+reason = "anoma/dos-pm#158: an instruction builder over the generated `client::accounts` and `client::args`, usable without an RPC connection, beside the same builder on the program instance. This is the EVM bindings' parallel: forge bind's call structs, usable without a provider, beside the contract instance."
+
+[[excuse]]
+id = "adapter-client-update-expiry-config-ix-fn"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::update_expiry_config_ix fn"
+evm = []
+solana = ["pub fn crate::update_expiry_config_ix(pa_program: &solana_address::Address, authority: &solana_address::Address, new_min_expiry_slots: u64, new_max_expiry_slots: u64) -> solana_instruction::Instruction"]
+reason = "anoma/dos-pm#158: an instruction builder over the generated `client::accounts` and `client::args`, usable without an RPC connection, beside the same builder on the program instance. This is the EVM bindings' parallel: forge bind's call structs, usable without a provider, beside the contract instance."
+
+[[excuse]]
+id = "adapter-client-upgrade-ix-fn"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::upgrade_ix fn"
+evm = []
+solana = ["pub fn crate::upgrade_ix(pa_program: &solana_address::Address, authority: &solana_address::Address, buffer: &solana_address::Address, spill: &solana_address::Address) -> solana_instruction::Instruction"]
+reason = "anoma/dos-pm#158: an instruction builder over the generated `client::accounts` and `client::args`, usable without an RPC connection, beside the same builder on the program instance. This is the EVM bindings' parallel: forge bind's call structs, usable without a provider, beside the contract instance."
+
+[[excuse]]
+id = "adapter-client-version-ix-fn"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::version_ix fn"
+evm = []
+solana = ["pub fn crate::version_ix(pa_program: &solana_address::Address) -> solana_instruction::Instruction"]
+reason = "anoma/dos-pm#158: an instruction builder over the generated `client::accounts` and `client::args`, usable without an RPC connection, beside the same builder on the program instance. This is the EVM bindings' parallel: forge bind's call structs, usable without a provider, beside the contract instance."
+
+[[excuse]]
+id = "forwarder-client-derive-forwarder-config-pda-fn"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "rust crate::derive_forwarder_config_pda fn"
+evm = []
+solana = ["pub fn crate::derive_forwarder_config_pda(forwarder_program: &solana_address::Address) -> (solana_address::Address, u8)"]
+reason = "anoma/dos-pm#158: Rust declare_program! does not resolve PDAs; the helper is built from the generated seed constants and tested against the IDL's pda.seeds."
+
+[[excuse]]
+id = "forwarder-client-derive-nonce-bitmap-pda-fn"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "rust crate::derive_nonce_bitmap_pda fn"
+evm = []
+solana = ["pub fn crate::derive_nonce_bitmap_pda(forwarder_program: &solana_address::Address, user: &solana_address::Address, word_index: u64) -> (solana_address::Address, u8)"]
+reason = "anoma/dos-pm#158: Rust declare_program! does not resolve PDAs; the helper is built from the generated seed constants and tested against the IDL's pda.seeds."
+
+[[excuse]]
+id = "forwarder-client-pda-mod"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "rust crate::pda mod"
+evm = []
+solana = ["pub mod crate::pda"]
+reason = "anoma/dos-pm#158: the client's program addresses. Rust declare_program! does not resolve PDAs, so each helper is built from the generated seed constants and tested against the IDL's pda.seeds; the rest are addresses whose seeds the IDL does not declare (event authority, nullifier and root markers, the loader's ProgramData, the escrow authority)."
+
+[[excuse]]
+id = "forwarder-client-forwarder-mod"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "rust crate::forwarder mod"
+evm = []
+solana = ["pub mod crate::forwarder"]
+reason = "anoma/dos-pm#158: the forwarder's instruction builders over the generated `client::accounts` and `client::args`, usable without an RPC connection beside the same builders on the instance (the EVM bindings' parallel: forge bind's call structs beside the contract instance), its call accounts (`build_wrap_forwarder_accounts`, `build_unwrap_forwarder_accounts`, `nonce_word_index`), which no IDL lists, and the upgrade's compute-unit limit."
+
+[[excuse]]
+id = "forwarder-client-emergency-migrating-mod"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "rust crate::emergency_migrating mod"
+evm = []
+solana = ["pub mod crate::emergency_migrating"]
+reason = "anoma/dos-pm#158: the emergency-migrating build's instruction builders over its generated `client::accounts` and `client::args` (the EVM bindings' parallel: forge bind's call structs beside the contract instance), its migration call accounts, which no IDL lists, and its PDAs: the migration record's, built from the generated seed constant because Rust declare_program! does not resolve PDAs, and the vulnerable logic refs', whose seeds the IDL does not declare."
+
+[[excuse]]
+id = "forwarder-client-upgrade-ixs-fn"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "rust crate::upgrade_ixs fn"
+evm = []
+solana = ["pub fn crate::upgrade_ixs(forwarder_program: &solana_address::Address, owner: &solana_address::Address, buffer: &solana_address::Address, spill: &solana_address::Address) -> [solana_instruction::Instruction; 2]"]
+reason = "anoma/dos-pm#158: an instruction builder over the generated `client::accounts` and `client::args`, usable without an RPC connection, beside the same builder on the program instance. This is the EVM bindings' parallel: forge bind's call structs, usable without a provider, beside the contract instance."
+
+[[excuse]]
+id = "forwarder-client-upgrade-compute-unit-limit-const"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "rust crate::UPGRADE_COMPUTE_UNIT_LIMIT const"
+evm = []
+solana = ["pub const crate::UPGRADE_COMPUTE_UNIT_LIMIT: u32"]
+reason = "anoma/dos-pm#158: transaction sizing for the loader upgrade: the compute-unit limit the upgrade transaction requests, the most a transaction may have, because the upgrade hashes the whole buffer. No IDL describes compute budgets."
+
+[[excuse]]
+id = "forwarder-client-generated--spl-token-forwarder-mod"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "rust crate::generated::spl_token_forwarder mod"
+evm = []
+solana = ["pub mod crate::generated::spl_token_forwarder"]
+reason = "anoma/dos-pm#158: the code declare_program! generates from the program's IDL, the Solana counterpart of forge bind's generated module, laid out as declare_program! lays it out."
+
+[[excuse]]
+id = "forwarder-client-generated--emergency-migrating-spl-token-forwarder-mod"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "rust crate::generated::emergency_migrating_spl_token_forwarder mod"
+evm = []
+solana = ["pub mod crate::generated::emergency_migrating_spl_token_forwarder"]
+reason = "anoma/dos-pm#158: the code declare_program! generates from the program's IDL, the Solana counterpart of forge bind's generated module, laid out as declare_program! lays it out."
+
+[[excuse]]
+id = "forwarder-client-deployments-mod"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "rust crate::deployments mod"
+evm = []
+solana = ["pub mod crate::deployments"]
+reason = "anoma/dos-pm#158: the deployment record's reader, the Solana counterpart of the EVM bindings' `addresses` module: a program id and first-deployment slot per cluster, read from deployments.json."
+
+[[excuse]]
+id = "forwarder-client-instance-mod"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "rust crate::instance mod"
+evm = []
+solana = ["pub mod crate::instance"]
+reason = "anoma/dos-pm#158: the program instance, the Solana counterpart of the EVM bindings' `contract` module: the program at its recorded address, with the reads of its EVM interface and its instruction builders."
+
+[[excuse]]
+id = "forwarder-client-addresses-mod"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "rust crate::addresses mod"
+evm = ["pub mod crate::addresses"]
+solana = []
+reason = "anoma/dos-pm#158: the EVM deployment record's reader; the Solana client's counterpart is its `deployments` module, which reads program ids and slots instead of proxy addresses."
+
+[[excuse]]
+id = "forwarder-client-contract-mod"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "rust crate::contract mod"
+evm = ["pub mod crate::contract"]
+solana = []
+reason = "anoma/dos-pm#158: the EVM contract instance; the Solana client's counterpart is its `instance` module, which answers the same reads from the program's accounts."
+
+[[excuse]]
+id = "forwarder-client-file-idls-spl-token-forwarder-json"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "file idls/spl_token_forwarder.json"
+evm = []
+solana = ["present"]
+reason = "anoma/dos-pm#158: an IDL the client vendors, from which declare_program! generates its code; the Solana counterpart of the ABI that forge bind's generated module embeds."
+
+[[excuse]]
+id = "forwarder-client-file-idls-emergency-migrating-spl-token-forwarder-json"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "file idls/emergency_migrating_spl_token_forwarder.json"
+evm = []
+solana = ["present"]
+reason = "anoma/dos-pm#158: an IDL the client vendors, from which declare_program! generates its code; the Solana counterpart of the ABI that forge bind's generated module embeds."
+
+[[excuse]]
+id = "forwarder-client-close-config-ix-fn"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "rust crate::close_config_ix fn"
+evm = []
+solana = ["pub fn crate::close_config_ix(forwarder_program: &solana_address::Address, owner: &solana_address::Address, pa_state: &solana_address::Address) -> solana_instruction::Instruction"]
+reason = "anoma/dos-pm#158: an instruction builder over the generated `client::accounts` and `client::args`, usable without an RPC connection, beside the same builder on the program instance. This is the EVM bindings' parallel: forge bind's call structs, usable without a provider, beside the contract instance."
+
+[[excuse]]
+id = "forwarder-client-close-escrow-ix-fn"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "rust crate::close_escrow_ix fn"
+evm = []
+solana = ["pub fn crate::close_escrow_ix(forwarder_program: &solana_address::Address, owner: &solana_address::Address, pa_state: &solana_address::Address, mint: &solana_address::Address, recipient_ata: &solana_address::Address) -> solana_instruction::Instruction"]
+reason = "anoma/dos-pm#158: an instruction builder over the generated `client::accounts` and `client::args`, usable without an RPC connection, beside the same builder on the program instance. This is the EVM bindings' parallel: forge bind's call structs, usable without a provider, beside the contract instance."
+
+[[excuse]]
+id = "forwarder-client-close-nonce-bitmaps-batch-ix-fn"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "rust crate::close_nonce_bitmaps_batch_ix fn"
+evm = []
+solana = ["pub fn crate::close_nonce_bitmaps_batch_ix(forwarder_program: &solana_address::Address, owner: &solana_address::Address, pa_state: &solana_address::Address, bitmaps: &[solana_address::Address]) -> solana_instruction::Instruction"]
+reason = "anoma/dos-pm#158: an instruction builder over the generated `client::accounts` and `client::args`, usable without an RPC connection, beside the same builder on the program instance. This is the EVM bindings' parallel: forge bind's call structs, usable without a provider, beside the contract instance."
+
+[[excuse]]
+id = "forwarder-client-init-nonce-bitmap-ix-fn"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "rust crate::init_nonce_bitmap_ix fn"
+evm = []
+solana = ["pub fn crate::init_nonce_bitmap_ix(forwarder_program: &solana_address::Address, payer: &solana_address::Address, user: &solana_address::Address, word_index: u64) -> solana_instruction::Instruction"]
+reason = "anoma/dos-pm#158: an instruction builder over the generated `client::accounts` and `client::args`, usable without an RPC connection, beside the same builder on the program instance. This is the EVM bindings' parallel: forge bind's call structs, usable without a provider, beside the contract instance."
+
+[[excuse]]
+id = "forwarder-client-initialize-ix-fn"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "rust crate::initialize_ix fn"
+evm = []
+solana = ["pub fn crate::initialize_ix(forwarder_program: &solana_address::Address, authority: &solana_address::Address, protocol_adapter: &solana_address::Address, logic_ref: [u8; 32], initial_owner: &solana_address::Address) -> solana_instruction::Instruction"]
+reason = "anoma/dos-pm#158: an instruction builder over the generated `client::accounts` and `client::args`, usable without an RPC connection, beside the same builder on the program instance. This is the EVM bindings' parallel: forge bind's call structs, usable without a provider, beside the contract instance."
+
+[[excuse]]
+id = "forwarder-client-reinitialize-ix-fn"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "rust crate::reinitialize_ix fn"
+evm = []
+solana = ["pub fn crate::reinitialize_ix(forwarder_program: &solana_address::Address, owner: &solana_address::Address, logic_ref: [u8; 32]) -> solana_instruction::Instruction"]
+reason = "anoma/dos-pm#158: an instruction builder over the generated `client::accounts` and `client::args`, usable without an RPC connection, beside the same builder on the program instance. This is the EVM bindings' parallel: forge bind's call structs, usable without a provider, beside the contract instance."
+
+[[excuse]]
+id = "forwarder-client-renounce-ownership-ix-fn"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "rust crate::renounce_ownership_ix fn"
+evm = []
+solana = ["pub fn crate::renounce_ownership_ix(forwarder_program: &solana_address::Address, owner: &solana_address::Address) -> solana_instruction::Instruction"]
+reason = "anoma/dos-pm#158: an instruction builder over the generated `client::accounts` and `client::args`, usable without an RPC connection, beside the same builder on the program instance. This is the EVM bindings' parallel: forge bind's call structs, usable without a provider, beside the contract instance."
+
+[[excuse]]
+id = "forwarder-client-transfer-ownership-ix-fn"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "rust crate::transfer_ownership_ix fn"
+evm = []
+solana = ["pub fn crate::transfer_ownership_ix(forwarder_program: &solana_address::Address, owner: &solana_address::Address, new_owner: &solana_address::Address) -> solana_instruction::Instruction"]
+reason = "anoma/dos-pm#158: an instruction builder over the generated `client::accounts` and `client::args`, usable without an RPC connection, beside the same builder on the program instance. This is the EVM bindings' parallel: forge bind's call structs, usable without a provider, beside the contract instance."
+
+[[excuse]]
+id = "forwarder-client-version-ix-fn"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "rust crate::version_ix fn"
+evm = []
+solana = ["pub fn crate::version_ix(forwarder_program: &solana_address::Address) -> solana_instruction::Instruction"]
+reason = "anoma/dos-pm#158: an instruction builder over the generated `client::accounts` and `client::args`, usable without an RPC connection, beside the same builder on the program instance. This is the EVM bindings' parallel: forge bind's call structs, usable without a provider, beside the contract instance."
+
+[[excuse]]
+id = "forwarder-client-file-deployments-json--legacy-0-chainid"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "file deployments.json#/legacy/0/chainId"
+evm = ["11155111"]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's `legacy` list names the V1 deployment on each EVM chain, which V2 migrates from. The Solana V1 deployments are closed and V2 migrates nothing from them (anoma/dos-pm#156), so the Solana record has no such list."
+
+[[excuse]]
+id = "forwarder-client-file-deployments-json--legacy-0-forwarder"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "file deployments.json#/legacy/0/forwarder"
+evm = ["\"0x0A62bE41E66841f693f922991C4e40C89cb0CFDF\""]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's `legacy` list names the V1 deployment on each EVM chain, which V2 migrates from. The Solana V1 deployments are closed and V2 migrates nothing from them (anoma/dos-pm#156), so the Solana record has no such list."
+
+[[excuse]]
+id = "forwarder-client-file-deployments-json--legacy-0-logicref"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "file deployments.json#/legacy/0/logicRef"
+evm = ["\"0xbc12323668c37c3d381ca798f11116f35fb1639d12239b29da7810df3985e7ad\""]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's `legacy` list names the V1 deployment on each EVM chain, which V2 migrates from. The Solana V1 deployments are closed and V2 migrates nothing from them (anoma/dos-pm#156), so the Solana record has no such list."
+
+[[excuse]]
+id = "forwarder-client-file-deployments-json--legacy-1-chainid"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "file deployments.json#/legacy/1/chainId"
+evm = ["1"]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's `legacy` list names the V1 deployment on each EVM chain, which V2 migrates from. The Solana V1 deployments are closed and V2 migrates nothing from them (anoma/dos-pm#156), so the Solana record has no such list."
+
+[[excuse]]
+id = "forwarder-client-file-deployments-json--legacy-1-forwarder"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "file deployments.json#/legacy/1/forwarder"
+evm = ["\"0x775C81A47F2618a8594a7a7f4A3Df2a300337559\""]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's `legacy` list names the V1 deployment on each EVM chain, which V2 migrates from. The Solana V1 deployments are closed and V2 migrates nothing from them (anoma/dos-pm#156), so the Solana record has no such list."
+
+[[excuse]]
+id = "forwarder-client-file-deployments-json--legacy-1-logicref"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "file deployments.json#/legacy/1/logicRef"
+evm = ["\"0xbc12323668c37c3d381ca798f11116f35fb1639d12239b29da7810df3985e7ad\""]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's `legacy` list names the V1 deployment on each EVM chain, which V2 migrates from. The Solana V1 deployments are closed and V2 migrates nothing from them (anoma/dos-pm#156), so the Solana record has no such list."
+
+[[excuse]]
+id = "forwarder-client-file-deployments-json--legacy-2-chainid"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "file deployments.json#/legacy/2/chainId"
+evm = ["84532"]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's `legacy` list names the V1 deployment on each EVM chain, which V2 migrates from. The Solana V1 deployments are closed and V2 migrates nothing from them (anoma/dos-pm#156), so the Solana record has no such list."
+
+[[excuse]]
+id = "forwarder-client-file-deployments-json--legacy-2-forwarder"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "file deployments.json#/legacy/2/forwarder"
+evm = ["\"0xfAa9DE773Be11fc759A16F294d32BB2261bF818B\""]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's `legacy` list names the V1 deployment on each EVM chain, which V2 migrates from. The Solana V1 deployments are closed and V2 migrates nothing from them (anoma/dos-pm#156), so the Solana record has no such list."
+
+[[excuse]]
+id = "forwarder-client-file-deployments-json--legacy-2-logicref"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "file deployments.json#/legacy/2/logicRef"
+evm = ["\"0xbc12323668c37c3d381ca798f11116f35fb1639d12239b29da7810df3985e7ad\""]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's `legacy` list names the V1 deployment on each EVM chain, which V2 migrates from. The Solana V1 deployments are closed and V2 migrates nothing from them (anoma/dos-pm#156), so the Solana record has no such list."
+
+[[excuse]]
+id = "forwarder-client-file-deployments-json--legacy-3-chainid"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "file deployments.json#/legacy/3/chainId"
+evm = ["8453"]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's `legacy` list names the V1 deployment on each EVM chain, which V2 migrates from. The Solana V1 deployments are closed and V2 migrates nothing from them (anoma/dos-pm#156), so the Solana record has no such list."
+
+[[excuse]]
+id = "forwarder-client-file-deployments-json--legacy-3-forwarder"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "file deployments.json#/legacy/3/forwarder"
+evm = ["\"0xfAa9DE773Be11fc759A16F294d32BB2261bF818B\""]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's `legacy` list names the V1 deployment on each EVM chain, which V2 migrates from. The Solana V1 deployments are closed and V2 migrates nothing from them (anoma/dos-pm#156), so the Solana record has no such list."
+
+[[excuse]]
+id = "forwarder-client-file-deployments-json--legacy-3-logicref"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "file deployments.json#/legacy/3/logicRef"
+evm = ["\"0xbc12323668c37c3d381ca798f11116f35fb1639d12239b29da7810df3985e7ad\""]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's `legacy` list names the V1 deployment on each EVM chain, which V2 migrates from. The Solana V1 deployments are closed and V2 migrates nothing from them (anoma/dos-pm#156), so the Solana record has no such list."
+
+[[excuse]]
+id = "forwarder-client-file-deployments-json--legacy-4-chainid"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "file deployments.json#/legacy/4/chainId"
+evm = ["10"]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's `legacy` list names the V1 deployment on each EVM chain, which V2 migrates from. The Solana V1 deployments are closed and V2 migrates nothing from them (anoma/dos-pm#156), so the Solana record has no such list."
+
+[[excuse]]
+id = "forwarder-client-file-deployments-json--legacy-4-forwarder"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "file deployments.json#/legacy/4/forwarder"
+evm = ["\"0xfAa9DE773Be11fc759A16F294d32BB2261bF818B\""]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's `legacy` list names the V1 deployment on each EVM chain, which V2 migrates from. The Solana V1 deployments are closed and V2 migrates nothing from them (anoma/dos-pm#156), so the Solana record has no such list."
+
+[[excuse]]
+id = "forwarder-client-file-deployments-json--legacy-4-logicref"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "file deployments.json#/legacy/4/logicRef"
+evm = ["\"0xbc12323668c37c3d381ca798f11116f35fb1639d12239b29da7810df3985e7ad\""]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's `legacy` list names the V1 deployment on each EVM chain, which V2 migrates from. The Solana V1 deployments are closed and V2 migrates nothing from them (anoma/dos-pm#156), so the Solana record has no such list."
+
+[[excuse]]
+id = "forwarder-client-file-deployments-json--legacy-5-chainid"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "file deployments.json#/legacy/5/chainId"
+evm = ["42161"]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's `legacy` list names the V1 deployment on each EVM chain, which V2 migrates from. The Solana V1 deployments are closed and V2 migrates nothing from them (anoma/dos-pm#156), so the Solana record has no such list."
+
+[[excuse]]
+id = "forwarder-client-file-deployments-json--legacy-5-forwarder"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "file deployments.json#/legacy/5/forwarder"
+evm = ["\"0xfAa9DE773Be11fc759A16F294d32BB2261bF818B\""]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's `legacy` list names the V1 deployment on each EVM chain, which V2 migrates from. The Solana V1 deployments are closed and V2 migrates nothing from them (anoma/dos-pm#156), so the Solana record has no such list."
+
+[[excuse]]
+id = "forwarder-client-file-deployments-json--legacy-5-logicref"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "file deployments.json#/legacy/5/logicRef"
+evm = ["\"0xbc12323668c37c3d381ca798f11116f35fb1639d12239b29da7810df3985e7ad\""]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's `legacy` list names the V1 deployment on each EVM chain, which V2 migrates from. The Solana V1 deployments are closed and V2 migrates nothing from them (anoma/dos-pm#156), so the Solana record has no such list."
+
+[[excuse]]
+id = "forwarder-client-file-deployments-json--legacy-6-chainid"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "file deployments.json#/legacy/6/chainId"
+evm = ["56"]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's `legacy` list names the V1 deployment on each EVM chain, which V2 migrates from. The Solana V1 deployments are closed and V2 migrates nothing from them (anoma/dos-pm#156), so the Solana record has no such list."
+
+[[excuse]]
+id = "forwarder-client-file-deployments-json--legacy-6-forwarder"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "file deployments.json#/legacy/6/forwarder"
+evm = ["\"0xDe6A308ed57AF26BFf059e6C550BD4908aC1840e\""]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's `legacy` list names the V1 deployment on each EVM chain, which V2 migrates from. The Solana V1 deployments are closed and V2 migrates nothing from them (anoma/dos-pm#156), so the Solana record has no such list."
+
+[[excuse]]
+id = "forwarder-client-file-deployments-json--legacy-6-logicref"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "file deployments.json#/legacy/6/logicRef"
+evm = ["\"0xbc12323668c37c3d381ca798f11116f35fb1639d12239b29da7810df3985e7ad\""]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's `legacy` list names the V1 deployment on each EVM chain, which V2 migrates from. The Solana V1 deployments are closed and V2 migrates nothing from them (anoma/dos-pm#156), so the Solana record has no such list."
+
+[[excuse]]
+id = "forwarder-client-file-deployments-json--legacy-7-chainid"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "file deployments.json#/legacy/7/chainId"
+evm = ["143"]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's `legacy` list names the V1 deployment on each EVM chain, which V2 migrates from. The Solana V1 deployments are closed and V2 migrates nothing from them (anoma/dos-pm#156), so the Solana record has no such list."
+
+[[excuse]]
+id = "forwarder-client-file-deployments-json--legacy-7-forwarder"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "file deployments.json#/legacy/7/forwarder"
+evm = ["\"0x23dc44E1a1c3d5432EeC8A1c027e22ccDC0A8F54\""]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's `legacy` list names the V1 deployment on each EVM chain, which V2 migrates from. The Solana V1 deployments are closed and V2 migrates nothing from them (anoma/dos-pm#156), so the Solana record has no such list."
+
+[[excuse]]
+id = "forwarder-client-file-deployments-json--legacy-7-logicref"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "file deployments.json#/legacy/7/logicRef"
+evm = ["\"0xbc12323668c37c3d381ca798f11116f35fb1639d12239b29da7810df3985e7ad\""]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's `legacy` list names the V1 deployment on each EVM chain, which V2 migrates from. The Solana V1 deployments are closed and V2 migrates nothing from them (anoma/dos-pm#156), so the Solana record has no such list."
+
+[[excuse]]
+id = "forwarder-client-file-deployments-json--legacy-8-chainid"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "file deployments.json#/legacy/8/chainId"
+evm = ["988"]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's `legacy` list names the V1 deployment on each EVM chain, which V2 migrates from. The Solana V1 deployments are closed and V2 migrates nothing from them (anoma/dos-pm#156), so the Solana record has no such list."
+
+[[excuse]]
+id = "forwarder-client-file-deployments-json--legacy-8-forwarder"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "file deployments.json#/legacy/8/forwarder"
+evm = ["\"0x334E41aA1df8f521E3cC64b5fa19b666b8251CDC\""]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's `legacy` list names the V1 deployment on each EVM chain, which V2 migrates from. The Solana V1 deployments are closed and V2 migrates nothing from them (anoma/dos-pm#156), so the Solana record has no such list."
+
+[[excuse]]
+id = "forwarder-client-file-deployments-json--legacy-8-logicref"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "file deployments.json#/legacy/8/logicRef"
+evm = ["\"0xbc12323668c37c3d381ca798f11116f35fb1639d12239b29da7810df3985e7ad\""]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's `legacy` list names the V1 deployment on each EVM chain, which V2 migrates from. The Solana V1 deployments are closed and V2 migrates nothing from them (anoma/dos-pm#156), so the Solana record has no such list."
+
+[[excuse]]
+id = "forwarder-client-file-deployments-json--legacy-9-chainid"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "file deployments.json#/legacy/9/chainId"
+evm = ["4326"]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's `legacy` list names the V1 deployment on each EVM chain, which V2 migrates from. The Solana V1 deployments are closed and V2 migrates nothing from them (anoma/dos-pm#156), so the Solana record has no such list."
+
+[[excuse]]
+id = "forwarder-client-file-deployments-json--legacy-9-forwarder"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "file deployments.json#/legacy/9/forwarder"
+evm = ["\"0x334E41aA1df8f521E3cC64b5fa19b666b8251CDC\""]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's `legacy` list names the V1 deployment on each EVM chain, which V2 migrates from. The Solana V1 deployments are closed and V2 migrates nothing from them (anoma/dos-pm#156), so the Solana record has no such list."
+
+[[excuse]]
+id = "forwarder-client-file-deployments-json--legacy-9-logicref"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "file deployments.json#/legacy/9/logicRef"
+evm = ["\"0xbc12323668c37c3d381ca798f11116f35fb1639d12239b29da7810df3985e7ad\""]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's `legacy` list names the V1 deployment on each EVM chain, which V2 migrates from. The Solana V1 deployments are closed and V2 migrates nothing from them (anoma/dos-pm#156), so the Solana record has no such list."
+
+[[excuse]]
+id = "forwarder-client-file-deployments-json--staging-0-chainid"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "file deployments.json#/staging/0/chainId"
+evm = ["11155111"]
+solana = ["\"solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1\""]
+reason = "anoma/dos-pm#158: the record names a chain by its chain id in each chain's own scheme: EIP-155's number on EVM, CAIP-2's `solana:` and the cluster's genesis hash prefix on Solana."
+
+[[excuse]]
+id = "forwarder-client-file-deployments-json--staging-0-deploymentslot"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "file deployments.json#/staging/0/deploymentSlot"
+evm = []
+solana = ["null"]
+reason = "anoma/dos-pm#158: the slot of the program's first deployment, from which an indexer reads the program's history; the EVM record has no such field."
+
+[[excuse]]
+id = "forwarder-client-file-deployments-json--staging-0-programid"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "file deployments.json#/staging/0/programId"
+evm = []
+solana = ["\"34kd782wMwzkdwGFS5jfGGdTAz8zbaxVczQHs3E8oKF4\""]
+reason = "anoma/dos-pm#158: a Solana program keeps one address across upgrades, so the record names the program id where the EVM record names its proxy."
+
+[[excuse]]
+id = "forwarder-client-file-deployments-json--staging-0-proxy-address"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "file deployments.json#/staging/0/proxy/address"
+evm = ["\"0x0281E89De2c6A0e878df550Af0F705C4B7920b0D\""]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's ERC1967 proxy deployment (address, creation code, initial implementation, initializer data); a Solana program upgrades in place at its program id and has no proxy."
+
+[[excuse]]
+id = "forwarder-client-file-deployments-json--staging-0-proxy-creationcode"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "file deployments.json#/staging/0/proxy/creationCode"
+evm = ["\"0x6080604052610284803803806100148161016e565b9283398101604082820312610156578151916001600160a01b03831690818403610156576020810151906001600160401b038211610156570182601f82011215610156578051906001600160401b03821161015a5761007c601f8301601f191660200161016e565b938285526020838301011161015657815f9260208093018387015e8401015281511561014757823b15610135577f360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc80546001600160a01b031916821790557fbc7cd75a20ee27fd9adebab32041f755214dbc6bffa90cc0225b39da2e5c2d3b5f80a280511561011e5761010e91610193565b505b604051606490816102208239f35b505034156101105763b398979f60e01b5f5260045ffd5b634c9c8ce360e01b5f5260045260245ffd5b6330a289cf60e21b5f5260045ffd5b5f80fd5b634e487b7160e01b5f52604160045260245ffd5b6040519190601f01601f191682016001600160401b0381118382101761015a57604052565b905f8091602081519101845af4808061020c575b156101c75750506040513d81523d5f602083013e60203d82010160405290565b156101ec57639996b31560e01b5f9081526001600160a01b0391909116600452602490fd5b3d156101fd576040513d5f823e3d90fd5b63d6bda27560e01b5f5260045ffd5b503d1515806101a75750813b15156101a756fe60806040525f8073ffffffffffffffffffffffffffffffffffffffff7f360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc5416368280378136915af43d5f803e156053573d5ff35b3d5ffdfea164736f6c6343000825000a\""]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's ERC1967 proxy deployment (address, creation code, initial implementation, initializer data); a Solana program upgrades in place at its program id and has no proxy."
+
+[[excuse]]
+id = "forwarder-client-file-deployments-json--staging-0-proxy-initialimplementation"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "file deployments.json#/staging/0/proxy/initialImplementation"
+evm = ["\"0x5E61faccd5aBd6ED40CDFeB53Ba83bAC95150B44\""]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's ERC1967 proxy deployment (address, creation code, initial implementation, initializer data); a Solana program upgrades in place at its program id and has no proxy."
+
+[[excuse]]
+id = "forwarder-client-file-deployments-json--staging-0-proxy-initializerdata"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "file deployments.json#/staging/0/proxy/initializerData"
+evm = ["\"0xd26b3e6e0000000000000000000000009efa7b20ecc0fda991194da92e190e9ab36062d551c2403f4e1de40c3c3ecef69385f8772ee99b4a610e88f1ad2b1b85b481a7f200000000000000000000000061462be56782568376f9cb069382efa72764a407\""]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's ERC1967 proxy deployment (address, creation code, initial implementation, initializer data); a Solana program upgrades in place at its program id and has no proxy."
+
+[[excuse]]
+id = "forwarder-client-file-deployments-json--staging-1-chainid"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "file deployments.json#/staging/1/chainId"
+evm = ["84532"]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's second staging chain (Base Sepolia, 84532); Solana has one staging cluster, devnet, which the record's first staging entry names."
+
+[[excuse]]
+id = "forwarder-client-file-deployments-json--staging-1-proxy-address"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "file deployments.json#/staging/1/proxy/address"
+evm = ["\"0x4E76505D541641Ae71F504630520Cb53f07559bc\""]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's second staging chain (Base Sepolia, 84532); Solana has one staging cluster, devnet, which the record's first staging entry names."
+
+[[excuse]]
+id = "forwarder-client-file-deployments-json--staging-1-proxy-creationcode"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "file deployments.json#/staging/1/proxy/creationCode"
+evm = ["\"0x6080604052610284803803806100148161016e565b9283398101604082820312610156578151916001600160a01b03831690818403610156576020810151906001600160401b038211610156570182601f82011215610156578051906001600160401b03821161015a5761007c601f8301601f191660200161016e565b938285526020838301011161015657815f9260208093018387015e8401015281511561014757823b15610135577f360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc80546001600160a01b031916821790557fbc7cd75a20ee27fd9adebab32041f755214dbc6bffa90cc0225b39da2e5c2d3b5f80a280511561011e5761010e91610193565b505b604051606490816102208239f35b505034156101105763b398979f60e01b5f5260045ffd5b634c9c8ce360e01b5f5260045260245ffd5b6330a289cf60e21b5f5260045ffd5b5f80fd5b634e487b7160e01b5f52604160045260245ffd5b6040519190601f01601f191682016001600160401b0381118382101761015a57604052565b905f8091602081519101845af4808061020c575b156101c75750506040513d81523d5f602083013e60203d82010160405290565b156101ec57639996b31560e01b5f9081526001600160a01b0391909116600452602490fd5b3d156101fd576040513d5f823e3d90fd5b63d6bda27560e01b5f5260045ffd5b503d1515806101a75750813b15156101a756fe60806040525f8073ffffffffffffffffffffffffffffffffffffffff7f360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc5416368280378136915af43d5f803e156053573d5ff35b3d5ffdfea164736f6c6343000825000a\""]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's second staging chain (Base Sepolia, 84532); Solana has one staging cluster, devnet, which the record's first staging entry names."
+
+[[excuse]]
+id = "forwarder-client-file-deployments-json--staging-1-proxy-initialimplementation"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "file deployments.json#/staging/1/proxy/initialImplementation"
+evm = ["\"0x5E61faccd5aBd6ED40CDFeB53Ba83bAC95150B44\""]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's second staging chain (Base Sepolia, 84532); Solana has one staging cluster, devnet, which the record's first staging entry names."
+
+[[excuse]]
+id = "forwarder-client-file-deployments-json--staging-1-proxy-initializerdata"
+pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
+key = "file deployments.json#/staging/1/proxy/initializerData"
+evm = ["\"0xd26b3e6e0000000000000000000000005d9a268621f1fb36fb64d7b32398831afa44a75151c2403f4e1de40c3c3ecef69385f8772ee99b4a610e88f1ad2b1b85b481a7f200000000000000000000000061462be56782568376f9cb069382efa72764a407\""]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's second staging chain (Base Sepolia, 84532); Solana has one staging cluster, devnet, which the record's first staging entry names."
+
+[[excuse]]
+id = "adapter-client-file-deployments-json--legacy-0-chainid"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "file deployments.json#/legacy/0/chainId"
+evm = ["11155111"]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's `legacy` list names the V1 deployment on each EVM chain, which V2 migrates from. The Solana V1 deployments are closed and V2 migrates nothing from them (anoma/dos-pm#156), so the Solana record has no such list."
+
+[[excuse]]
+id = "adapter-client-file-deployments-json--legacy-0-protocoladapter"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "file deployments.json#/legacy/0/protocolAdapter"
+evm = ["\"0xf152BBA809d6cba122579cee997A54B8F3FBa417\""]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's `legacy` list names the V1 deployment on each EVM chain, which V2 migrates from. The Solana V1 deployments are closed and V2 migrates nothing from them (anoma/dos-pm#156), so the Solana record has no such list."
+
+[[excuse]]
+id = "adapter-client-file-deployments-json--legacy-1-chainid"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "file deployments.json#/legacy/1/chainId"
+evm = ["1"]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's `legacy` list names the V1 deployment on each EVM chain, which V2 migrates from. The Solana V1 deployments are closed and V2 migrates nothing from them (anoma/dos-pm#156), so the Solana record has no such list."
+
+[[excuse]]
+id = "adapter-client-file-deployments-json--legacy-1-protocoladapter"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "file deployments.json#/legacy/1/protocolAdapter"
+evm = ["\"0x0eA3B55b68A3f307c8FE3fe66E443247c95F0CfF\""]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's `legacy` list names the V1 deployment on each EVM chain, which V2 migrates from. The Solana V1 deployments are closed and V2 migrates nothing from them (anoma/dos-pm#156), so the Solana record has no such list."
+
+[[excuse]]
+id = "adapter-client-file-deployments-json--legacy-2-chainid"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "file deployments.json#/legacy/2/chainId"
+evm = ["84532"]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's `legacy` list names the V1 deployment on each EVM chain, which V2 migrates from. The Solana V1 deployments are closed and V2 migrates nothing from them (anoma/dos-pm#156), so the Solana record has no such list."
+
+[[excuse]]
+id = "adapter-client-file-deployments-json--legacy-2-protocoladapter"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "file deployments.json#/legacy/2/protocolAdapter"
+evm = ["\"0x094FCC095323080e71a037b2B1e3519c07dd84F8\""]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's `legacy` list names the V1 deployment on each EVM chain, which V2 migrates from. The Solana V1 deployments are closed and V2 migrates nothing from them (anoma/dos-pm#156), so the Solana record has no such list."
+
+[[excuse]]
+id = "adapter-client-file-deployments-json--legacy-3-chainid"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "file deployments.json#/legacy/3/chainId"
+evm = ["8453"]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's `legacy` list names the V1 deployment on each EVM chain, which V2 migrates from. The Solana V1 deployments are closed and V2 migrates nothing from them (anoma/dos-pm#156), so the Solana record has no such list."
+
+[[excuse]]
+id = "adapter-client-file-deployments-json--legacy-3-protocoladapter"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "file deployments.json#/legacy/3/protocolAdapter"
+evm = ["\"0x094FCC095323080e71a037b2B1e3519c07dd84F8\""]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's `legacy` list names the V1 deployment on each EVM chain, which V2 migrates from. The Solana V1 deployments are closed and V2 migrates nothing from them (anoma/dos-pm#156), so the Solana record has no such list."
+
+[[excuse]]
+id = "adapter-client-file-deployments-json--legacy-4-chainid"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "file deployments.json#/legacy/4/chainId"
+evm = ["10"]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's `legacy` list names the V1 deployment on each EVM chain, which V2 migrates from. The Solana V1 deployments are closed and V2 migrates nothing from them (anoma/dos-pm#156), so the Solana record has no such list."
+
+[[excuse]]
+id = "adapter-client-file-deployments-json--legacy-4-protocoladapter"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "file deployments.json#/legacy/4/protocolAdapter"
+evm = ["\"0x094FCC095323080e71a037b2B1e3519c07dd84F8\""]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's `legacy` list names the V1 deployment on each EVM chain, which V2 migrates from. The Solana V1 deployments are closed and V2 migrates nothing from them (anoma/dos-pm#156), so the Solana record has no such list."
+
+[[excuse]]
+id = "adapter-client-file-deployments-json--legacy-5-chainid"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "file deployments.json#/legacy/5/chainId"
+evm = ["42161"]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's `legacy` list names the V1 deployment on each EVM chain, which V2 migrates from. The Solana V1 deployments are closed and V2 migrates nothing from them (anoma/dos-pm#156), so the Solana record has no such list."
+
+[[excuse]]
+id = "adapter-client-file-deployments-json--legacy-5-protocoladapter"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "file deployments.json#/legacy/5/protocolAdapter"
+evm = ["\"0x094FCC095323080e71a037b2B1e3519c07dd84F8\""]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's `legacy` list names the V1 deployment on each EVM chain, which V2 migrates from. The Solana V1 deployments are closed and V2 migrates nothing from them (anoma/dos-pm#156), so the Solana record has no such list."
+
+[[excuse]]
+id = "adapter-client-file-deployments-json--legacy-6-chainid"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "file deployments.json#/legacy/6/chainId"
+evm = ["56"]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's `legacy` list names the V1 deployment on each EVM chain, which V2 migrates from. The Solana V1 deployments are closed and V2 migrates nothing from them (anoma/dos-pm#156), so the Solana record has no such list."
+
+[[excuse]]
+id = "adapter-client-file-deployments-json--legacy-6-protocoladapter"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "file deployments.json#/legacy/6/protocolAdapter"
+evm = ["\"0xFC44b66a39fe6923Ad8d3c93bFeC369728862B68\""]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's `legacy` list names the V1 deployment on each EVM chain, which V2 migrates from. The Solana V1 deployments are closed and V2 migrates nothing from them (anoma/dos-pm#156), so the Solana record has no such list."
+
+[[excuse]]
+id = "adapter-client-file-deployments-json--legacy-7-chainid"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "file deployments.json#/legacy/7/chainId"
+evm = ["143"]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's `legacy` list names the V1 deployment on each EVM chain, which V2 migrates from. The Solana V1 deployments are closed and V2 migrates nothing from them (anoma/dos-pm#156), so the Solana record has no such list."
+
+[[excuse]]
+id = "adapter-client-file-deployments-json--legacy-7-protocoladapter"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "file deployments.json#/legacy/7/protocolAdapter"
+evm = ["\"0x2D2Fa19aFdbb20DC73737ca5f075cfAE00Cd90C2\""]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's `legacy` list names the V1 deployment on each EVM chain, which V2 migrates from. The Solana V1 deployments are closed and V2 migrates nothing from them (anoma/dos-pm#156), so the Solana record has no such list."
+
+[[excuse]]
+id = "adapter-client-file-deployments-json--legacy-8-chainid"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "file deployments.json#/legacy/8/chainId"
+evm = ["988"]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's `legacy` list names the V1 deployment on each EVM chain, which V2 migrates from. The Solana V1 deployments are closed and V2 migrates nothing from them (anoma/dos-pm#156), so the Solana record has no such list."
+
+[[excuse]]
+id = "adapter-client-file-deployments-json--legacy-8-protocoladapter"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "file deployments.json#/legacy/8/protocolAdapter"
+evm = ["\"0x2D2Fa19aFdbb20DC73737ca5f075cfAE00Cd90C2\""]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's `legacy` list names the V1 deployment on each EVM chain, which V2 migrates from. The Solana V1 deployments are closed and V2 migrates nothing from them (anoma/dos-pm#156), so the Solana record has no such list."
+
+[[excuse]]
+id = "adapter-client-file-deployments-json--legacy-9-chainid"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "file deployments.json#/legacy/9/chainId"
+evm = ["4326"]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's `legacy` list names the V1 deployment on each EVM chain, which V2 migrates from. The Solana V1 deployments are closed and V2 migrates nothing from them (anoma/dos-pm#156), so the Solana record has no such list."
+
+[[excuse]]
+id = "adapter-client-file-deployments-json--legacy-9-protocoladapter"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "file deployments.json#/legacy/9/protocolAdapter"
+evm = ["\"0x2D2Fa19aFdbb20DC73737ca5f075cfAE00Cd90C2\""]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's `legacy` list names the V1 deployment on each EVM chain, which V2 migrates from. The Solana V1 deployments are closed and V2 migrates nothing from them (anoma/dos-pm#156), so the Solana record has no such list."
+
+[[excuse]]
+id = "adapter-client-file-deployments-json--staging-0-chainid"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "file deployments.json#/staging/0/chainId"
+evm = ["11155111"]
+solana = ["\"solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1\""]
+reason = "anoma/dos-pm#158: the record names a chain by its chain id in each chain's own scheme: EIP-155's number on EVM, CAIP-2's `solana:` and the cluster's genesis hash prefix on Solana."
+
+[[excuse]]
+id = "adapter-client-file-deployments-json--staging-0-deploymentslot"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "file deployments.json#/staging/0/deploymentSlot"
+evm = []
+solana = ["null"]
+reason = "anoma/dos-pm#158: the slot of the program's first deployment, from which an indexer reads the program's history; the EVM record has no such field."
+
+[[excuse]]
+id = "adapter-client-file-deployments-json--staging-0-programid"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "file deployments.json#/staging/0/programId"
+evm = []
+solana = ["\"2gH5DnTwDLLFk3oYxnbrceSFdTMtvaxQz29x5W8Etmpx\""]
+reason = "anoma/dos-pm#158: a Solana program keeps one address across upgrades, so the record names the program id where the EVM record names its proxy."
+
+[[excuse]]
+id = "adapter-client-file-deployments-json--staging-0-proxy-address"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "file deployments.json#/staging/0/proxy/address"
+evm = ["\"0xe10157AAe82bee77c04E8DfCa72eF1048361b77c\""]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's ERC1967 proxy deployment (address, creation code, initial implementation, initializer data); a Solana program upgrades in place at its program id and has no proxy."
+
+[[excuse]]
+id = "adapter-client-file-deployments-json--staging-0-proxy-creationcode"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "file deployments.json#/staging/0/proxy/creationCode"
+evm = ["\"0x6080604052610284803803806100148161016e565b9283398101604082820312610156578151916001600160a01b03831690818403610156576020810151906001600160401b038211610156570182601f82011215610156578051906001600160401b03821161015a5761007c601f8301601f191660200161016e565b938285526020838301011161015657815f9260208093018387015e8401015281511561014757823b15610135577f360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc80546001600160a01b031916821790557fbc7cd75a20ee27fd9adebab32041f755214dbc6bffa90cc0225b39da2e5c2d3b5f80a280511561011e5761010e91610193565b505b604051606490816102208239f35b505034156101105763b398979f60e01b5f5260045ffd5b634c9c8ce360e01b5f5260045260245ffd5b6330a289cf60e21b5f5260045ffd5b5f80fd5b634e487b7160e01b5f52604160045260245ffd5b6040519190601f01601f191682016001600160401b0381118382101761015a57604052565b905f8091602081519101845af4808061020c575b156101c75750506040513d81523d5f602083013e60203d82010160405290565b156101ec57639996b31560e01b5f9081526001600160a01b0391909116600452602490fd5b3d156101fd576040513d5f823e3d90fd5b63d6bda27560e01b5f5260045ffd5b503d1515806101a75750813b15156101a756fe60806040525f8073ffffffffffffffffffffffffffffffffffffffff7f360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc5416368280378136915af43d5f803e156053573d5ff35b3d5ffdfea164736f6c6343000826000a\""]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's ERC1967 proxy deployment (address, creation code, initial implementation, initializer data); a Solana program upgrades in place at its program id and has no proxy."
+
+[[excuse]]
+id = "adapter-client-file-deployments-json--staging-0-proxy-initialimplementation"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "file deployments.json#/staging/0/proxy/initialImplementation"
+evm = ["\"0xF64a58Feab5fcc25ac37685D317D3Fe706C6ebc9\""]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's ERC1967 proxy deployment (address, creation code, initial implementation, initializer data); a Solana program upgrades in place at its program id and has no proxy."
+
+[[excuse]]
+id = "adapter-client-file-deployments-json--staging-0-proxy-initializerdata"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "file deployments.json#/staging/0/proxy/initializerData"
+evm = ["\"0xc4d66de800000000000000000000000061462be56782568376f9cb069382efa72764a407\""]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's ERC1967 proxy deployment (address, creation code, initial implementation, initializer data); a Solana program upgrades in place at its program id and has no proxy."
+
+[[excuse]]
+id = "adapter-client-file-deployments-json--staging-1-chainid"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "file deployments.json#/staging/1/chainId"
+evm = ["84532"]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's second staging chain (Base Sepolia, 84532); Solana has one staging cluster, devnet, which the record's first staging entry names."
+
+[[excuse]]
+id = "adapter-client-file-deployments-json--staging-1-proxy-address"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "file deployments.json#/staging/1/proxy/address"
+evm = ["\"0x2FcEda431C29dF735eFCba12cf55e36f47C7F6Bd\""]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's second staging chain (Base Sepolia, 84532); Solana has one staging cluster, devnet, which the record's first staging entry names."
+
+[[excuse]]
+id = "adapter-client-file-deployments-json--staging-1-proxy-creationcode"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "file deployments.json#/staging/1/proxy/creationCode"
+evm = ["\"0x6080604052610284803803806100148161016e565b9283398101604082820312610156578151916001600160a01b03831690818403610156576020810151906001600160401b038211610156570182601f82011215610156578051906001600160401b03821161015a5761007c601f8301601f191660200161016e565b938285526020838301011161015657815f9260208093018387015e8401015281511561014757823b15610135577f360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc80546001600160a01b031916821790557fbc7cd75a20ee27fd9adebab32041f755214dbc6bffa90cc0225b39da2e5c2d3b5f80a280511561011e5761010e91610193565b505b604051606490816102208239f35b505034156101105763b398979f60e01b5f5260045ffd5b634c9c8ce360e01b5f5260045260245ffd5b6330a289cf60e21b5f5260045ffd5b5f80fd5b634e487b7160e01b5f52604160045260245ffd5b6040519190601f01601f191682016001600160401b0381118382101761015a57604052565b905f8091602081519101845af4808061020c575b156101c75750506040513d81523d5f602083013e60203d82010160405290565b156101ec57639996b31560e01b5f9081526001600160a01b0391909116600452602490fd5b3d156101fd576040513d5f823e3d90fd5b63d6bda27560e01b5f5260045ffd5b503d1515806101a75750813b15156101a756fe60806040525f8073ffffffffffffffffffffffffffffffffffffffff7f360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc5416368280378136915af43d5f803e156053573d5ff35b3d5ffdfea164736f6c6343000826000a\""]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's second staging chain (Base Sepolia, 84532); Solana has one staging cluster, devnet, which the record's first staging entry names."
+
+[[excuse]]
+id = "adapter-client-file-deployments-json--staging-1-proxy-initialimplementation"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "file deployments.json#/staging/1/proxy/initialImplementation"
+evm = ["\"0xF9d22889fa49acF5611A02a4F3f93c18D62C720B\""]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's second staging chain (Base Sepolia, 84532); Solana has one staging cluster, devnet, which the record's first staging entry names."
+
+[[excuse]]
+id = "adapter-client-file-deployments-json--staging-1-proxy-initializerdata"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "file deployments.json#/staging/1/proxy/initializerData"
+evm = ["\"0xc4d66de800000000000000000000000061462be56782568376f9cb069382efa72764a407\""]
+solana = []
+reason = "anoma/dos-pm#158: the EVM record's second staging chain (Base Sepolia, 84532); Solana has one staging cluster, devnet, which the record's first staging entry names."
+
+[[excuse]]
+id = "adapter-npm-package"
+pair = "anoma-pa-solana-client/npm:@anomaorg/pa-solana-client (unpaired)"
+key = "package"
+evm = []
+solana = ["published"]
+reason = "anoma/dos-pm#158: the TypeScript client for Solana consumers (events decoded by the IDL coder, the deployment record, the instance and the hand-written parts). The pinned EVM repositories publish no npm package to pair it with; pa-evm's only package.json (contracts/package.json) is unnamed and holds its Solidity tooling."
+
+[[excuse]]
+id = "forwarder-npm-package"
+pair = "anomapay-spl-token-forwarder/npm:@anomaorg/anomapay-spl-token-forwarder (unpaired)"
+key = "package"
+evm = []
+solana = ["published"]
+reason = "anoma/dos-pm#158: the TypeScript client for Solana consumers (events decoded by the IDL coder, the deployment record, the instance and the hand-written parts). The pinned EVM repositories publish no npm package to pair it with; pa-evm's only package.json (contracts/package.json) is unnamed and holds its Solidity tooling."
