@@ -263,6 +263,54 @@ async fn local_prover_keeps_an_interleaved_resource_order() {
     );
 }
 
+/// The aggregation guest verifies each logic proof against the action tree
+/// root it recomputes from the compliance unit's tags, so the local prover,
+/// which replicates it, refuses a logic instance bound to another root: here
+/// the root of the same tags in the other order.
+#[tokio::test]
+async fn local_prover_refuses_a_logic_instance_bound_to_another_action_tree_root() {
+    let mut built = trivial::build(13, trivial::Overrides::default())
+        .expect("a trivial action must build")
+        .witnesses;
+    let witness = &built.compliance_witness;
+    let ResourceWitness::Consumed(consumed) = &witness.resource_witnesses[0] else {
+        panic!("the first resource must be the consumed one");
+    };
+    let nf_key = consumed.nf_key.clone();
+    let nullifier = consumed
+        .resource
+        .nullifier(&nf_key)
+        .expect("the consumed resource must have a nullifier");
+    let commitment = witness.resource_witnesses[1].resource().commitment();
+    let other_root = ActionTree::new(vec![commitment, nullifier])
+        .root()
+        .expect("the action tree must have a root");
+    built.logic_witnesses = witness
+        .resource_witnesses
+        .iter()
+        .map(|resource| {
+            Box::new(TrivialLogicWitness {
+                resource: *resource.resource(),
+                action_tree_root: other_root,
+                is_consumed: matches!(resource, ResourceWitness::Consumed(_)),
+                nf_key: nf_key.clone(),
+            }) as Box<dyn LogicWitness>
+        })
+        .collect();
+
+    let error = LocalProver::new(JournalEncoding::Risc0Serde)
+        .prove(&[built])
+        .await
+        .err()
+        .expect("the local prover must refuse logic instances bound to another action tree root");
+    assert!(
+        error
+            .to_string()
+            .contains("logic witness 0 of action 0 proves against another action tree root"),
+        "the error must name the logic witness and the action: {error:#}"
+    );
+}
+
 #[tokio::test]
 async fn local_prover_mock_aggregates_a_consume_only_action() {
     let built = trivial::build(

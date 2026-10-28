@@ -22,8 +22,8 @@ pub(super) struct ConstrainedLogic {
     pub verifying_key: Digest,
     /// Position of the originating witness in
     /// [`ActionWitnesses::logic_witnesses`], correlating the logics, in the
-    /// compliance unit's resource order, with their per-witness proving jobs.
-    #[cfg_attr(not(any(feature = "e2e", feature = "prove")), allow(dead_code))]
+    /// compliance unit's resource order, with their per-witness proving jobs
+    /// and naming the witness in the local prover's errors.
     pub witness_index: usize,
 }
 

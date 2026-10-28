@@ -86,7 +86,8 @@ fn journal_digest(journal: &[u8]) -> Digest {
 
 /// Constrains every action and builds the aggregation instance the way the
 /// batch aggregation guest does: the action tree roots are recomputed from the
-/// compliance tags, the per-resource app data is merged in the compliance
+/// compliance tags and every logic instance must be bound to its action's, the
+/// per-resource app data is merged in the compliance
 /// unit's resource order, and the actions using a kind tree must share it.
 fn constrain_txn(
     action_witnesses: &[ActionWitnesses],
@@ -112,8 +113,14 @@ fn constrain_txn(
             .iter()
             .zip(constrained.resource_logics)
             .map(|(resource, logic)| {
+                anyhow::ensure!(
+                    logic.instance.action_tree_root == action_tree_root,
+                    "logic witness {} of action {action_idx} proves against another action tree \
+                     root",
+                    logic.witness_index
+                );
                 let app_data = logic.instance.app_data;
-                match *resource {
+                Ok(match *resource {
                     ComplianceResourceInstance::Consumed {
                         nullifier,
                         logic_ref,
@@ -132,9 +139,9 @@ fn constrain_txn(
                         logic_ref,
                         app_data,
                     },
-                }
+                })
             })
-            .collect();
+            .collect::<anyhow::Result<_>>()?;
 
         actions.push(ActionAggregated {
             resource_instances,
