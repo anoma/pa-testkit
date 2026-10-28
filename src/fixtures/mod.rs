@@ -3,6 +3,7 @@
 //! integration-test crate can reuse them.
 
 pub mod identities;
+pub mod ordered;
 pub mod passthrough;
 pub mod trivial;
 

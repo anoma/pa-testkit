@@ -22,7 +22,7 @@ for decisions.
 
 A single flat crate, `anoma-pa-testkit` — no workspace. Feature-gated parts:
 
-- `fixtures` (default) — the trivial action kind and the test identities
+- `fixtures` (default) — the trivial, pass-through and ordered action kinds and the test identities
 - `local` (default) — `LocalProver`: native `constrain` plus mock Groth16
   seals, no real proving
 - `e2e` — `QueueProver`: submits witnesses to the remote proving queue

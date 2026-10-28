@@ -63,8 +63,10 @@ nesting.
   the app data a test gives them (an external call, in the encoding of the
   chain under test), under a logic whose guest commits its instance as given
   (`circuits/passthrough-logic`, committed as `elfs/passthrough-logic-guest.bin`,
-  rebuilt reproducibly by `scripts/update_elfs.sh`). App- and chain-agnostic,
-  exposed for reuse by every integration-test crate.
+  rebuilt reproducibly by `scripts/update_elfs.sh`), and the ordered action
+  kind, whose consumed and created resources come in the order a test lists
+  them, each under the pass-through logic or the trivial one. App- and
+  chain-agnostic, exposed for reuse by every integration-test crate.
 - `suite` (`feature = "fixtures"`): the chain-agnostic integration tests, each
   a function over any `Environment`; `suite_tests!` emits one test per suite
   function for an environment, so a harness cannot miss one. A suite test
