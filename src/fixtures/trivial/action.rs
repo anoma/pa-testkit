@@ -1,6 +1,6 @@
 use anoma_rm_risc0::action_tree::ActionTree;
 use anoma_rm_risc0::compliance;
-use anoma_rm_risc0::resource::{ConsumedResourceWitness, Resource};
+use anoma_rm_risc0::resource::{Resource, ResourceWitness, ResourceWitnessConsumed};
 use anoma_rm_risc0::resource_logic::TrivialLogicWitness;
 use anyhow::Context;
 use risc0_zkvm::Digest;
@@ -59,13 +59,23 @@ pub fn build(seed: u8, overrides: Overrides) -> anyhow::Result<ActionData> {
     let compliance_witness = compliance::from_resources_with_ephemeral_root(
         consumed_ephemerals
             .iter()
-            .map(|consumed| ConsumedResourceWitness::from_resource(*consumed, nf_key.clone()))
-            .collect::<Vec<_>>(),
-        created_ephemerals.clone(),
+            .map(|consumed| {
+                ResourceWitness::Consumed(ResourceWitnessConsumed::from_resource(
+                    *consumed,
+                    nf_key.clone(),
+                ))
+            })
+            .chain(
+                created_ephemerals
+                    .iter()
+                    .copied()
+                    .map(ResourceWitness::Created),
+            )
+            .collect(),
         overrides
             .ephemeral_root
             .unwrap_or(anoma_rm_risc0::compliance::INITIAL_ROOT),
-        crate::fixtures::kind_table(),
+        crate::fixtures::kind_tree(),
     );
 
     let tags: Vec<Digest> = consumed_nullifiers

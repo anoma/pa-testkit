@@ -17,8 +17,7 @@
 //!   functions).
 //!
 //! Names follow each language's convention, so they compare in snake_case
-//! (functions, arguments, fields) or as written (types, events, errors), an
-//! event's name without the `Event` suffix the Solana programs give theirs.
+//! (functions, arguments, fields) or as written (types, events, errors).
 //! Types compare in one notation: `u<N>` / `i<N>`, `bool`, `string`, `bytes`,
 //! `bytes<N>` (a fixed byte array: Solidity `bytes32`, Anchor `[u8; 32]`),
 //! `vec<T>`, `[T; N]`, `option<T>`, a defined type by name (an Anchor type
@@ -94,7 +93,7 @@ pub fn abi_surface(abi: &Value) -> anyhow::Result<Surface> {
             "event" => {
                 let fields = abi_params(entry, "inputs", &mut s)?;
                 s.insert(
-                    format!("event {}", event_name(str_field(entry, "name")?)),
+                    format!("event {}", str_field(entry, "name")?),
                     fields_value(&fields),
                 );
             }
@@ -225,7 +224,7 @@ fn idl_surface(idl: &Value) -> anyhow::Result<Surface> {
             other => bail!("an IDL type of kind {other}"),
         };
         let key = if events.contains(&name) {
-            format!("event {}", event_name(name))
+            format!("event {name}")
         } else if accounts.contains(&name) {
             format!("account {name}")
         } else {
@@ -310,11 +309,6 @@ fn signature(args: &[(String, String)], returns: &[String]) -> String {
 fn fields_value(fields: &[(String, String)]) -> String {
     let fields: Vec<String> = fields.iter().map(|(n, t)| format!("{n}: {t}")).collect();
     format!("({})", fields.join(", "))
-}
-
-/// An event's name without the `Event` suffix the Solana programs give it.
-fn event_name(name: &str) -> &str {
-    name.strip_suffix("Event").unwrap_or(name)
 }
 
 /// `name` in snake_case: an underscore before each capital that starts a new
@@ -419,10 +413,10 @@ mod tests {
                 {"name": "submit", "accounts": [],
                  "args": [{"name": "action", "type": {"defined": {"name": "Action"}}}]}
             ],
-            "events": [{"name": "LogicRefDeniedEvent", "discriminator": [1]}],
+            "events": [{"name": "LogicRefDenied", "discriminator": [1]}],
             "errors": [{"code": 6000, "name": "DeniedLogicRef", "msg": "denied"}],
             "types": [
-                {"name": "LogicRefDeniedEvent", "type": {"kind": "struct",
+                {"name": "LogicRefDenied", "type": {"kind": "struct",
                  "fields": [{"name": "logic_ref", "type": {"array": ["u8", 32]}}]}},
                 {"name": "Action", "type": {"kind": "struct", "fields": [
                     {"name": "owner", "type": "pubkey"},
@@ -442,7 +436,8 @@ mod tests {
         assert_eq!(lines.len(), 6, "{lines:#?}");
     }
 
-    /// What differs shows: an argument's type, and an entry one side lacks.
+    /// What differs shows: an argument's type, and an entry one side lacks,
+    /// including an event whose name differs only by a suffix.
     #[test]
     fn a_differing_type_and_a_missing_entry_show() {
         let abi = json!([
@@ -450,7 +445,8 @@ mod tests {
              "inputs": [{"name": "count", "type": "uint256", "internalType": "uint256"}],
              "outputs": []},
             {"type": "function", "name": "latestRoot", "stateMutability": "view",
-             "inputs": [], "outputs": [{"name": "", "type": "bytes32", "internalType": "bytes32"}]}
+             "inputs": [], "outputs": [{"name": "", "type": "bytes32", "internalType": "bytes32"}]},
+            {"type": "event", "name": "Paused", "anonymous": false, "inputs": []}
         ]);
         let idl = json!({
             "instructions": [
@@ -458,8 +454,10 @@ mod tests {
                 {"name": "txdata_init", "accounts": [], "args": []}
             ],
             "accounts": [{"name": "State", "discriminator": [1]}],
+            "events": [{"name": "PausedEvent", "discriminator": [2]}],
             "types": [{"name": "State", "type": {"kind": "struct",
-                       "fields": [{"name": "root", "type": {"array": ["u8", 32]}}]}}]
+                       "fields": [{"name": "root", "type": {"array": ["u8", 32]}}]}},
+                      {"name": "PausedEvent", "type": {"kind": "struct", "fields": []}}]
         });
         let lines = compare(
             "E ↔ S",
@@ -474,14 +472,16 @@ mod tests {
             got,
             vec![
                 ("account State", Outcome::OnlySolana),
+                ("event Paused", Outcome::OnlyEvm),
+                ("event PausedEvent", Outcome::OnlySolana),
                 ("fn latest_root", Outcome::OnlyEvm),
                 ("fn set_count", Outcome::Differs),
                 ("fn txdata_init", Outcome::OnlySolana),
             ],
             "{lines:#?}"
         );
-        assert_eq!(lines[2].evm, vec!["(count: u256)"]);
-        assert_eq!(lines[2].solana, vec!["(count: u64)"]);
+        assert_eq!(lines[4].evm, vec!["(count: u256)"]);
+        assert_eq!(lines[4].solana, vec!["(count: u64)"]);
     }
 
     /// An IDL type alias is its target: a field of the alias `U256` (of
@@ -494,9 +494,9 @@ mod tests {
         ]);
         let idl = json!({
             "instructions": [],
-            "events": [{"name": "ResourcePayloadEvent", "discriminator": [1]}],
+            "events": [{"name": "ResourcePayload", "discriminator": [1]}],
             "types": [
-                {"name": "ResourcePayloadEvent", "type": {"kind": "struct",
+                {"name": "ResourcePayload", "type": {"kind": "struct",
                  "fields": [{"name": "index", "type": {"defined": {"name": "U256"}}}]}},
                 {"name": "U256", "type": {"kind": "type", "alias": "u256"}}
             ]

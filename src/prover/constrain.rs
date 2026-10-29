@@ -21,9 +21,9 @@ pub(super) struct ConstrainedLogic {
     /// The logic's verifying key.
     pub verifying_key: Digest,
     /// Position of the originating witness in
-    /// [`ActionWitnesses::logic_witnesses`], correlating canonical-order
-    /// logics with their per-witness proving jobs.
-    #[cfg_attr(not(any(feature = "e2e", feature = "prove")), allow(dead_code))]
+    /// [`ActionWitnesses::logic_witnesses`], correlating the logics, in the
+    /// compliance unit's resource order, with their per-witness proving jobs
+    /// and naming the witness in the local prover's errors.
     pub witness_index: usize,
 }
 
@@ -33,10 +33,8 @@ pub(super) struct ConstrainedAction {
     /// The action's compliance instance.
     #[cfg_attr(not(feature = "local"), allow(dead_code))]
     pub compliance_instance: ComplianceInstance,
-    /// Logic inputs for the consumed resources, in `consumed_publics` order.
-    pub consumed_logics: Vec<ConstrainedLogic>,
-    /// Logic inputs for the created resources, in `created_publics` order.
-    pub created_logics: Vec<ConstrainedLogic>,
+    /// Logic inputs for the resources, in `resource_instances` order.
+    pub resource_logics: Vec<ConstrainedLogic>,
 }
 
 /// Runs `f`, turning a panic with a message into an error: the circuits panic
@@ -55,13 +53,13 @@ pub(super) fn catching_panics<T>(f: impl FnOnce() -> anyhow::Result<T>) -> anyho
     })
 }
 
-/// The kind table root the batch aggregation circuit commits to for actions
+/// The kind tree root the batch aggregation circuit commits to for actions
 /// whose compliance instances commit to `roots`: the one root every action
-/// using a kind table commits to, or the empty table's root (the padding leaf)
-/// when none uses one. An action whose resources no table lists commits to
-/// the empty table's root and joins any. A transaction without actions does
+/// using a kind tree commits to, or the empty tree's root (the padding leaf)
+/// when none uses one. An action whose resources no tree lists commits to
+/// the empty tree's root and joins any. A transaction without actions does
 /// not aggregate.
-pub(super) fn aggregated_kind_table_root(
+pub(super) fn aggregated_kind_tree_root(
     roots: impl IntoIterator<Item = Digest>,
 ) -> anyhow::Result<Digest> {
     let mut roots = roots.into_iter().peekable();
@@ -77,7 +75,7 @@ pub(super) fn aggregated_kind_table_root(
         let shared = *used.get_or_insert(root);
         anyhow::ensure!(
             root == shared,
-            "action {action_idx} uses a different kind table than the transaction"
+            "action {action_idx} uses a different kind tree than the transaction"
         );
     }
     Ok(used.unwrap_or(PADDING_LEAF))
@@ -98,10 +96,9 @@ pub(super) fn actions(
 }
 
 /// Constrains every witness of an action and checks that each of the compliance
-/// unit's consumed and created resources has a matching logic witness — by tag,
-/// role, and verifying key — mirroring [`anoma_rm_risc0::action::Action`]. The
-/// returned logics are reordered into the canonical tag order (consumed
-/// nullifiers, then created commitments).
+/// unit's resources has a matching logic witness — by tag, role, and verifying
+/// key — mirroring [`anoma_rm_risc0::action::Action`]. The returned logics are
+/// reordered into the compliance unit's resource order, the order of its tags.
 pub(super) fn action(
     witnesses: &ActionWitnesses,
     action_idx: usize,
@@ -111,8 +108,7 @@ pub(super) fn action(
             format!("failed to constrain the compliance unit of action {action_idx}")
         })?;
 
-    let resource_count =
-        compliance_instance.consumed_publics.len() + compliance_instance.created_publics.len();
+    let resource_count = compliance_instance.resource_instances.len();
     anyhow::ensure!(
         witnesses.logic_witnesses.len() == resource_count,
         "action {action_idx} must have exactly one logic witness per resource: \
@@ -145,31 +141,16 @@ pub(super) fn action(
         );
     }
 
-    let consumed_logics = compliance_instance
-        .consumed_publics
+    let resource_logics = compliance_instance
+        .resource_instances
         .iter()
-        .map(|consumed| {
+        .map(|resource| {
             take_validated_logic(
                 &mut logics,
                 &logic_index_by_tag,
-                consumed.resource_nullifier,
-                true,
-                consumed.resource_logic_ref,
-                action_idx,
-            )
-        })
-        .collect::<anyhow::Result<Vec<_>>>()?;
-
-    let created_logics = compliance_instance
-        .created_publics
-        .iter()
-        .map(|created| {
-            take_validated_logic(
-                &mut logics,
-                &logic_index_by_tag,
-                created.resource_commitment,
-                false,
-                created.resource_logic_ref,
+                resource.tag(),
+                resource.is_consumed(),
+                resource.logic_ref(),
                 action_idx,
             )
         })
@@ -177,8 +158,7 @@ pub(super) fn action(
 
     Ok(ConstrainedAction {
         compliance_instance,
-        consumed_logics,
-        created_logics,
+        resource_logics,
     })
 }
 
@@ -219,28 +199,28 @@ fn take_validated_logic(
 mod tests {
     use super::*;
 
-    const TABLE: Digest = Digest::new([7; 8]);
-    const OTHER_TABLE: Digest = Digest::new([9; 8]);
+    const TREE: Digest = Digest::new([7; 8]);
+    const OTHER_TREE: Digest = Digest::new([9; 8]);
 
     #[test]
-    fn actions_without_a_kind_table_aggregate_under_the_empty_tables_root() {
+    fn actions_without_a_kind_tree_aggregate_under_the_empty_trees_root() {
         assert_eq!(
-            aggregated_kind_table_root([PADDING_LEAF, PADDING_LEAF]).unwrap(),
+            aggregated_kind_tree_root([PADDING_LEAF, PADDING_LEAF]).unwrap(),
             PADDING_LEAF
         );
     }
 
     #[test]
-    fn an_action_without_a_kind_table_joins_the_table_the_others_use() {
+    fn an_action_without_a_kind_tree_joins_the_tree_the_others_use() {
         assert_eq!(
-            aggregated_kind_table_root([PADDING_LEAF, TABLE, PADDING_LEAF, TABLE]).unwrap(),
-            TABLE
+            aggregated_kind_tree_root([PADDING_LEAF, TREE, PADDING_LEAF, TREE]).unwrap(),
+            TREE
         );
     }
 
     #[test]
     fn a_transaction_without_actions_does_not_aggregate() {
-        let error = aggregated_kind_table_root([])
+        let error = aggregated_kind_tree_root([])
             .expect_err("a transaction without actions must not aggregate");
         assert!(
             error.to_string().contains("without actions"),
@@ -249,13 +229,13 @@ mod tests {
     }
 
     #[test]
-    fn actions_using_two_kind_tables_do_not_aggregate() {
-        let error = aggregated_kind_table_root([TABLE, PADDING_LEAF, OTHER_TABLE])
-            .expect_err("two kind tables must not aggregate");
+    fn actions_using_two_kind_trees_do_not_aggregate() {
+        let error = aggregated_kind_tree_root([TREE, PADDING_LEAF, OTHER_TREE])
+            .expect_err("two kind trees must not aggregate");
         assert!(
             error
                 .to_string()
-                .contains("action 2 uses a different kind table"),
+                .contains("action 2 uses a different kind tree"),
             "the error must name the action: {error}"
         );
     }

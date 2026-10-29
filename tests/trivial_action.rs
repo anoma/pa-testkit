@@ -7,10 +7,14 @@ use anoma_pa_testkit::assert::{Needle, expect_integration_panic};
 use anoma_pa_testkit::environment::Prover;
 use anoma_pa_testkit::fixtures::trivial;
 use anoma_pa_testkit::prover::LocalProver;
-use anoma_rm_risc0::compliance::KindTableEntry;
-use anoma_rm_risc0::kind_table::KindTable;
+use anoma_pa_testkit::witness::LogicWitness;
+use anoma_rm_risc0::Digest;
+use anoma_rm_risc0::action_tree::ActionTree;
+use anoma_rm_risc0::compliance::KindTreeEntry;
+use anoma_rm_risc0::kind_tree::KindTree;
 use anoma_rm_risc0::proving_system::JournalEncoding;
-use anoma_rm_risc0::resource::kind;
+use anoma_rm_risc0::resource::{ResourceWitness, kind};
+use anoma_rm_risc0::resource_logic::TrivialLogicWitness;
 use k256::elliptic_curve::sec1::ToEncodedPoint;
 
 #[test]
@@ -88,12 +92,12 @@ async fn local_prover_mock_aggregates_trivial_actions() {
     assert_eq!(aggregation.instance.actions.len(), 8);
 }
 
-/// The batch aggregation circuit commits to the kind table of the actions that
-/// use one, and an action whose resources the table does not list (it commits
-/// to the empty table's root) joins them. The local prover replicates that
-/// circuit, so it must aggregate such a pair under the used table's root.
+/// The batch aggregation circuit commits to the kind tree of the actions that
+/// use one, and an action whose resources the tree does not list (it commits
+/// to the empty tree's root) joins them. The local prover replicates that
+/// circuit, so it must aggregate such a pair under the used tree's root.
 #[tokio::test]
-async fn local_prover_aggregates_an_action_without_a_kind_table_with_one_using_it() {
+async fn local_prover_aggregates_an_action_without_a_kind_tree_with_one_using_it() {
     let mut listed = trivial::build(30, trivial::Overrides::default())
         .expect("must build a trivial action")
         .witnesses;
@@ -101,26 +105,26 @@ async fn local_prover_aggregates_an_action_without_a_kind_table_with_one_using_i
         .expect("must build a trivial action")
         .witnesses;
 
-    // A table listing the first action's kind, assigned its own kind point, so
-    // the action balances as without the table.
-    let resource = listed.compliance_witness.consumed_data[0].resource;
-    let kind_point = kind(&resource)
+    // A tree listing the first action's kind, assigned its own kind base, so
+    // the action balances as without the tree.
+    let resource = *listed.compliance_witness.resource_witnesses[0].resource();
+    let kind_base = kind(&resource)
         .expect("the trivial resource must have a kind")
         .to_affine()
         .to_encoded_point(false)
         .as_bytes()
         .to_vec();
-    let table = KindTable::from_entries(vec![KindTableEntry {
+    let tree = KindTree::from_entries(vec![KindTreeEntry {
         logic_ref: resource.logic_ref,
         label_ref: resource.label_ref,
-        kind_point,
+        kind_base,
     }])
-    .expect("the table must build");
+    .expect("the tree must build");
     let witness = &mut listed.compliance_witness;
-    witness.kind_paths = table.kind_paths_for(&witness.consumed_data, &witness.created_resources);
+    witness.kind_paths = tree.kind_paths_for(&witness.resource_witnesses);
     assert!(
         witness.kind_paths.iter().all(Option::is_some),
-        "the table must list every resource of the first action"
+        "the tree must list every resource of the first action"
     );
     assert!(
         unlisted
@@ -128,21 +132,21 @@ async fn local_prover_aggregates_an_action_without_a_kind_table_with_one_using_i
             .kind_paths
             .iter()
             .all(Option::is_none),
-        "no kind table is loaded, so the second action must use none"
+        "no kind tree is loaded, so the second action must use none"
     );
 
     let txn = LocalProver::new(JournalEncoding::Risc0Serde)
         .prove(&[listed, unlisted])
         .await
-        .expect("the local prover must aggregate actions with and without a kind table");
+        .expect("the local prover must aggregate actions with and without a kind tree");
 
     let instance = txn
         .aggregation_instance()
         .expect("the transaction must carry an aggregation");
     assert_eq!(
-        instance.kind_table_root,
-        table.root(),
-        "the aggregation must commit to the kind table the first action uses"
+        instance.kind_tree_root,
+        tree.root(),
+        "the aggregation must commit to the kind tree the first action uses"
     );
 }
 
@@ -168,8 +172,143 @@ async fn local_prover_mock_aggregates_an_n_to_m_action() {
         .aggregation
         .as_ref()
         .expect("the transaction must carry an aggregation");
-    assert_eq!(aggregation.instance.actions[0].consumed_publics.len(), 2);
-    assert_eq!(aggregation.instance.actions[0].created_publics.len(), 3);
+    let is_consumed: Vec<bool> = aggregation.instance.actions[0]
+        .resource_instances
+        .iter()
+        .map(|resource| resource.is_consumed())
+        .collect();
+    assert_eq!(is_consumed, [true, true, false, false, false]);
+}
+
+/// An action's resources are one ordered list, and created resources may
+/// precede consumed ones. The local prover keeps the compliance unit's order
+/// in the aggregation, whatever order the logic witnesses come in.
+#[tokio::test]
+async fn local_prover_keeps_an_interleaved_resource_order() {
+    let mut built = trivial::build(
+        12,
+        trivial::Overrides {
+            created_count: Some(2),
+            ..trivial::Overrides::default()
+        },
+    )
+    .expect("a 1:2 trivial action must build")
+    .witnesses;
+
+    // Created, consumed, created: a created nonce derives from its index
+    // among the created resources, so the reordered witness still holds.
+    let witness = &mut built.compliance_witness;
+    witness.resource_witnesses.swap(0, 1);
+    witness.kind_paths.swap(0, 1);
+    let ResourceWitness::Consumed(consumed) = &witness.resource_witnesses[1] else {
+        panic!("the second resource must be the consumed one");
+    };
+    let nf_key = consumed.nf_key.clone();
+    let tags: Vec<Digest> = witness
+        .resource_witnesses
+        .iter()
+        .map(|resource| match resource {
+            ResourceWitness::Consumed(consumed) => consumed
+                .resource
+                .nullifier(&consumed.nf_key)
+                .expect("the consumed resource must have a nullifier"),
+            ResourceWitness::Created(created) => created.commitment(),
+        })
+        .collect();
+    let action_tree_root = ActionTree::new(tags.clone())
+        .root()
+        .expect("the action tree must have a root");
+    // The logic witnesses prove against the reordered action tree, listed in
+    // reverse to show they pair with the resources by tag.
+    built.logic_witnesses = witness
+        .resource_witnesses
+        .iter()
+        .rev()
+        .map(|resource| {
+            Box::new(TrivialLogicWitness {
+                resource: *resource.resource(),
+                action_tree_root,
+                is_consumed: matches!(resource, ResourceWitness::Consumed(_)),
+                nf_key: nf_key.clone(),
+            }) as Box<dyn LogicWitness>
+        })
+        .collect();
+
+    let txn = LocalProver::new(JournalEncoding::Risc0Serde)
+        .prove(&[built])
+        .await
+        .expect("the local prover must constrain an interleaved action");
+
+    let action = &txn
+        .aggregation_instance()
+        .expect("the transaction must carry an aggregation")
+        .actions[0];
+    let aggregated: Vec<(Digest, bool)> = action
+        .resource_instances
+        .iter()
+        .map(|resource| (resource.tag(), resource.is_consumed()))
+        .collect();
+    assert_eq!(
+        aggregated,
+        [(tags[0], false), (tags[1], true), (tags[2], false)],
+        "the aggregation must keep the compliance unit's resource order"
+    );
+    assert_eq!(action.action_tree_root, action_tree_root);
+    assert_eq!(
+        txn.created_commitments()
+            .expect("the commitments must be readable")
+            .collect::<Vec<_>>(),
+        [tags[0], tags[2]],
+        "the created commitments come in the list's order"
+    );
+}
+
+/// The aggregation guest verifies each logic proof against the action tree
+/// root it recomputes from the compliance unit's tags, so the local prover,
+/// which replicates it, refuses a logic instance bound to another root: here
+/// the root of the same tags in the other order.
+#[tokio::test]
+async fn local_prover_refuses_a_logic_instance_bound_to_another_action_tree_root() {
+    let mut built = trivial::build(13, trivial::Overrides::default())
+        .expect("a trivial action must build")
+        .witnesses;
+    let witness = &built.compliance_witness;
+    let ResourceWitness::Consumed(consumed) = &witness.resource_witnesses[0] else {
+        panic!("the first resource must be the consumed one");
+    };
+    let nf_key = consumed.nf_key.clone();
+    let nullifier = consumed
+        .resource
+        .nullifier(&nf_key)
+        .expect("the consumed resource must have a nullifier");
+    let commitment = witness.resource_witnesses[1].resource().commitment();
+    let other_root = ActionTree::new(vec![commitment, nullifier])
+        .root()
+        .expect("the action tree must have a root");
+    built.logic_witnesses = witness
+        .resource_witnesses
+        .iter()
+        .map(|resource| {
+            Box::new(TrivialLogicWitness {
+                resource: *resource.resource(),
+                action_tree_root: other_root,
+                is_consumed: matches!(resource, ResourceWitness::Consumed(_)),
+                nf_key: nf_key.clone(),
+            }) as Box<dyn LogicWitness>
+        })
+        .collect();
+
+    let error = LocalProver::new(JournalEncoding::Risc0Serde)
+        .prove(&[built])
+        .await
+        .err()
+        .expect("the local prover must refuse logic instances bound to another action tree root");
+    assert!(
+        error
+            .to_string()
+            .contains("logic witness 0 of action 0 proves against another action tree root"),
+        "the error must name the logic witness and the action: {error:#}"
+    );
 }
 
 #[tokio::test]
@@ -194,8 +333,13 @@ async fn local_prover_mock_aggregates_a_consume_only_action() {
         .aggregation
         .as_ref()
         .expect("the transaction must carry an aggregation");
-    assert_eq!(aggregation.instance.actions[0].consumed_publics.len(), 2);
-    assert!(aggregation.instance.actions[0].created_publics.is_empty());
+    let resource_instances = &aggregation.instance.actions[0].resource_instances;
+    assert_eq!(resource_instances.len(), 2);
+    assert!(
+        resource_instances
+            .iter()
+            .all(|resource| resource.is_consumed())
+    );
 }
 
 /// The local prover refuses an action whose padding resource breaks the
@@ -233,9 +377,15 @@ async fn the_consumed_resources_name_the_overridden_ephemeral_root() -> anyhow::
     let txn = LocalProver::new(JournalEncoding::Risc0Serde)
         .prove(&[built.witnesses])
         .await?;
-    for consumed in &txn.aggregation_instance()?.actions[0].consumed_publics {
+    let resource_instances = &txn.aggregation_instance()?.actions[0].resource_instances;
+    assert_eq!(resource_instances.len(), 3);
+    for consumed in resource_instances
+        .iter()
+        .filter(|resource| resource.is_consumed())
+    {
         assert_eq!(
-            consumed.commitment_tree_root, root,
+            consumed.commitment_tree_root(),
+            Some(root),
             "a consumed ephemeral resource must name the overridden root"
         );
     }

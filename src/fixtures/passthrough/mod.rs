@@ -8,7 +8,7 @@
 //! derived-data bundle [`ActionData`], and [`Overrides`].
 
 mod action;
-mod logic;
+pub(crate) mod logic;
 
 pub use action::{ActionData, Overrides, build};
 pub use logic::{PASSTHROUGH_LOGIC_PK, PASSTHROUGH_LOGIC_VK};

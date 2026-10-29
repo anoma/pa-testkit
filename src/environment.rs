@@ -4,6 +4,8 @@
 //! harness's to translate into these terms.
 
 use anoma_rm_risc0::Digest;
+use anoma_rm_risc0::aggregation_instance::AggregationInstance;
+use sha3::{Digest as _, Keccak256};
 
 use crate::commitment_tree::FrontierCommitmentTree;
 use crate::transaction::Transaction;
@@ -55,6 +57,13 @@ pub enum Event {
     TransactionExecuted { transaction_id: Digest },
 }
 
+/// The id of the transaction whose aggregation instance is `instance`, which
+/// its [`Event::TransactionExecuted`] carries: the keccak hash of its action
+/// tree roots, in order (the instance's delta message).
+pub fn transaction_id(instance: &AggregationInstance) -> Digest {
+    Digest::from_bytes(Keccak256::digest(instance.delta_msg()).into())
+}
+
 /// Which payload of a resource's app data a [`Event::Payload`] blob is from.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PayloadKind {
@@ -84,7 +93,7 @@ pub enum Refusal {
     /// stores nor the empty table's.
     UnacceptedKindTreeRoot,
     /// The aggregation proof does not prove the transaction's actions under
-    /// the adapter's compliance key and the transaction's kind tree root.
+    /// the adapter's compliance verifying key and the transaction's kind tree root.
     InvalidAggregationProof,
     /// An external call returned other than the output its proof expects.
     ExternalCallOutputMismatch,
@@ -186,4 +195,41 @@ pub trait Prover {
     ///
     /// Invalid witnesses will result in an error.
     async fn prove(&self, actions: &[ActionWitnesses]) -> anyhow::Result<Transaction>;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use anoma_rm_risc0::aggregation_instance::ActionAggregated;
+
+    fn instance(action_tree_roots: &[Digest]) -> AggregationInstance {
+        AggregationInstance {
+            compliance_vk: Digest::default(),
+            kind_tree_root: Digest::default(),
+            actions: action_tree_roots
+                .iter()
+                .map(|root| ActionAggregated {
+                    resource_instances: vec![],
+                    delta_x: [0; 8],
+                    delta_y: [0; 8],
+                    action_tree_root: *root,
+                })
+                .collect(),
+        }
+    }
+
+    /// The id is keccak256 of the action tree roots concatenated: of no
+    /// bytes for no action, and of 32 zero bytes for one action whose root is
+    /// zero.
+    #[test]
+    fn the_transaction_id_is_the_keccak_of_the_action_tree_roots() {
+        assert_eq!(
+            transaction_id(&instance(&[])).to_string(),
+            "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"
+        );
+        assert_eq!(
+            transaction_id(&instance(&[Digest::default()])).to_string(),
+            "290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563"
+        );
+    }
 }

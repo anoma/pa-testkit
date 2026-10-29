@@ -42,16 +42,16 @@ pub(super) struct BaseProof {
 }
 
 /// The transaction to aggregate: every action with its base proofs and the
-/// delta proof, plus the kind table root its aggregation is checked
+/// delta proof, plus the kind tree root its aggregation is checked
 /// against.
 pub(super) struct Assembled {
     pub transaction: ArmTxn,
-    pub kind_table_root: Digest,
+    pub kind_tree_root: Digest,
 }
 
 /// Assembles each constrained action with its base proofs into an
-/// [`Action`], its logic verifier inputs in the canonical tag order (consumed
-/// nullifiers, then created commitments), and proves the transaction's delta
+/// [`Action`], its logic verifier inputs in the compliance unit's resource
+/// order, and proves the transaction's delta
 /// from the actions' rcvs. Every base proof must be used exactly once.
 pub(super) fn assemble(
     action_witnesses: &[ActionWitnesses],
@@ -67,15 +67,10 @@ pub(super) fn assemble(
             instance: compliance_proof.instance,
         };
 
-        // `constrain` returns the logics in the canonical tag order, and
-        // `witness_index` correlates each with its proof.
-        let logic_count = action.consumed_logics.len() + action.created_logics.len();
-        let mut logic_verifier_inputs = Vec::with_capacity(logic_count);
-        for logic in action
-            .consumed_logics
-            .into_iter()
-            .chain(action.created_logics)
-        {
+        // `constrain` returns the logics in the compliance unit's resource
+        // order, and `witness_index` correlates each with its proof.
+        let mut logic_verifier_inputs = Vec::with_capacity(action.resource_logics.len());
+        for logic in action.resource_logics {
             let proof = take_base_proof(
                 &mut base_proofs,
                 action_idx,
@@ -109,14 +104,14 @@ pub(super) fn assemble(
         delta_proof::from_bytes_vec(&rcvs)
             .context("failed to construct delta witness from rcv values")?,
     );
-    // `verify` takes the root the transaction is checked against. No global kind table is installed here, so it
+    // `verify` takes the root the transaction is checked against. No global kind tree is installed here, so it
     // comes from the compliance instances, which makes the check compare the aggregation against them.
-    let kind_table_root = super::constrain::aggregated_kind_table_root(
+    let kind_tree_root = super::constrain::aggregated_kind_tree_root(
         actions
             .iter()
             .map(|action| {
                 compliance_unit::get_instance(&action.compliance_unit)
-                    .map(|instance| instance.kind_table_root)
+                    .map(|instance| instance.kind_tree_root)
                     .map_err(|error| {
                         anyhow::anyhow!("failed to read the compliance instance: {error:?}")
                     })
@@ -129,18 +124,18 @@ pub(super) fn assemble(
 
     Ok(Assembled {
         transaction,
-        kind_table_root,
+        kind_tree_root,
     })
 }
 
-/// Verifies the aggregated transaction against the kind table root of
+/// Verifies the aggregated transaction against the kind tree root of
 /// its [`Assembled`] form, its aggregation journal in `encoding`.
 pub(super) fn verify_aggregated(
     aggregated: ArmTxn,
-    kind_table_root: Digest,
+    kind_tree_root: Digest,
     encoding: JournalEncoding,
 ) -> anyhow::Result<Transaction> {
-    transaction::verify(&aggregated, kind_table_root, encoding)
+    transaction::verify(&aggregated, kind_tree_root, encoding)
         .context("aggregated transaction failed local verification")?;
 
     Ok(Transaction::from_arm(aggregated))

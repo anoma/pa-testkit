@@ -82,7 +82,7 @@ impl Prover for Risc0Prover {
         })
         .await
         .context("failed to aggregate the transaction")?;
-        assemble::verify_aggregated(aggregated, assembled.kind_table_root, encoding)
+        assemble::verify_aggregated(aggregated, assembled.kind_tree_root, encoding)
     }
 }
 
@@ -182,7 +182,7 @@ mod tests {
             "the aggregation proof must be a Groth16 receipt"
         );
 
-        transaction::verify(arm_txn, crate::fixtures::kind_table_root(), encoding)
+        transaction::verify(arm_txn, crate::fixtures::kind_tree_root(), encoding)
             .expect("the aggregated transaction must verify");
     }
 }

@@ -64,7 +64,7 @@ adapter mirrors, in pa-evm's order), or refused it for a `Refusal`, one of the p
 as a spent nullifier or an unknown root; the enum lists them). A harness
 decodes its chain's error into a `Refusal`, so a suite test names the reason
 the same way for every chain. A reason is in the list only if every chain's
-adapter can report it apart from the others: both report a kind table they
+adapter can report it apart from the others: both report a kind tree they
 neither store nor is the empty one (`UnacceptedKindTreeRoot`) apart
 from a bad seal (`InvalidAggregationProof`), but the Solana adapter does not
 say which side's denylist refused a resource, so both sides are
