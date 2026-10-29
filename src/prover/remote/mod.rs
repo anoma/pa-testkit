@@ -104,6 +104,11 @@ async fn prove_via_queue(
     queue: &QueueClient,
     action_witnesses: &[&ActionWitnesses],
 ) -> anyhow::Result<Transaction> {
+    // The queue's SDK sends no journal encoding, and the queue reads a missing one as ABI.
+    anyhow::ensure!(
+        matches!(JOURNAL_ENCODING, JournalEncoding::Abi),
+        "the proving queue decodes every aggregation journal as ABI: turn on the `abi_encoding` feature"
+    );
     let constrained =
         std::panic::catch_unwind(AssertUnwindSafe(|| constrain_actions(action_witnesses)))
             .unwrap_or_else(|cause| {

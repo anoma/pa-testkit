@@ -20,6 +20,7 @@ build *args:
 # Test
 test *args:
     cargo test {{ args }}
+    cargo test --features e2e {{ args }}
 
 # Publish
 publish *args:
@@ -29,3 +30,4 @@ publish *args:
 lint:
     cargo clippy --no-deps -- -Dwarnings
     cargo clippy --no-deps --tests -- -Dwarnings
+    cargo clippy --no-deps --tests --features e2e -- -Dwarnings

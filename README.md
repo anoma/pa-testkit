@@ -23,7 +23,7 @@ A single flat crate, `anoma-pa-testkit` — no workspace. Feature-gated parts:
 - `fixtures` (default) — the action builder, the trivial resource and the test identities
 - `local` (default) — `LocalProver`: native `constrain` plus mock Groth16
   seals, no real proving
-- `e2e` — `QueueProver`: submits witnesses to the remote proving queue
+- `e2e` — `QueueProver`: submits witnesses to the remote proving queue; it proves only with `abi_encoding`, because the queue decodes every aggregation journal as ABI
 - `abi_encoding` — the EVM-ABI aggregation journal encoding (what the EVM
   protocol adapter reconstructs); off by default
 - `mocks` — `mockall` doubles of the core traits
