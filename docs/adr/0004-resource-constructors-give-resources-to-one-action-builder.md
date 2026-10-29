@@ -22,7 +22,7 @@ Under ADR-0003, each action kind had its own `build`, which put only the resourc
 ## Consequences
 
 - A test builds and proves an action in two steps: `let wrap = action::build([ephemeral::consumed(..), persistent::created(..)])?;`, then `prove_actions(&env, [&wrap])`. `prove_actions` takes any iterator of action witnesses, so a batch passes as `&actions`. A batch of actions is a map over seeds; `build_many` is gone.
-- `trivial::resources` and the counts of `trivial::Overrides` are gone. A trivial action is a list such as `[trivial::consumed(1, Overrides::default()), trivial::created(1)]`.
+- `trivial::resources` and the counts of `trivial::Overrides` are gone. A trivial action is a list such as `[trivial::consumed(1, Overrides::default()), trivial::created()]`.
 - A test takes a resource by its position, for example `wrap.resources()[1]`. No type names the resources by side and ephemerality.
 - Logic witnesses out of the order of the resources fail in the provers, as they fail in arm.
 - A test that needs a created nonce other than the derived one must build the compliance witness itself. arm-risc0 tests that the compliance circuit rejects such a nonce.
