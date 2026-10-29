@@ -243,7 +243,7 @@ async fn local_prover_balances_the_aliases_of_a_kind() {
 async fn local_prover_reports_an_invalid_logic_before_an_imbalance() {
     let built = action::build([
         trivial::consumed(1, trivial::Overrides::invalid_nonzero_quantity()),
-        trivial::created(1),
+        trivial::created(),
     ])
     .expect("the action must build");
 
