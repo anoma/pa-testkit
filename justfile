@@ -16,6 +16,7 @@ fmt-check:
 # Build
 build *args:
     cargo build {{ args }}
+    cargo build --features e2e,abi_encoding {{ args }}
 
 # Test
 test *args:
@@ -30,4 +31,6 @@ publish *args:
 lint:
     cargo clippy --no-deps -- -Dwarnings
     cargo clippy --no-deps --tests -- -Dwarnings
+    cargo clippy --no-deps --features e2e,abi_encoding -- -Dwarnings
     cargo clippy --no-deps --tests --features e2e -- -Dwarnings
+    cargo clippy --no-deps --tests --features e2e,abi_encoding -- -Dwarnings
