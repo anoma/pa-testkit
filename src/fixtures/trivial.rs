@@ -61,10 +61,10 @@ pub fn consumed(seed: u8, overrides: Overrides) -> ActionResource {
     )
 }
 
-/// A created trivial resource. `seed` sets its nullifier key commitment and its random seed; the
-/// action builder derives its nonce.
-pub fn created(seed: u8) -> ActionResource {
-    let nf_key = nullifier_key(seed);
+/// A created trivial resource. Its nullifier key commitment and its random seed are fixed. The
+/// action builder derives its nonce, which makes its commitment unique.
+pub fn created() -> ActionResource {
+    let nf_key = NullifierKey::default();
     let resource = ResourceToCreate {
         logic_ref: PADDING_LOGIC_VK,
         label_ref: Digest::default(),
@@ -72,7 +72,7 @@ pub fn created(seed: u8) -> ActionResource {
         value_ref: Digest::default(),
         is_ephemeral: true,
         nk_commitment: nf_key.commit(),
-        rand_seed: [seed.wrapping_add(33); 32],
+        rand_seed: [0; 32],
     };
     ActionResource::created(resource, logic(nf_key, false))
 }
