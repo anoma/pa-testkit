@@ -62,7 +62,7 @@ id = "forwarder-init-nonce-bitmap"
 pair = "anomapay-erc20-forwarder/crates/bindings/src/generated/erc20_forwarder.rs ↔ anomapay-spl-token-forwarder/crates/client/idls/spl_token_forwarder.json"
 key = "fn init_nonce_bitmap"
 evm = []
-solana = ["(_user: address, _word_index: u64)"]
+solana = ["(user: address, word_index: u64)"]
 reason = "anoma/dos-pm#157: creates the nonce bitmap that a wrap records its nonce in. A new Solana account needs its rent paid, and the adapter passes a forwarder no signer, so nothing inside the wrap can pay: an instruction before the settlement must. The submitter sends this one in the settlement's transaction; anyone may send it, and sending it again changes nothing. On EVM, the transaction's gas pays for Permit2's storage write."
 
 [[excuse]]
@@ -110,7 +110,7 @@ id = "emergency-forwarder-init-nonce-bitmap"
 pair = "anomapay-erc20-forwarder/crates/bindings/src/generated/emergency_migrating_erc20_forwarder.rs ↔ anomapay-spl-token-forwarder/crates/client/idls/emergency_migrating_spl_token_forwarder.json"
 key = "fn init_nonce_bitmap"
 evm = []
-solana = ["(_user: address, _word_index: u64)"]
+solana = ["(user: address, word_index: u64)"]
 reason = "anoma/dos-pm#157: creates the nonce bitmap that a wrap records its nonce in. A new Solana account needs its rent paid, and the adapter passes a forwarder no signer, so nothing inside the wrap can pay: an instruction before the settlement must. The submitter sends this one in the settlement's transaction; anyone may send it, and sending it again changes nothing. On EVM, the transaction's gas pays for Permit2's storage write."
 
 [[excuse]]
@@ -152,6 +152,14 @@ key = "rust crate::EventDecodeError enum"
 evm = []
 solana = ["pub enum crate::EventDecodeError"]
 reason = "anoma/dos-pm#158: CPI event framing, which the client writes by hand: the adapter emits each event as an invocation of itself whose data starts with Anchor's 8-byte event tag, and the IDL describes only the event body after the tag, which the generated event types decode. EVM events are logs that the ABI describes whole."
+
+[[excuse]]
+id = "adapter-client-max-leaf-count-const"
+pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
+key = "rust crate::MAX_LEAF_COUNT const"
+evm = []
+solana = ["pub const crate::MAX_LEAF_COUNT: u64"]
+reason = "anoma/dos-pm#158: a Merkle helper, which the client writes by hand: it mirrors the adapter's on-chain commitment tree (its hashing, padding and depth), which no IDL describes, so a client computes roots and paths off chain."
 
 [[excuse]]
 id = "adapter-client-max-loaded-accounts-data-size-bytes-const"
@@ -446,7 +454,7 @@ id = "adapter-client-zero-hashes-fn"
 pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
 key = "rust crate::zero_hashes fn"
 evm = []
-solana = ["pub fn crate::zero_hashes() -> [[u8; 32]; 32]"]
+solana = ["pub fn crate::zero_hashes() -> &'static [[u8; 32]; 33]"]
 reason = "anoma/dos-pm#158: a Merkle helper, which the client writes by hand: it mirrors the adapter's on-chain commitment tree (its hashing, padding and depth), which no IDL describes, so a client computes roots and paths off chain."
 
 [[excuse]]
@@ -1485,7 +1493,7 @@ reason = "anoma/dos-pm#158: a Solana program keeps one address across upgrades, 
 id = "forwarder-client-file-deployments-json--staging-0-proxy-address"
 pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
 key = "file deployments.json#/staging/0/proxy/address"
-evm = ["\"0x0281E89De2c6A0e878df550Af0F705C4B7920b0D\""]
+evm = ["\"0x7ac696ad6932701E8E2e4e439Fb926D77Bc537f4\""]
 solana = []
 reason = "anoma/dos-pm#158: the EVM record's ERC1967 proxy deployment (address, creation code, initial implementation, initializer data); a Solana program upgrades in place at its program id and has no proxy."
 
@@ -1493,7 +1501,7 @@ reason = "anoma/dos-pm#158: the EVM record's ERC1967 proxy deployment (address, 
 id = "forwarder-client-file-deployments-json--staging-0-proxy-creationcode"
 pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
 key = "file deployments.json#/staging/0/proxy/creationCode"
-evm = ["\"0x6080604052610284803803806100148161016e565b9283398101604082820312610156578151916001600160a01b03831690818403610156576020810151906001600160401b038211610156570182601f82011215610156578051906001600160401b03821161015a5761007c601f8301601f191660200161016e565b938285526020838301011161015657815f9260208093018387015e8401015281511561014757823b15610135577f360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc80546001600160a01b031916821790557fbc7cd75a20ee27fd9adebab32041f755214dbc6bffa90cc0225b39da2e5c2d3b5f80a280511561011e5761010e91610193565b505b604051606490816102208239f35b505034156101105763b398979f60e01b5f5260045ffd5b634c9c8ce360e01b5f5260045260245ffd5b6330a289cf60e21b5f5260045ffd5b5f80fd5b634e487b7160e01b5f52604160045260245ffd5b6040519190601f01601f191682016001600160401b0381118382101761015a57604052565b905f8091602081519101845af4808061020c575b156101c75750506040513d81523d5f602083013e60203d82010160405290565b156101ec57639996b31560e01b5f9081526001600160a01b0391909116600452602490fd5b3d156101fd576040513d5f823e3d90fd5b63d6bda27560e01b5f5260045ffd5b503d1515806101a75750813b15156101a756fe60806040525f8073ffffffffffffffffffffffffffffffffffffffff7f360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc5416368280378136915af43d5f803e156053573d5ff35b3d5ffdfea164736f6c6343000825000a\""]
+evm = ["\"0x6080604052610284803803806100148161016e565b9283398101604082820312610156578151916001600160a01b03831690818403610156576020810151906001600160401b038211610156570182601f82011215610156578051906001600160401b03821161015a5761007c601f8301601f191660200161016e565b938285526020838301011161015657815f9260208093018387015e8401015281511561014757823b15610135577f360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc80546001600160a01b031916821790557fbc7cd75a20ee27fd9adebab32041f755214dbc6bffa90cc0225b39da2e5c2d3b5f80a280511561011e5761010e91610193565b505b604051606490816102208239f35b505034156101105763b398979f60e01b5f5260045ffd5b634c9c8ce360e01b5f5260045260245ffd5b6330a289cf60e21b5f5260045ffd5b5f80fd5b634e487b7160e01b5f52604160045260245ffd5b6040519190601f01601f191682016001600160401b0381118382101761015a57604052565b905f8091602081519101845af4808061020c575b156101c75750506040513d81523d5f602083013e60203d82010160405290565b156101ec57639996b31560e01b5f9081526001600160a01b0391909116600452602490fd5b3d156101fd576040513d5f823e3d90fd5b63d6bda27560e01b5f5260045ffd5b503d1515806101a75750813b15156101a756fe60806040525f8073ffffffffffffffffffffffffffffffffffffffff7f360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc5416368280378136915af43d5f803e156053573d5ff35b3d5ffdfea164736f6c6343000826000a\""]
 solana = []
 reason = "anoma/dos-pm#158: the EVM record's ERC1967 proxy deployment (address, creation code, initial implementation, initializer data); a Solana program upgrades in place at its program id and has no proxy."
 
@@ -1501,7 +1509,7 @@ reason = "anoma/dos-pm#158: the EVM record's ERC1967 proxy deployment (address, 
 id = "forwarder-client-file-deployments-json--staging-0-proxy-initialimplementation"
 pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
 key = "file deployments.json#/staging/0/proxy/initialImplementation"
-evm = ["\"0x5E61faccd5aBd6ED40CDFeB53Ba83bAC95150B44\""]
+evm = ["\"0x62070D3Bf613DF3B2BeC63848Bd3A1aa9e22A929\""]
 solana = []
 reason = "anoma/dos-pm#158: the EVM record's ERC1967 proxy deployment (address, creation code, initial implementation, initializer data); a Solana program upgrades in place at its program id and has no proxy."
 
@@ -1509,7 +1517,7 @@ reason = "anoma/dos-pm#158: the EVM record's ERC1967 proxy deployment (address, 
 id = "forwarder-client-file-deployments-json--staging-0-proxy-initializerdata"
 pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
 key = "file deployments.json#/staging/0/proxy/initializerData"
-evm = ["\"0xd26b3e6e0000000000000000000000009efa7b20ecc0fda991194da92e190e9ab36062d551c2403f4e1de40c3c3ecef69385f8772ee99b4a610e88f1ad2b1b85b481a7f200000000000000000000000061462be56782568376f9cb069382efa72764a407\""]
+evm = ["\"0xd26b3e6e000000000000000000000000e10157aae82bee77c04e8dfca72ef1048361b77c9c7f5feab5f4dc239b5caf180f633e4eac94b5ba6504029abee8d49541f4e02600000000000000000000000061462be56782568376f9cb069382efa72764a407\""]
 solana = []
 reason = "anoma/dos-pm#158: the EVM record's ERC1967 proxy deployment (address, creation code, initial implementation, initializer data); a Solana program upgrades in place at its program id and has no proxy."
 
@@ -1525,7 +1533,7 @@ reason = "anoma/dos-pm#158: the EVM record's second staging chain (Base Sepolia,
 id = "forwarder-client-file-deployments-json--staging-1-proxy-address"
 pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
 key = "file deployments.json#/staging/1/proxy/address"
-evm = ["\"0x4E76505D541641Ae71F504630520Cb53f07559bc\""]
+evm = ["\"0x81BE420ACb7beabC350F499b79ABc6412c90E9f9\""]
 solana = []
 reason = "anoma/dos-pm#158: the EVM record's second staging chain (Base Sepolia, 84532); Solana has one staging cluster, devnet, which the record's first staging entry names."
 
@@ -1533,7 +1541,7 @@ reason = "anoma/dos-pm#158: the EVM record's second staging chain (Base Sepolia,
 id = "forwarder-client-file-deployments-json--staging-1-proxy-creationcode"
 pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
 key = "file deployments.json#/staging/1/proxy/creationCode"
-evm = ["\"0x6080604052610284803803806100148161016e565b9283398101604082820312610156578151916001600160a01b03831690818403610156576020810151906001600160401b038211610156570182601f82011215610156578051906001600160401b03821161015a5761007c601f8301601f191660200161016e565b938285526020838301011161015657815f9260208093018387015e8401015281511561014757823b15610135577f360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc80546001600160a01b031916821790557fbc7cd75a20ee27fd9adebab32041f755214dbc6bffa90cc0225b39da2e5c2d3b5f80a280511561011e5761010e91610193565b505b604051606490816102208239f35b505034156101105763b398979f60e01b5f5260045ffd5b634c9c8ce360e01b5f5260045260245ffd5b6330a289cf60e21b5f5260045ffd5b5f80fd5b634e487b7160e01b5f52604160045260245ffd5b6040519190601f01601f191682016001600160401b0381118382101761015a57604052565b905f8091602081519101845af4808061020c575b156101c75750506040513d81523d5f602083013e60203d82010160405290565b156101ec57639996b31560e01b5f9081526001600160a01b0391909116600452602490fd5b3d156101fd576040513d5f823e3d90fd5b63d6bda27560e01b5f5260045ffd5b503d1515806101a75750813b15156101a756fe60806040525f8073ffffffffffffffffffffffffffffffffffffffff7f360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc5416368280378136915af43d5f803e156053573d5ff35b3d5ffdfea164736f6c6343000825000a\""]
+evm = ["\"0x6080604052610284803803806100148161016e565b9283398101604082820312610156578151916001600160a01b03831690818403610156576020810151906001600160401b038211610156570182601f82011215610156578051906001600160401b03821161015a5761007c601f8301601f191660200161016e565b938285526020838301011161015657815f9260208093018387015e8401015281511561014757823b15610135577f360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc80546001600160a01b031916821790557fbc7cd75a20ee27fd9adebab32041f755214dbc6bffa90cc0225b39da2e5c2d3b5f80a280511561011e5761010e91610193565b505b604051606490816102208239f35b505034156101105763b398979f60e01b5f5260045ffd5b634c9c8ce360e01b5f5260045260245ffd5b6330a289cf60e21b5f5260045ffd5b5f80fd5b634e487b7160e01b5f52604160045260245ffd5b6040519190601f01601f191682016001600160401b0381118382101761015a57604052565b905f8091602081519101845af4808061020c575b156101c75750506040513d81523d5f602083013e60203d82010160405290565b156101ec57639996b31560e01b5f9081526001600160a01b0391909116600452602490fd5b3d156101fd576040513d5f823e3d90fd5b63d6bda27560e01b5f5260045ffd5b503d1515806101a75750813b15156101a756fe60806040525f8073ffffffffffffffffffffffffffffffffffffffff7f360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc5416368280378136915af43d5f803e156053573d5ff35b3d5ffdfea164736f6c6343000826000a\""]
 solana = []
 reason = "anoma/dos-pm#158: the EVM record's second staging chain (Base Sepolia, 84532); Solana has one staging cluster, devnet, which the record's first staging entry names."
 
@@ -1541,7 +1549,7 @@ reason = "anoma/dos-pm#158: the EVM record's second staging chain (Base Sepolia,
 id = "forwarder-client-file-deployments-json--staging-1-proxy-initialimplementation"
 pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
 key = "file deployments.json#/staging/1/proxy/initialImplementation"
-evm = ["\"0x5E61faccd5aBd6ED40CDFeB53Ba83bAC95150B44\""]
+evm = ["\"0x62070D3Bf613DF3B2BeC63848Bd3A1aa9e22A929\""]
 solana = []
 reason = "anoma/dos-pm#158: the EVM record's second staging chain (Base Sepolia, 84532); Solana has one staging cluster, devnet, which the record's first staging entry names."
 
@@ -1549,7 +1557,7 @@ reason = "anoma/dos-pm#158: the EVM record's second staging chain (Base Sepolia,
 id = "forwarder-client-file-deployments-json--staging-1-proxy-initializerdata"
 pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
 key = "file deployments.json#/staging/1/proxy/initializerData"
-evm = ["\"0xd26b3e6e0000000000000000000000005d9a268621f1fb36fb64d7b32398831afa44a75151c2403f4e1de40c3c3ecef69385f8772ee99b4a610e88f1ad2b1b85b481a7f200000000000000000000000061462be56782568376f9cb069382efa72764a407\""]
+evm = ["\"0xd26b3e6e0000000000000000000000002fceda431c29df735efcba12cf55e36f47c7f6bd9c7f5feab5f4dc239b5caf180f633e4eac94b5ba6504029abee8d49541f4e02600000000000000000000000061462be56782568376f9cb069382efa72764a407\""]
 solana = []
 reason = "anoma/dos-pm#158: the EVM record's second staging chain (Base Sepolia, 84532); Solana has one staging cluster, devnet, which the record's first staging entry names."
 
