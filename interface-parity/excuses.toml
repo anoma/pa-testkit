@@ -138,6 +138,190 @@ solana = ["()"]
 reason = "anoma/dos-pm#157: moves the whole balance of an escrow token account, the wrapped tokens of every user who wrapped into it, to a token account of the mint that the owner picks, then returns the account's rent deposit to the owner. The V2 EVM forwarder has no such function, but the owner gains no power from it: on both chains the owner can replace the code (`upgrade`, `upgradeToAndCall`) with code that moves the tokens. Only the owner can send it, and only while the adapter is paused."
 
 [[excuse]]
+id = "adapter-read-latest-commitment-tree-root"
+pair = "pa-evm/crates/bindings/src/generated/protocol_adapter.rs ↔ solana-protocol-adapter/solana-pa-prototype/idl/protocol_adapter.json"
+key = "fn latest_commitment_tree_root"
+evm = ["() -> bytes32"]
+solana = []
+reason = "anoma/dos-pm#142: the view function `latestCommitmentTreeRoot` of the EVM adapter. The Solana program has no instruction for it; its client answers it with `ProtocolAdapterInstance::latest_commitment_tree_root` (anoma-pa-solana-client, `contract`), read from the adapter's state account."
+
+[[excuse]]
+id = "adapter-read-is-commitment-tree-root-historical"
+pair = "pa-evm/crates/bindings/src/generated/protocol_adapter.rs ↔ solana-protocol-adapter/solana-pa-prototype/idl/protocol_adapter.json"
+key = "fn is_commitment_tree_root_historical"
+evm = ["(root: bytes32) -> bool"]
+solana = []
+reason = "anoma/dos-pm#142: the view function `isCommitmentTreeRootHistorical` of the EVM adapter. The Solana program has no instruction for it; its client answers it with `ProtocolAdapterInstance::is_commitment_tree_root_historical` (anoma-pa-solana-client, `contract`), read from the root's marker account (the tree's initial root, the padding leaf, has none and is historical)."
+
+[[excuse]]
+id = "adapter-read-commitment-count"
+pair = "pa-evm/crates/bindings/src/generated/protocol_adapter.rs ↔ solana-protocol-adapter/solana-pa-prototype/idl/protocol_adapter.json"
+key = "fn commitment_count"
+evm = ["() -> u256"]
+solana = []
+reason = "anoma/dos-pm#142: the view function `commitmentCount` of the EVM adapter. The Solana program has no instruction for it; its client answers it with `ProtocolAdapterInstance::commitment_count` (anoma-pa-solana-client, `contract`), read from the adapter's state account."
+
+[[excuse]]
+id = "adapter-read-commitment-tree-depth"
+pair = "pa-evm/crates/bindings/src/generated/protocol_adapter.rs ↔ solana-protocol-adapter/solana-pa-prototype/idl/protocol_adapter.json"
+key = "fn commitment_tree_depth"
+evm = ["() -> u8"]
+solana = []
+reason = "anoma/dos-pm#142: the view function `commitmentTreeDepth` of the EVM adapter. The Solana program has no instruction for it; its client answers it with `ProtocolAdapterInstance::commitment_tree_depth` (anoma-pa-solana-client, `contract`), read from the adapter's state account."
+
+[[excuse]]
+id = "adapter-read-commitment-tree-capacity"
+pair = "pa-evm/crates/bindings/src/generated/protocol_adapter.rs ↔ solana-protocol-adapter/solana-pa-prototype/idl/protocol_adapter.json"
+key = "fn commitment_tree_capacity"
+evm = ["() -> u256"]
+solana = []
+reason = "anoma/dos-pm#142: the view function `commitmentTreeCapacity` of the EVM adapter. The Solana program has no instruction for it; its client answers it with `ProtocolAdapterInstance::commitment_tree_capacity` (anoma-pa-solana-client, `contract`), read from the adapter's state account."
+
+[[excuse]]
+id = "adapter-read-commitment-tree-left-siblings"
+pair = "pa-evm/crates/bindings/src/generated/protocol_adapter.rs ↔ solana-protocol-adapter/solana-pa-prototype/idl/protocol_adapter.json"
+key = "fn commitment_tree_left_siblings"
+evm = ["() -> vec<bytes32>"]
+solana = []
+reason = "anoma/dos-pm#142: the view function `commitmentTreeLeftSiblings` of the EVM adapter. The Solana program has no instruction for it; its client answers it with `ProtocolAdapterInstance::commitment_tree_left_siblings` (anoma-pa-solana-client, `contract`), read from the adapter's state account."
+
+[[excuse]]
+id = "adapter-read-commitment-tree-empty-subtree-roots"
+pair = "pa-evm/crates/bindings/src/generated/protocol_adapter.rs ↔ solana-protocol-adapter/solana-pa-prototype/idl/protocol_adapter.json"
+key = "fn commitment_tree_empty_subtree_roots"
+evm = ["() -> vec<bytes32>"]
+solana = []
+reason = "anoma/dos-pm#142: the view function `commitmentTreeEmptySubtreeRoots` of the EVM adapter. The Solana program has no instruction for it; its client answers it with `ProtocolAdapterInstance::commitment_tree_empty_subtree_roots` (anoma-pa-solana-client, `contract`), read from the adapter's state account."
+
+[[excuse]]
+id = "adapter-read-is-nullifier-contained"
+pair = "pa-evm/crates/bindings/src/generated/protocol_adapter.rs ↔ solana-protocol-adapter/solana-pa-prototype/idl/protocol_adapter.json"
+key = "fn is_nullifier_contained"
+evm = ["(nullifier: bytes32) -> bool"]
+solana = []
+reason = "anoma/dos-pm#142: the view function `isNullifierContained` of the EVM adapter. The Solana program has no instruction for it; its client answers it with `ProtocolAdapterInstance::is_nullifier_contained` (anoma-pa-solana-client, `contract`), read from the nullifier's marker account."
+
+[[excuse]]
+id = "adapter-read-is-logic-ref-denied"
+pair = "pa-evm/crates/bindings/src/generated/protocol_adapter.rs ↔ solana-protocol-adapter/solana-pa-prototype/idl/protocol_adapter.json"
+key = "fn is_logic_ref_denied"
+evm = ["(logic_ref: bytes32, consumed: bool) -> bool"]
+solana = []
+reason = "anoma/dos-pm#142: the view function `isLogicRefDenied` of the EVM adapter. The Solana program has no instruction for it; its client answers it with `ProtocolAdapterInstance::is_logic_ref_denied` (anoma-pa-solana-client, `contract`), read from the denylists in the adapter's state account."
+
+[[excuse]]
+id = "adapter-read-get-kind-tree-root"
+pair = "pa-evm/crates/bindings/src/generated/protocol_adapter.rs ↔ solana-protocol-adapter/solana-pa-prototype/idl/protocol_adapter.json"
+key = "fn get_kind_tree_root"
+evm = ["() -> bytes32"]
+solana = []
+reason = "anoma/dos-pm#142: the view function `getKindTreeRoot` of the EVM adapter. The Solana program has no instruction for it; its client answers it with `ProtocolAdapterInstance::get_kind_tree_root` (anoma-pa-solana-client, `contract`), read from the adapter's state account."
+
+[[excuse]]
+id = "adapter-read-empty-kind-tree-root"
+pair = "pa-evm/crates/bindings/src/generated/protocol_adapter.rs ↔ solana-protocol-adapter/solana-pa-prototype/idl/protocol_adapter.json"
+key = "fn empty_kind_tree_root"
+evm = ["() -> bytes32"]
+solana = []
+reason = "anoma/dos-pm#142: the view function `EMPTY_KIND_TREE_ROOT` of the EVM adapter. The Solana program has no instruction for it; its client answers it with `ProtocolAdapterInstance::empty_kind_tree_root` (anoma-pa-solana-client, `contract`), read from the IDL constant `EMPTY_KIND_TREE_ROOT`."
+
+[[excuse]]
+id = "adapter-read-owner"
+pair = "pa-evm/crates/bindings/src/generated/protocol_adapter.rs ↔ solana-protocol-adapter/solana-pa-prototype/idl/protocol_adapter.json"
+key = "fn owner"
+evm = ["() -> address"]
+solana = []
+reason = "anoma/dos-pm#142: the view function `owner` of the EVM adapter. The Solana program has no instruction for it; its client answers it with `ProtocolAdapterInstance::owner` (anoma-pa-solana-client, `contract`), read from the adapter's state account."
+
+[[excuse]]
+id = "adapter-read-paused"
+pair = "pa-evm/crates/bindings/src/generated/protocol_adapter.rs ↔ solana-protocol-adapter/solana-pa-prototype/idl/protocol_adapter.json"
+key = "fn paused"
+evm = ["() -> bool"]
+solana = []
+reason = "anoma/dos-pm#142: the view function `paused` of the EVM adapter. The Solana program has no instruction for it; its client answers it with `ProtocolAdapterInstance::paused` (anoma-pa-solana-client, `contract`), read from the adapter's state account."
+
+[[excuse]]
+id = "adapter-read-risc-zero-verifier-router"
+pair = "pa-evm/crates/bindings/src/generated/protocol_adapter.rs ↔ solana-protocol-adapter/solana-pa-prototype/idl/protocol_adapter.json"
+key = "fn risc_zero_verifier_router"
+evm = ["() -> address"]
+solana = []
+reason = "anoma/dos-pm#142: the view function `RISC_ZERO_VERIFIER_ROUTER` of the EVM adapter. The Solana program has no instruction for it; its client answers it with `ProtocolAdapterInstance::risc_zero_verifier_router` (anoma-pa-solana-client, `contract`), read from the adapter's state account."
+
+[[excuse]]
+id = "adapter-read-risc-zero-verifier-selector"
+pair = "pa-evm/crates/bindings/src/generated/protocol_adapter.rs ↔ solana-protocol-adapter/solana-pa-prototype/idl/protocol_adapter.json"
+key = "fn risc_zero_verifier_selector"
+evm = ["() -> bytes4"]
+solana = []
+reason = "anoma/dos-pm#142: the view function `RISC_ZERO_VERIFIER_SELECTOR` of the EVM adapter. The Solana program has no instruction for it; its client answers it with `ProtocolAdapterInstance::risc_zero_verifier_selector` (anoma-pa-solana-client, `contract`), read from the adapter's state account."
+
+[[excuse]]
+id = "forwarder-read-get-logic-ref"
+pair = "anomapay-erc20-forwarder/crates/bindings/src/generated/erc20_forwarder.rs ↔ anomapay-spl-token-forwarder/crates/client/idls/spl_token_forwarder.json"
+key = "fn get_logic_ref"
+evm = ["() -> bytes32"]
+solana = []
+reason = "anoma/dos-pm#143: the view function `getLogicRef` of the EVM forwarder. The Solana program has no instruction for it; its client answers it with `SplTokenForwarderInstance::get_logic_ref` (anomapay-spl-token-forwarder-client, `contract`), read from the forwarder's config account."
+
+[[excuse]]
+id = "forwarder-read-get-protocol-adapter"
+pair = "anomapay-erc20-forwarder/crates/bindings/src/generated/erc20_forwarder.rs ↔ anomapay-spl-token-forwarder/crates/client/idls/spl_token_forwarder.json"
+key = "fn get_protocol_adapter"
+evm = ["() -> address"]
+solana = []
+reason = "anoma/dos-pm#143: the view function `getProtocolAdapter` of the EVM forwarder. The Solana program has no instruction for it; its client answers it with `SplTokenForwarderInstance::get_protocol_adapter` (anomapay-spl-token-forwarder-client, `contract`), read from the forwarder's config account."
+
+[[excuse]]
+id = "forwarder-read-owner"
+pair = "anomapay-erc20-forwarder/crates/bindings/src/generated/erc20_forwarder.rs ↔ anomapay-spl-token-forwarder/crates/client/idls/spl_token_forwarder.json"
+key = "fn owner"
+evm = ["() -> address"]
+solana = []
+reason = "anoma/dos-pm#143: the view function `owner` of the EVM forwarder. The Solana program has no instruction for it; its client answers it with `SplTokenForwarderInstance::owner` (anomapay-spl-token-forwarder-client, `contract`), read from the forwarder's config account."
+
+[[excuse]]
+id = "emergency-forwarder-read-get-logic-ref"
+pair = "anomapay-erc20-forwarder/crates/bindings/src/generated/emergency_migrating_erc20_forwarder.rs ↔ anomapay-spl-token-forwarder/crates/client/idls/emergency_migrating_spl_token_forwarder.json"
+key = "fn get_logic_ref"
+evm = ["() -> bytes32"]
+solana = []
+reason = "anoma/dos-pm#143: the view function `getLogicRef` of the EVM emergency-migrating forwarder. The Solana program has no instruction for it; its client answers it with `EmergencyMigratingSplTokenForwarderInstance::get_logic_ref` (anomapay-spl-token-forwarder-client, `contract`), read from the forwarder's config account."
+
+[[excuse]]
+id = "emergency-forwarder-read-get-protocol-adapter"
+pair = "anomapay-erc20-forwarder/crates/bindings/src/generated/emergency_migrating_erc20_forwarder.rs ↔ anomapay-spl-token-forwarder/crates/client/idls/emergency_migrating_spl_token_forwarder.json"
+key = "fn get_protocol_adapter"
+evm = ["() -> address"]
+solana = []
+reason = "anoma/dos-pm#143: the view function `getProtocolAdapter` of the EVM emergency-migrating forwarder. The Solana program has no instruction for it; its client answers it with `EmergencyMigratingSplTokenForwarderInstance::get_protocol_adapter` (anomapay-spl-token-forwarder-client, `contract`), read from the forwarder's config account."
+
+[[excuse]]
+id = "emergency-forwarder-read-owner"
+pair = "anomapay-erc20-forwarder/crates/bindings/src/generated/emergency_migrating_erc20_forwarder.rs ↔ anomapay-spl-token-forwarder/crates/client/idls/emergency_migrating_spl_token_forwarder.json"
+key = "fn owner"
+evm = ["() -> address"]
+solana = []
+reason = "anoma/dos-pm#143: the view function `owner` of the EVM emergency-migrating forwarder. The Solana program has no instruction for it; its client answers it with `EmergencyMigratingSplTokenForwarderInstance::owner` (anomapay-spl-token-forwarder-client, `contract`), read from the forwarder's config account."
+
+[[excuse]]
+id = "emergency-forwarder-read-is-logic-ref-vulnerable"
+pair = "anomapay-erc20-forwarder/crates/bindings/src/generated/emergency_migrating_erc20_forwarder.rs ↔ anomapay-spl-token-forwarder/crates/client/idls/emergency_migrating_spl_token_forwarder.json"
+key = "fn is_logic_ref_vulnerable"
+evm = ["(logic_ref: bytes32) -> bool"]
+solana = []
+reason = "anoma/dos-pm#143: the view function `isLogicRefVulnerable` of the EVM emergency-migrating forwarder. The Solana program has no instruction for it; its client answers it with `EmergencyMigratingSplTokenForwarderInstance::is_logic_ref_vulnerable` (anomapay-spl-token-forwarder-client, `contract`), read from the build's vulnerable logic refs account."
+
+[[excuse]]
+id = "emergency-forwarder-read-is-nullifier-migrated"
+pair = "anomapay-erc20-forwarder/crates/bindings/src/generated/emergency_migrating_erc20_forwarder.rs ↔ anomapay-spl-token-forwarder/crates/client/idls/emergency_migrating_spl_token_forwarder.json"
+key = "fn is_nullifier_migrated"
+evm = ["(nullifier: bytes32) -> bool"]
+solana = []
+reason = "anoma/dos-pm#143: the view function `isNullifierMigrated` of the EVM emergency-migrating forwarder. The Solana program has no instruction for it; its client answers it with `EmergencyMigratingSplTokenForwarderInstance::is_nullifier_migrated` (anomapay-spl-token-forwarder-client, `contract`), read from the nullifier's migration record."
+
+[[excuse]]
 id = "adapter-client-commitmenttreestate-struct"
 pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
 key = "rust crate::CommitmentTreeState struct"
@@ -682,14 +866,6 @@ solana = ["pub fn crate::settlement_calls(forwarder: &solana_address::Address, p
 reason = "anoma/dos-pm#158: settlement planning, which the client writes by hand: the forwarder's `settlement_calls` gives the accounts and preceding instructions of a settlement's calls to it, so the settlement fits Solana's transaction limits. No IDL describes them."
 
 [[excuse]]
-id = "forwarder-client-sha256-fn"
-pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
-key = "rust crate::sha256 fn"
-evm = []
-solana = ["pub fn crate::sha256(bytes: &[u8]) -> [u8; 32]"]
-reason = "anoma/dos-pm#158: a wire format no IDL describes, which the client writes by hand: the 120-byte wrap authorization message a user signs with ed25519 (sha256 of the layout, base64-encoded), where the EVM forwarder uses a Permit2 / EIP-712 signature."
-
-[[excuse]]
 id = "forwarder-client-submitter-mod"
 pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
 key = "rust crate::submitter mod"
@@ -794,38 +970,6 @@ solana = ["pub struct crate::generated::U256LeBytes(pub [u8; 32])"]
 reason = "anoma/dos-pm#158: the shim for the IDL's u256, which declare_program! cannot generate until otter-sec/anchor#5224 ships."
 
 [[excuse]]
-id = "adapter-client-deployments-mod"
-pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
-key = "rust crate::deployments mod"
-evm = []
-solana = ["pub mod crate::deployments"]
-reason = "anoma/dos-pm#158: the deployment record's reader, the Solana counterpart of the EVM bindings' `addresses` module: a program id and first-deployment slot per cluster, read from deployments.json."
-
-[[excuse]]
-id = "adapter-client-instance-mod"
-pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
-key = "rust crate::instance mod"
-evm = []
-solana = ["pub mod crate::instance"]
-reason = "anoma/dos-pm#158: the program instance, the Solana counterpart of the EVM bindings' `contract` module: the program at its recorded address, with the reads of its EVM interface and its instruction builders."
-
-[[excuse]]
-id = "adapter-client-addresses-mod"
-pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
-key = "rust crate::addresses mod"
-evm = ["pub mod crate::addresses"]
-solana = []
-reason = "anoma/dos-pm#158: the EVM deployment record's reader; the Solana client's counterpart is its `deployments` module, which reads program ids and slots instead of proxy addresses."
-
-[[excuse]]
-id = "adapter-client-contract-mod"
-pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
-key = "rust crate::contract mod"
-evm = ["pub mod crate::contract"]
-solana = []
-reason = "anoma/dos-pm#158: the EVM contract instance; the Solana client's counterpart is its `instance` module, which answers the same reads from the program's accounts."
-
-[[excuse]]
 id = "adapter-client-mock-selector-const"
 pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
 key = "rust crate::MOCK_SELECTOR const"
@@ -841,34 +985,19 @@ evm = []
 solana = ["pub mod crate::constants"]
 reason = "anoma/dos-pm#158: the adapter client's hand-written constants: settlement planning's compute, heap, loaded-data and upload limits, the Merkle helpers' tree depth, and `settlement_input`'s mock selector. No IDL describes them."
 
+
 [[excuse]]
 id = "adapter-client-file-idls-readme-md"
 pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
 key = "file idls/README.md"
 evm = []
-solana = ["sha256 ba71bf8e731c280939ed8ae42c7cbdf4bbf37324f3372c20c75b939f3c203f97"]
-reason = "anoma/dos-pm#158: an IDL the client vendors, from which declare_program! generates its code; the Solana counterpart of the ABI that forge bind's generated module embeds."
-
-[[excuse]]
-id = "adapter-client-file-idls-block-time-forwarder-json"
-pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
-key = "file idls/block_time_forwarder.json"
-evm = []
-solana = ["present"]
-reason = "anoma/dos-pm#158: an IDL the client vendors, from which declare_program! generates its code; the Solana counterpart of the ABI that forge bind's generated module embeds."
+solana = ["sha256 40f9437b8afa217b59a8f902e29361dd5df9d624ac5b4cbded6209b2d5eb1089"]
+reason = "anoma/dos-pm#158: a README explaining the two IDL files beside it. The Solana client is generated from IDL files it ships. The EVM bindings are generated from ABIs that end up inside the generated code, so they ship no such files and no README for them."
 
 [[excuse]]
 id = "adapter-client-file-idls-protocol-adapter-json"
 pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
 key = "file idls/protocol_adapter.json"
-evm = []
-solana = ["present"]
-reason = "anoma/dos-pm#158: an IDL the client vendors, from which declare_program! generates its code; the Solana counterpart of the ABI that forge bind's generated module embeds."
-
-[[excuse]]
-id = "adapter-client-file-idls-test-forwarder-json"
-pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
-key = "file idls/test_forwarder.json"
 evm = []
 solana = ["present"]
 reason = "anoma/dos-pm#158: an IDL the client vendors, from which declare_program! generates its code; the Solana counterpart of the ABI that forge bind's generated module embeds."
@@ -1104,38 +1233,6 @@ key = "rust crate::generated::emergency_migrating_spl_token_forwarder mod"
 evm = []
 solana = ["pub mod crate::generated::emergency_migrating_spl_token_forwarder"]
 reason = "anoma/dos-pm#158: the code declare_program! generates from the program's IDL, the Solana counterpart of forge bind's generated module, laid out as declare_program! lays it out."
-
-[[excuse]]
-id = "forwarder-client-deployments-mod"
-pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
-key = "rust crate::deployments mod"
-evm = []
-solana = ["pub mod crate::deployments"]
-reason = "anoma/dos-pm#158: the deployment record's reader, the Solana counterpart of the EVM bindings' `addresses` module: a program id and first-deployment slot per cluster, read from deployments.json."
-
-[[excuse]]
-id = "forwarder-client-instance-mod"
-pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
-key = "rust crate::instance mod"
-evm = []
-solana = ["pub mod crate::instance"]
-reason = "anoma/dos-pm#158: the program instance, the Solana counterpart of the EVM bindings' `contract` module: the program at its recorded address, with the reads of its EVM interface and its instruction builders."
-
-[[excuse]]
-id = "forwarder-client-addresses-mod"
-pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
-key = "rust crate::addresses mod"
-evm = ["pub mod crate::addresses"]
-solana = []
-reason = "anoma/dos-pm#158: the EVM deployment record's reader; the Solana client's counterpart is its `deployments` module, which reads program ids and slots instead of proxy addresses."
-
-[[excuse]]
-id = "forwarder-client-contract-mod"
-pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
-key = "rust crate::contract mod"
-evm = ["pub mod crate::contract"]
-solana = []
-reason = "anoma/dos-pm#158: the EVM contract instance; the Solana client's counterpart is its `instance` module, which answers the same reads from the program's accounts."
 
 [[excuse]]
 id = "forwarder-client-file-idls-spl-token-forwarder-json"
@@ -1473,12 +1570,13 @@ evm = ["11155111"]
 solana = ["\"solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1\""]
 reason = "anoma/dos-pm#158: the record names a chain by its chain id in each chain's own scheme: EIP-155's number on EVM, CAIP-2's `solana:` and the cluster's genesis hash prefix on Solana."
 
+
 [[excuse]]
 id = "forwarder-client-file-deployments-json--staging-0-deploymentslot"
 pair = "anomapay-erc20-forwarder/cargo:anomapay-erc20-forwarder-bindings ↔ anomapay-spl-token-forwarder/cargo:anomapay-spl-token-forwarder-client"
 key = "file deployments.json#/staging/0/deploymentSlot"
 evm = []
-solana = ["null"]
+solana = ["517245444"]
 reason = "anoma/dos-pm#158: the slot of the program's first deployment, from which an indexer reads the program's history; the EVM record has no such field."
 
 [[excuse]]
@@ -1729,12 +1827,13 @@ evm = ["11155111"]
 solana = ["\"solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1\""]
 reason = "anoma/dos-pm#158: the record names a chain by its chain id in each chain's own scheme: EIP-155's number on EVM, CAIP-2's `solana:` and the cluster's genesis hash prefix on Solana."
 
+
 [[excuse]]
 id = "adapter-client-file-deployments-json--staging-0-deploymentslot"
 pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anoma-pa-solana-client"
 key = "file deployments.json#/staging/0/deploymentSlot"
 evm = []
-solana = ["null"]
+solana = ["516619497"]
 reason = "anoma/dos-pm#158: the slot of the program's first deployment, from which an indexer reads the program's history; the EVM record has no such field."
 
 [[excuse]]
