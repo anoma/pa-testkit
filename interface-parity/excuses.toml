@@ -992,7 +992,7 @@ pair = "pa-evm/cargo:anoma-pa-evm-bindings ↔ anoma-pa-solana-client/cargo:anom
 key = "file idls/README.md"
 evm = []
 solana = ["sha256 40f9437b8afa217b59a8f902e29361dd5df9d624ac5b4cbded6209b2d5eb1089"]
-reason = "anoma/dos-pm#158: the readme of the client's `idls/` directory, which describes the IDLs the client vendors (`protocol_adapter.json` and `verifier_router.json`): that they are byte for byte the files committed at the adapter tag the client records, checked by the `idl_at_tag` test; that declare_program! generates the crate's code from them; and which other consumers read them. A forge bind module embeds its ABI and ships no such file."
+reason = "anoma/dos-pm#158: a README explaining the two IDL files beside it. The Solana client is generated from IDL files it ships. The EVM bindings are generated from ABIs that end up inside the generated code, so they ship no such files and no README for them."
 
 [[excuse]]
 id = "adapter-client-file-idls-protocol-adapter-json"
