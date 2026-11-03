@@ -39,8 +39,10 @@ impl Overrides {
     }
 }
 
-/// A consumed trivial resource. `seed` sets its nullifier key, its nonce and its random seed, so
-/// two consumed resources of one transaction need different seeds.
+/// A consumed trivial resource. `seed` sets its nullifier key, its random seed and the last byte
+/// of its nonce, so two consumed resources of one transaction need different seeds. The other
+/// bytes of the nonce name the testkit, so a forked chain holds its nullifier only if a testkit
+/// user spent the resource there.
 pub fn consumed(seed: u8, overrides: Overrides) -> ActionResource {
     let nf_key = nullifier_key(seed);
     let resource = Resource {
@@ -49,7 +51,7 @@ pub fn consumed(seed: u8, overrides: Overrides) -> ActionResource {
         quantity: overrides.quantity.unwrap_or(0),
         value_ref: Digest::default(),
         is_ephemeral: overrides.is_ephemeral.unwrap_or(true),
-        nonce: overrides.nonce.unwrap_or([seed; 32]),
+        nonce: overrides.nonce.unwrap_or_else(|| default_nonce(seed)),
         nk_commitment: nf_key.commit(),
         rand_seed: [seed.wrapping_add(11); 32],
     };
@@ -79,6 +81,13 @@ pub fn created() -> ActionResource {
 
 fn nullifier_key(seed: u8) -> NullifierKey {
     NullifierKey::from_bytes([seed; 32])
+}
+
+/// The default nonce of a consumed trivial resource: bytes that name the testkit, then `seed`.
+fn default_nonce(seed: u8) -> [u8; 32] {
+    let mut nonce = *b"anoma pa-testkit trivial nonce 0";
+    nonce[31] = seed;
+    nonce
 }
 
 fn logic(
