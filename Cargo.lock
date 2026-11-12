@@ -242,6 +242,7 @@ dependencies = [
  "regex",
  "risc0-zkvm",
  "serde",
+ "serde_json",
  "sha2 0.11.0",
  "sha3 0.10.9",
  "tokio",
