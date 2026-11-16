@@ -12,11 +12,14 @@ use anyhow::Context;
 use futures::future::try_join_all;
 use heliax_ap_orchestrator_sdk::QueueClient;
 use heliax_ap_orchestrator_sdk::{
-    AggregateProofResult, BaseProofResult, GpuAggregationProofPayload, GpuComplianceProofPayload,
-    GpuLogicProofPayload, ProofPayload, ProofType,
+    AggregateProofResult, BaseProofResult, GpuComplianceProofPayload, GpuLogicProofPayload,
+    ProofPayload, ProofType,
 };
 
+mod aggregation_job;
 mod queue;
+
+use aggregation_job::GpuAggregationProofPayload;
 
 use super::assemble::{self, BaseProof, BaseProofKey, BaseProofSlot};
 use super::constrain;
@@ -139,6 +142,7 @@ async fn prove_via_queue(
         transaction: serialized,
         batch_aggregation_pk: Some(batch_aggregation_pk.to_vec()),
         compliance_vk: Some(COMPLIANCE_VK.as_bytes().to_vec()),
+        journal_encoding: encoding.into(),
     };
     let agg_job_id = queue
         .submit(agg_payload)
