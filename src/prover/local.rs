@@ -14,7 +14,6 @@ use anoma_rm_risc0::transaction::{self, Aggregation, Delta, Transaction as ArmTx
 use anyhow::Context;
 use risc0_zkvm::sha::Digestible;
 use risc0_zkvm::{Digest, Groth16Receipt, InnerReceipt, MaybePruned, ReceiptClaim};
-use sha2::{Digest as _, Sha256};
 
 use super::JOURNAL_ENCODING;
 use super::{balance, constrain};
@@ -65,12 +64,6 @@ fn encode_seal(verifying_key: Digest, journal: Digest) -> Vec<u8> {
         Digest::new([u32::MAX; 8]),
     )))
     .unwrap()
-}
-
-fn journal_digest(journal: &[u8]) -> Digest {
-    let raw: [u8; 32] = Sha256::digest(journal).into();
-
-    raw.into()
 }
 
 /// Constrains every action, checks that the transaction balances, and builds
@@ -165,7 +158,7 @@ fn constrain_txn(action_witnesses: &[&ActionWitnesses]) -> anyhow::Result<Transa
         }
     };
 
-    let proof = encode_seal(verifying_key, journal_digest(&journal));
+    let proof = encode_seal(verifying_key, journal.digest());
 
     let arm_txn = transaction::generate_delta_proof(ArmTxn {
         actions: None,
