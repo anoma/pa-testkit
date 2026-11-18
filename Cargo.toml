@@ -6,6 +6,7 @@ authors = ["Heliax <hello@heliax.dev>"]
 edition = "2024"
 license = "GPL-3.0"
 readme = "README.md"
+repository = "https://github.com/anoma/pa-testkit"
 
 # The fixtures and local prover are the testkit's core, so they are on by
 # default — this also lets `cargo test` run the `tests/trivial_action.rs` smoke
