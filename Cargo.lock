@@ -196,7 +196,7 @@ dependencies = [
 
 [[package]]
 name = "anoma-pa-testkit"
-version = "1.0.0-rc.9"
+version = "1.0.0"
 dependencies = [
  "anoma-rm-risc0",
  "anoma-rm-risc0-gadgets",
@@ -215,9 +215,9 @@ dependencies = [
 
 [[package]]
 name = "anoma-rm-core"
-version = "2.0.0-rc.9"
+version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b0da4afe7a08b0a2da67ec448bd914f92af84120569e9059e25997be727dc5bc"
+checksum = "ac55c1b20e55b1163c29f21594f480942762150642db5108d2f0b7537683cbf5"
 dependencies = [
  "bincode",
  "bytemuck",
@@ -229,9 +229,9 @@ dependencies = [
 
 [[package]]
 name = "anoma-rm-risc0"
-version = "2.0.0-rc.9"
+version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ab34289567b788cb6dc29fab329e46deb0f7291a543cb316df3539ee03620706"
+checksum = "2d2b30ad12c15dcb29ad1b74d0f7944e59b3a5e856cb4711f78f3ef0accd9f29"
 dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
@@ -252,9 +252,9 @@ dependencies = [
 
 [[package]]
 name = "anoma-rm-risc0-gadgets"
-version = "2.0.0-rc.9"
+version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1f8b4c422b8fbf99721b6aa4b95217803c263749fd3aa26bdcd4761a8abd1c0d"
+checksum = "3886bcc597fc7ab457f9adb824577c89a41170821071781208bc525141440f1e"
 dependencies = [
  "aes-gcm",
  "alloy-primitives",
